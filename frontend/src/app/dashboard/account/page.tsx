@@ -32,11 +32,10 @@ import { api } from '@/lib/api-client';
 import { ActiveAlertsSection } from '@/components/alerts/active-alerts-section';
 import { AlertRulesSection } from '@/components/alerts/alert-rules-section';
 import { MembersSection } from '@/components/members/members-section';
-import { CustomersSection } from '@/components/platform/customers-section';
 import { DevicesSection } from '@/components/devices/devices-section';
 import { ValidationRulesPanel } from '@/components/datasets/validation-rules-panel';
 import { AuditLogSection } from '@/components/audit/audit-log-section';
-import { usePermission, usePlatformAdmin } from '@/components/auth/require-permission';
+import { usePermission } from '@/components/auth/require-permission';
 import { Actions } from '@/lib/permissions';
 
 // Account & Security is the consolidated settings surface. Sub-sections
@@ -66,7 +65,6 @@ const SECTION_VALUES = [
   'alert-rules',
   'validation',
   'audit-log',
-  'platform',
 ] as const;
 type SectionId = (typeof SECTION_VALUES)[number];
 
@@ -111,7 +109,6 @@ function AccountSecurityView() {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const canReadAudit = usePermission(Actions.AuditRead);
-  const isPlatformAdmin = usePlatformAdmin();
 
   // Active section from URL — keeps the page deep-linkable and lets
   // other pages (e.g. /dashboard/alerts) point at a specific tab.
@@ -331,12 +328,6 @@ function AccountSecurityView() {
             <TabsTrigger value="audit-log" className="gap-2">
               <ClipboardList className="h-4 w-4" />
               Audit log
-            </TabsTrigger>
-          )}
-          {isPlatformAdmin && (
-            <TabsTrigger value="platform" className="gap-2">
-              <ShieldAlert className="h-4 w-4" />
-              Platform
             </TabsTrigger>
           )}
         </TabsList>
@@ -853,16 +844,6 @@ function AccountSecurityView() {
               </CardHeader>
               <CardContent>
                 <AuditLogSection />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-
-        {isPlatformAdmin && (
-          <TabsContent value="platform" className="space-y-4">
-            <Card className="border-border/60">
-              <CardContent className="pt-6">
-                <CustomersSection />
               </CardContent>
             </Card>
           </TabsContent>

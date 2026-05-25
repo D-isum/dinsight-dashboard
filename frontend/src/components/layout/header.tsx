@@ -2,8 +2,19 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Search, Bell, Menu, User, LogOut, Settings, ChevronDown, Sparkles } from 'lucide-react';
+import {
+  Search,
+  Bell,
+  Menu,
+  User,
+  LogOut,
+  Settings,
+  ChevronDown,
+  Sparkles,
+  ShieldAlert,
+} from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
+import { usePlatformAdmin } from '@/components/auth/require-permission';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
 import {
@@ -22,6 +33,7 @@ interface HeaderProps {
 
 export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
+  const isPlatformAdmin = usePlatformAdmin();
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
@@ -213,6 +225,19 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
                   </DropdownMenuItem>
                 </Link>
               </div>
+              {isPlatformAdmin && (
+                <div className="border-t dark:border-border py-2">
+                  <Link href="/dashboard/admin">
+                    <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
+                      <ShieldAlert className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <span>Dinsight Admin</span>
+                      <span className="ml-auto text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                        staff
+                      </span>
+                    </DropdownMenuItem>
+                  </Link>
+                </div>
+              )}
               <div className="border-t dark:border-border py-2">
                 <DropdownMenuItem
                   onClick={logout}

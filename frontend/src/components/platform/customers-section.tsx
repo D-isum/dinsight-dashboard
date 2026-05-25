@@ -3,9 +3,6 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Copy, Loader2, ShieldAlert, Trash2, UserPlus } from 'lucide-react';
-import { PlatformDevicesSection } from '@/components/platform/platform-devices-section';
-import { PlatformAnalyticsSection } from '@/components/platform/platform-analytics-section';
-import { SupportSessionsSection } from '@/components/platform/support-sessions-section';
 import { api } from '@/lib/api-client';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -23,13 +20,11 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-// CustomersSection is the vendor-admin "Platform" surface for
-// onboarding + managing customer organizations. Backend gates the
-// underlying routes on middleware.RequirePlatformAdmin (admin of
-// `default` org); the FE mirror is usePlatformAdmin() — both must
-// pass for any row in this surface to do anything useful. This file
-// renders nothing protective itself; mount inside <RequirePermission>
-// or behind a usePlatformAdmin() check in the parent.
+// CustomersSection renders the customer-org onboarding form + the
+// customers list table. One of four sibling sections inside
+// /dashboard/admin (alongside analytics, devices, support sessions).
+// The parent route gates on usePlatformAdmin() — this file renders
+// nothing protective itself.
 
 interface CustomerSummary {
   id: number;
@@ -57,21 +52,16 @@ interface OnboardResponse {
 
 export function CustomersSection() {
   return (
-    <div className="space-y-8">
-      <header className="space-y-2">
-        <h2 className="text-2xl font-semibold">Customers</h2>
+    <div className="space-y-6">
+      <header className="space-y-1">
+        <h2 className="text-lg font-semibold">Customer organizations</h2>
         <p className="text-sm text-muted-foreground">
-          Every organization on this Dinsight deployment, plus tools to onboard new customers and
-          remove demo accounts. This view is restricted to platform administrators (admins of the{' '}
-          <code>default</code> organization).
+          Onboard a new customer and view the current customers on this Dinsight deployment.
         </p>
       </header>
 
-      <PlatformAnalyticsSection />
       <OnboardCustomerForm />
       <CustomersTable />
-      <PlatformDevicesSection />
-      <SupportSessionsSection />
     </div>
   );
 }
