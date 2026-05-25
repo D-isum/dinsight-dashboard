@@ -47,21 +47,33 @@ export function PlatformAnalyticsSection() {
     refetchInterval: 60_000,
   });
 
-  const totals = aggregate(query.data ?? []);
+  // The `default` org doubles as the vendor's dogfood customer in
+  // the current MVP — Pattern B in the architecture doc. It counts
+  // as a customer because it IS one (the vendor uses it to test
+  // every feature a real customer would). The `platform` badge on
+  // its row marks it as vendor-internal for clarity; nothing about
+  // the counts excludes it.
+  //
+  // Phase 7 (post-GA) will split vendor staff identity from customer
+  // tenancy, at which point default becomes a plain customer org
+  // and a separate /admin app holds the platform-admin surface.
+  const rows = query.data ?? [];
+  const totals = aggregate(rows);
 
   return (
     <section className="space-y-4">
       <header>
         <h3 className="text-sm font-semibold">Fleet analytics</h3>
         <p className="text-xs text-muted-foreground">
-          Per-organization counts across devices, members, file uploads, and ingestion. Recomputed
-          every 60 seconds.
+          Per-customer counts across devices, members, file uploads, and ingestion. Recomputed every
+          60 seconds. The vendor&apos;s own org (<code>default</code>) doubles as the dogfood
+          customer and is included in the counts.
         </p>
       </header>
 
-      {query.isSuccess && query.data.length > 0 && (
+      {query.isSuccess && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <StatCard label="Customers" value={query.data.length} />
+          <StatCard label="Customers" value={rows.length} />
           <StatCard label="Devices" value={totals.devices} sub={`${totals.devicesActive} active`} />
           <StatCard label="Members" value={totals.members} />
           <StatCard label="Uploads" value={totals.uploads} />

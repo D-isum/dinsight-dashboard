@@ -31,7 +31,9 @@ interface PlatformDeviceRow {
   slug: string;
   blob_path_prefix: string;
   status: 'active' | 'paused' | 'retired';
-  api_key_hint: string;
+  iot_hub_name?: string;
+  iot_hub_device_id?: string;
+  api_key_hint?: string; // legacy; only set on pre-IoT-Hub rows
   last_ingested_at?: string;
   last_ingest_error?: string;
   created_at: string;
@@ -55,8 +57,8 @@ export function PlatformDevicesSection() {
           <TableRow>
             <TableHead>Org</TableHead>
             <TableHead>Device</TableHead>
+            <TableHead>IoT Hub identity</TableHead>
             <TableHead>Status</TableHead>
-            <TableHead>Blob path</TableHead>
             <TableHead>Last ingested</TableHead>
             <TableHead>Created</TableHead>
           </TableRow>
@@ -78,13 +80,20 @@ export function PlatformDevicesSection() {
                   {d.name}
                   <div className="text-xs text-muted-foreground">{d.slug}</div>
                 </TableCell>
+                <TableCell className="text-xs font-mono text-muted-foreground">
+                  {d.iot_hub_device_id ? (
+                    <>
+                      {d.iot_hub_device_id}
+                      {d.iot_hub_name && <div className="text-[10px]">hub: {d.iot_hub_name}</div>}
+                    </>
+                  ) : (
+                    <span className="italic">(legacy / not linked)</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   <Badge variant={d.status === 'active' ? 'default' : 'secondary'}>
                     {d.status}
                   </Badge>
-                </TableCell>
-                <TableCell className="text-xs font-mono text-muted-foreground">
-                  {d.blob_path_prefix}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {d.last_ingested_at ? new Date(d.last_ingested_at).toLocaleString() : '—'}
