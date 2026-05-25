@@ -91,6 +91,13 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_TLS: "${SMTP_TLS:-false}"
       REQUIRE_EMAIL_VERIFICATION: "${REQUIRE_EMAIL_VERIFICATION:-false}"
+      # Azure Blob ingestion. Empty AZURE_STORAGE_ACCOUNT +
+      # AZURE_STORAGE_CONNECTION_STRING → worker runs in disabled mode,
+      # api keeps booting. See .env.example for the pilot values.
+      AZURE_STORAGE_ACCOUNT: "${AZURE_STORAGE_ACCOUNT:-}"
+      AZURE_STORAGE_CONNECTION_STRING: "${AZURE_STORAGE_CONNECTION_STRING:-}"
+      INGESTION_CONTAINER_NAME: "${INGESTION_CONTAINER_NAME:-}"
+      INGESTION_POLL_INTERVAL: "${INGESTION_POLL_INTERVAL:-5m}"
       LICENSE_PATH: /app/license.lic
       DEVICES_PATH: /app/runtime/devices.json
     volumes:
