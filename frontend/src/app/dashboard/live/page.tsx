@@ -1536,7 +1536,7 @@ export default function LiveMonitorPage() {
                 <option value="">Select dataset</option>
                 {datasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    {dataset.name}
+                    {formatLiveDatasetLabel(dataset)}
                   </option>
                 ))}
               </select>
@@ -1884,4 +1884,29 @@ export default function LiveMonitorPage() {
       </Card>
     </div>
   );
+}
+
+// formatLiveDatasetLabel mirrors the label format used on the Data
+// Ingestion + Insights pickers so source attribution (device + file
+// + Auto/Manual) is consistent across the dashboard. Trailing path
+// component only — the live monitor labels stay compact.
+function formatLiveDatasetLabel(dataset: {
+  dinsight_id: number;
+  name: string;
+  source: {
+    source: 'auto' | 'manual' | 'unknown';
+    deviceSlug?: string;
+    originalFileName?: string;
+  };
+}): string {
+  const id = `#${dataset.dinsight_id}`;
+  if (dataset.source.source === 'auto') {
+    const dev = dataset.source.deviceSlug ?? 'device';
+    const file = dataset.source.originalFileName?.split('/').pop() ?? '';
+    return file ? `${id} · ${dev} · ${file} · Auto` : `${id} · ${dev} · Auto`;
+  }
+  if (dataset.source.source === 'manual') {
+    return `${id} · Manual upload`;
+  }
+  return `${id} · ${dataset.name}`;
 }
