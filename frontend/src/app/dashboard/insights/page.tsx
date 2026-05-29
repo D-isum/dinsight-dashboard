@@ -1361,7 +1361,7 @@ export default function HealthInsightsPage() {
                 <option value="">Select dataset</option>
                 {datasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    {dataset.name}
+                    {formatInsightsDatasetLabel(dataset)}
                   </option>
                 ))}
               </select>
@@ -2006,4 +2006,29 @@ export default function HealthInsightsPage() {
       </Card>
     </div>
   );
+}
+
+// formatInsightsDatasetLabel mirrors the dataset-picker label used on
+// the Data Ingestion page so the source attribution (device + filename
+// + auto/manual tag) appears consistently across pages. Pure function
+// to keep the page-level useMemo dependencies simple.
+function formatInsightsDatasetLabel(dataset: {
+  dinsight_id: number;
+  name: string;
+  source: {
+    source: 'auto' | 'manual' | 'unknown';
+    deviceSlug?: string;
+    originalFileName?: string;
+  };
+}): string {
+  const id = `#${dataset.dinsight_id}`;
+  if (dataset.source.source === 'auto') {
+    const dev = dataset.source.deviceSlug ?? 'device';
+    const file = dataset.source.originalFileName?.split('/').pop() ?? '';
+    return file ? `${id} · ${dev} · ${file} · Auto` : `${id} · ${dev} · Auto`;
+  }
+  if (dataset.source.source === 'manual') {
+    return `${id} · Manual upload`;
+  }
+  return `${id} · ${dataset.name}`;
 }
