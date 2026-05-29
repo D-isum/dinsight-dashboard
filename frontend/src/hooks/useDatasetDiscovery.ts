@@ -1,7 +1,11 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-import { DinsightDatasetSummary, normalizeDinsightDatasetSummary } from '@/lib/dataset-normalizers';
+import {
+  DinsightDatasetSummary,
+  extractDatasetSource,
+  normalizeDinsightDatasetSummary,
+} from '@/lib/dataset-normalizers';
 
 export interface DatasetDiscoveryOptions {
   enabled?: boolean;
@@ -67,6 +71,30 @@ export function useDatasetDiscovery(options?: DatasetDiscoveryOptions): DatasetD
         try {
           const listResponse = await api.analysis.listDinsightIds();
           isDinsightListEndpointSupported = true;
+
+          // Phase-6+ backends return a rich `datasets` block alongside
+          // `ids`. When present, build summaries directly from it —
+          // one round trip instead of N. Falls back to fromKnownIds
+          // (per-id detail fetch) for older backends that only return
+          // `ids`.
+          const rawDatasets = listResponse?.data?.data?.datasets;
+          if (Array.isArray(rawDatasets) && rawDatasets.length > 0) {
+            const summaries: DinsightDatasetSummary[] = [];
+            for (const entry of rawDatasets) {
+              if (!entry || typeof entry !== 'object') continue;
+              const data = entry as Record<string, unknown>;
+              const id = Number(data.dinsight_id);
+              if (!Number.isInteger(id) || id <= 0) continue;
+              summaries.push({
+                dinsight_id: id,
+                name: `DInsight ID ${id}`,
+                type: 'dinsight',
+                source: extractDatasetSource(data),
+              });
+            }
+            return summaries.sort((a, b) => a.dinsight_id - b.dinsight_id);
+          }
+
           const rawIds = listResponse?.data?.data?.ids;
           const ids = Array.isArray(rawIds)
             ? rawIds

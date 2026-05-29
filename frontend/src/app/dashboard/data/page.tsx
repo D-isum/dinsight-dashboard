@@ -46,6 +46,47 @@ const DEFAULT_CONFIG: ProcessingConfig = {
 
 const MAX_FILE_BYTES = 250 * 1024 * 1024;
 
+// Sorts datasets newest-first by the upload's created_at timestamp.
+// Falls back to dinsight_id (DESC) when timestamps tie or are
+// missing — works for legacy rows the new join doesn't populate.
+function sortByCreatedAtDesc(
+  a: { source: { createdAt?: string }; dinsight_id: number },
+  b: { source: { createdAt?: string }; dinsight_id: number }
+): number {
+  const at = a.source.createdAt ? Date.parse(a.source.createdAt) : NaN;
+  const bt = b.source.createdAt ? Date.parse(b.source.createdAt) : NaN;
+  if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) {
+    return bt - at;
+  }
+  if (Number.isFinite(at) && !Number.isFinite(bt)) return -1;
+  if (!Number.isFinite(at) && Number.isFinite(bt)) return 1;
+  return b.dinsight_id - a.dinsight_id;
+}
+
+// Compact label for the picker's <option> rows (native <option>
+// can't render multi-line typography). For the full source-detail
+// card, see DatasetSourceCard below.
+function formatDatasetOptionLabel(dataset: {
+  dinsight_id: number;
+  name: string;
+  source: {
+    source: 'auto' | 'manual' | 'unknown';
+    deviceSlug?: string;
+    originalFileName?: string;
+  };
+}): string {
+  const id = `#${dataset.dinsight_id}`;
+  if (dataset.source.source === 'auto') {
+    const dev = dataset.source.deviceSlug ?? 'device';
+    const file = dataset.source.originalFileName ?? '';
+    return file ? `${id} · ${dev} · ${file} · Auto` : `${id} · ${dev} · Auto`;
+  }
+  if (dataset.source.source === 'manual') {
+    return `${id} · Manual upload`;
+  }
+  return `${id} · ${dataset.name}`;
+}
+
 export default function DataIngestionPage() {
   const { state, uploadBaseline, uploadMonitoring, resetWorkflow } = useUploadWorkflow();
   const { datasets, latestDatasetId, refetch } = useDatasetDiscovery({
@@ -132,18 +173,60 @@ export default function DataIngestionPage() {
     }
   }, [state.dinsightId]);
 
-  const filteredDatasets = useMemo(() => {
-    if (!datasetSearch.trim()) {
-      return datasets;
-    }
+  // Device filter for the picker — populated from the device_slug
+  // field that comes back on each dataset's source attribution.
+  // "" = no filter (all sources, including manual uploads).
+  const [deviceFilter, setDeviceFilter] = useState<string>('');
+  // Sort mode for the picker. Newest first matches "what did I just
+  // upload?"; oldest first is occasionally useful when scrolling
+  // back through history.
+  const [datasetSort, setDatasetSort] = useState<'newest' | 'oldest' | 'id-asc'>('newest');
 
-    const query = datasetSearch.toLowerCase();
-    return datasets.filter((dataset) => {
-      return (
-        String(dataset.dinsight_id).includes(query) || dataset.name.toLowerCase().includes(query)
-      );
-    });
-  }, [datasetSearch, datasets]);
+  // Devices that appear in the dataset set, derived for the filter
+  // dropdown. Deduped by slug; ordered alphabetically.
+  const datasetDevices = useMemo(() => {
+    const seen = new Map<string, string>(); // slug → display name
+    for (const dataset of datasets) {
+      const slug = dataset.source.deviceSlug;
+      if (!slug) continue;
+      if (!seen.has(slug)) {
+        seen.set(slug, dataset.source.deviceName ?? slug);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [datasets]);
+
+  const filteredDatasets = useMemo(() => {
+    let working = datasets;
+    if (deviceFilter === '__manual__') {
+      working = working.filter((d) => d.source.source === 'manual');
+    } else if (deviceFilter) {
+      working = working.filter((d) => d.source.deviceSlug === deviceFilter);
+    }
+    if (datasetSearch.trim()) {
+      const query = datasetSearch.toLowerCase();
+      working = working.filter((dataset) => {
+        return (
+          String(dataset.dinsight_id).includes(query) ||
+          dataset.name.toLowerCase().includes(query) ||
+          dataset.source.originalFileName?.toLowerCase().includes(query) ||
+          dataset.source.deviceName?.toLowerCase().includes(query) ||
+          dataset.source.deviceSlug?.toLowerCase().includes(query)
+        );
+      });
+    }
+    const sorted = [...working];
+    if (datasetSort === 'newest') {
+      sorted.sort((a, b) => sortByCreatedAtDesc(a, b));
+    } else if (datasetSort === 'oldest') {
+      sorted.sort((a, b) => -sortByCreatedAtDesc(a, b));
+    } else {
+      sorted.sort((a, b) => a.dinsight_id - b.dinsight_id);
+    }
+    return sorted;
+  }, [datasetSearch, datasets, deviceFilter, datasetSort]);
 
   const selectedDatasetMeta = useMemo(() => {
     return datasets.find((dataset) => dataset.dinsight_id === selectedBaselineDatasetId) ?? null;
@@ -752,7 +835,7 @@ export default function DataIngestionPage() {
                 <option value="">Select saved dataset</option>
                 {datasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    #{dataset.dinsight_id} - {dataset.name}
+                    {formatDatasetOptionLabel(dataset)}
                   </option>
                 ))}
               </select>
@@ -994,8 +1077,36 @@ export default function DataIngestionPage() {
                       <Input
                         value={datasetSearch}
                         onChange={(event) => setDatasetSearch(event.target.value)}
-                        placeholder="Search dataset by name or ID"
+                        placeholder="Search by ID, device, or filename"
                       />
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={deviceFilter}
+                          onChange={(event) => setDeviceFilter(event.target.value)}
+                          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                          title="Filter by source device"
+                        >
+                          <option value="">All sources</option>
+                          {datasetDevices.map((dev) => (
+                            <option key={dev.slug} value={dev.slug}>
+                              📡 {dev.name}
+                            </option>
+                          ))}
+                          <option value="__manual__">📁 Manual uploads only</option>
+                        </select>
+                        <select
+                          value={datasetSort}
+                          onChange={(event) =>
+                            setDatasetSort(event.target.value as typeof datasetSort)
+                          }
+                          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                          title="Sort order"
+                        >
+                          <option value="newest">Newest first</option>
+                          <option value="oldest">Oldest first</option>
+                          <option value="id-asc">ID ascending</option>
+                        </select>
+                      </div>
                       <select
                         value={
                           selectedBaselineDatasetId != null ? String(selectedBaselineDatasetId) : ''
@@ -1006,19 +1117,16 @@ export default function DataIngestionPage() {
                           )
                         }
                         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        size={Math.min(8, Math.max(3, filteredDatasets.length))}
                       >
                         <option value="">Select dataset</option>
                         {filteredDatasets.map((dataset) => (
                           <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                            #{dataset.dinsight_id} - {dataset.name}
+                            {formatDatasetOptionLabel(dataset)}
                           </option>
                         ))}
                       </select>
-                      {selectedDatasetMeta && (
-                        <p className="text-xs text-muted-foreground">
-                          Selected: #{selectedDatasetMeta.dinsight_id} ({selectedDatasetMeta.name})
-                        </p>
-                      )}
+                      {selectedDatasetMeta && <DatasetSourceCard dataset={selectedDatasetMeta} />}
                     </>
                   )}
 
@@ -1176,4 +1284,88 @@ export default function DataIngestionPage() {
       </div>
     </div>
   );
+}
+
+// DatasetSourceCard renders the full source-attribution block for
+// the currently-selected dataset using the multi-line typography
+// pattern (primary identity bold, supporting metadata muted). The
+// IoT-Hub/Manual badge makes the source unambiguous at a glance.
+function DatasetSourceCard({
+  dataset,
+}: {
+  dataset: {
+    dinsight_id: number;
+    source: {
+      source: 'auto' | 'manual' | 'unknown';
+      deviceName?: string;
+      deviceSlug?: string;
+      iotHubDeviceId?: string;
+      iotHubName?: string;
+      originalFileName?: string;
+      createdAt?: string;
+    };
+  };
+}) {
+  const s = dataset.source;
+  const isAuto = s.source === 'auto';
+  const isManual = s.source === 'manual';
+
+  // Primary line: device name (auto) OR "Manual upload" OR a fallback
+  // for legacy rows where source attribution is unknown.
+  const primary = isAuto
+    ? (s.deviceName ?? s.deviceSlug ?? 'IoT Hub device')
+    : isManual
+      ? 'Manual upload'
+      : `Dataset #${dataset.dinsight_id}`;
+
+  // Secondary line: original filename + ingested time + internal ID.
+  const secondaryParts: string[] = [];
+  if (s.originalFileName) secondaryParts.push(s.originalFileName);
+  if (s.createdAt) secondaryParts.push(formatRelativeTime(s.createdAt));
+  secondaryParts.push(`#${dataset.dinsight_id}`);
+
+  return (
+    <div className="rounded-md border border-border bg-surface px-3 py-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold truncate">{primary}</div>
+          <div className="text-xs text-muted-foreground truncate">{secondaryParts.join(' · ')}</div>
+          {isAuto && s.iotHubName && (
+            <div className="text-[10px] text-muted-foreground/80 truncate">
+              IoT Hub: {s.iotHubName}
+              {s.iotHubDeviceId ? ` · device ID ${s.iotHubDeviceId}` : ''}
+            </div>
+          )}
+        </div>
+        <span
+          className={
+            isAuto
+              ? 'shrink-0 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide'
+              : isManual
+                ? 'shrink-0 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide'
+                : 'shrink-0 rounded-full bg-slate-500/15 text-slate-700 dark:text-slate-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide'
+          }
+        >
+          {isAuto ? 'Auto' : isManual ? 'Manual' : 'Unknown'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// formatRelativeTime returns a compact human-friendly relative time
+// for the source-card secondary line. Falls back to the raw ISO
+// string when the input doesn't parse — the picker never throws.
+function formatRelativeTime(iso: string): string {
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return iso;
+  const diff = Date.now() - ms;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
+  return new Date(ms).toLocaleDateString();
 }

@@ -39,6 +39,8 @@ import { RequirePermission, usePermission } from '@/components/auth/require-perm
 import { Actions } from '@/lib/permissions';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api-client';
+import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
+import type { DinsightDatasetSource } from '@/lib/dataset-normalizers';
 
 // Catalog browses the dataset metadata + lineage + validation that
 // upload + processing pipelines record server-side. Read-only for
@@ -75,9 +77,41 @@ function CatalogView() {
   const { currentOrg } = useAuth();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<string>('');
   const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const canCreate = usePermission(Actions.DatasetCreate);
+
+  // Pull source attribution (device / file / created_at) from the
+  // /dinsight list endpoint and key it by dinsight_id so we can show
+  // a Source column on the metadata table. Each metadata row's
+  // dataset_id corresponds to dinsight_data.id — that's the join key.
+  const { datasets: dinsightSummaries } = useDatasetDiscovery({
+    queryKey: ['catalog', 'dinsight-source-map'],
+    refetchInterval: 60_000,
+    staleTime: 30_000,
+  });
+  const sourceByDinsightId = useMemo(() => {
+    const map = new Map<number, DinsightDatasetSource>();
+    for (const summary of dinsightSummaries) {
+      map.set(summary.dinsight_id, summary.source);
+    }
+    return map;
+  }, [dinsightSummaries]);
+
+  const sourceDevices = useMemo(() => {
+    const seen = new Map<string, string>(); // slug → name
+    for (const summary of dinsightSummaries) {
+      const slug = summary.source.deviceSlug;
+      if (!slug) continue;
+      if (!seen.has(slug)) {
+        seen.set(slug, summary.source.deviceName ?? slug);
+      }
+    }
+    return Array.from(seen.entries())
+      .map(([slug, name]) => ({ slug, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [dinsightSummaries]);
 
   const listQuery = useQuery<DatasetMetadataItem[]>({
     queryKey: ['datasets', 'metadata', currentOrg?.id, typeFilter],
@@ -105,16 +139,31 @@ function CatalogView() {
   });
 
   const filtered = useMemo(() => {
-    const items = listQuery.data ?? [];
-    if (!search.trim()) return items;
-    const q = search.toLowerCase();
-    return items.filter(
-      (item) =>
-        item.name.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q) ||
-        item.tags?.some((t) => t.toLowerCase().includes(q))
-    );
-  }, [listQuery.data, search]);
+    let items = listQuery.data ?? [];
+    if (sourceFilter) {
+      items = items.filter((item) => {
+        const src = sourceByDinsightId.get(item.dataset_id);
+        if (sourceFilter === '__manual__') return src?.source === 'manual';
+        if (sourceFilter === '__auto__') return src?.source === 'auto';
+        return src?.deviceSlug === sourceFilter;
+      });
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      items = items.filter((item) => {
+        const src = sourceByDinsightId.get(item.dataset_id);
+        return (
+          item.name.toLowerCase().includes(q) ||
+          item.description?.toLowerCase().includes(q) ||
+          item.tags?.some((t) => t.toLowerCase().includes(q)) ||
+          src?.deviceName?.toLowerCase().includes(q) ||
+          src?.deviceSlug?.toLowerCase().includes(q) ||
+          src?.originalFileName?.toLowerCase().includes(q)
+        );
+      });
+    }
+    return items;
+  }, [listQuery.data, search, sourceFilter, sourceByDinsightId]);
 
   return (
     <div className="space-y-6">
@@ -165,6 +214,25 @@ function CatalogView() {
               <option value="comparison">Comparison</option>
               <option value="monitoring">Monitoring</option>
             </select>
+            <select
+              value={sourceFilter}
+              onChange={(e) => setSourceFilter(e.target.value)}
+              className="rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
+              title="Filter by source"
+            >
+              <option value="">All sources</option>
+              <option value="__auto__">📡 Auto (IoT Hub)</option>
+              <option value="__manual__">📁 Manual uploads</option>
+              {sourceDevices.length > 0 && (
+                <optgroup label="By device">
+                  {sourceDevices.map((dev) => (
+                    <option key={dev.slug} value={dev.slug}>
+                      {dev.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
             {listQuery.data && (
               <span className="text-sm text-fg-muted">
                 {filtered.length} of {listQuery.data.length} datasets
@@ -180,6 +248,7 @@ function CatalogView() {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
+                <TableHead>Source</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Quality</TableHead>
                 <TableHead>Validation</TableHead>
@@ -210,6 +279,9 @@ function CatalogView() {
                       {item.description && (
                         <div className="text-xs text-fg-muted">{item.description}</div>
                       )}
+                    </TableCell>
+                    <TableCell>
+                      <CatalogSourceCell source={sourceByDinsightId.get(item.dataset_id)} />
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{item.dataset_type}</Badge>
@@ -641,4 +713,38 @@ function FieldRow({ label, value }: { label: string; value: string }) {
 
 function Label({ children }: { children: React.ReactNode }) {
   return <div className="text-xs uppercase tracking-wide text-fg-muted">{children}</div>;
+}
+
+// CatalogSourceCell renders the source attribution column on the
+// catalog table. Multi-line typography: device/manual on top
+// (primary), original filename muted below (secondary), small
+// Auto/Manual badge to the right. "—" for legacy rows where the
+// /dinsight list doesn't have source info.
+function CatalogSourceCell({ source }: { source?: DinsightDatasetSource }) {
+  if (!source || source.source === 'unknown') {
+    return <span className="text-xs text-fg-muted">—</span>;
+  }
+  const isAuto = source.source === 'auto';
+  const primary = isAuto
+    ? (source.deviceName ?? source.deviceSlug ?? 'IoT Hub device')
+    : 'Manual upload';
+  return (
+    <div className="flex items-center gap-2">
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium text-fg truncate">{primary}</div>
+        {source.originalFileName && (
+          <div className="text-xs text-fg-muted truncate">{source.originalFileName}</div>
+        )}
+      </div>
+      <span
+        className={
+          isAuto
+            ? 'shrink-0 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide'
+            : 'shrink-0 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide'
+        }
+      >
+        {isAuto ? 'Auto' : 'Manual'}
+      </span>
+    </div>
+  );
 }

@@ -5,12 +5,79 @@ import {
   normalizeMetadataEntry,
 } from '@/utils/metadata';
 
+// Source attribution chain on a dinsight_data row. Auto-ingested
+// datasets (Phase 6 IoT Hub upload worker) populate every device_*
+// field; manual /analyze uploads leave them blank and `source` is
+// "manual". The `source` discriminator drives the badge in the
+// dataset picker + catalog table.
+export interface DinsightDatasetSource {
+  source: 'auto' | 'manual' | 'unknown';
+  fileUploadId?: number;
+  originalFileName?: string;
+  deviceId?: number;
+  deviceName?: string;
+  deviceSlug?: string;
+  iotHubDeviceId?: string;
+  iotHubName?: string;
+  createdAt?: string;
+}
+
 export interface DinsightDatasetSummary {
   dinsight_id: number;
   name: string;
   type: 'dinsight';
   records?: number;
+  source: DinsightDatasetSource;
 }
+
+// Extracts the source-attribution block from a /dinsight payload.
+// Tolerant of legacy backends that don't include the fields — the
+// returned source defaults to "unknown" so UI logic stays simple
+// (manual fallback in the dataset picker).
+export const extractDatasetSource = (data: Record<string, unknown>): DinsightDatasetSource => {
+  const rawSource = typeof data.source === 'string' ? data.source : '';
+  const source: DinsightDatasetSource['source'] =
+    rawSource === 'auto' || rawSource === 'manual' ? rawSource : 'unknown';
+
+  const fileUploadId = toFiniteNumber(data.file_upload_id);
+  const deviceId = toFiniteNumber(data.device_id);
+  const originalFileName =
+    typeof data.original_file_name === 'string' && data.original_file_name.length > 0
+      ? (data.original_file_name as string)
+      : undefined;
+  const deviceName =
+    typeof data.device_name === 'string' && data.device_name.length > 0
+      ? (data.device_name as string)
+      : undefined;
+  const deviceSlug =
+    typeof data.device_slug === 'string' && data.device_slug.length > 0
+      ? (data.device_slug as string)
+      : undefined;
+  const iotHubDeviceId =
+    typeof data.iot_hub_device_id === 'string' && data.iot_hub_device_id.length > 0
+      ? (data.iot_hub_device_id as string)
+      : undefined;
+  const iotHubName =
+    typeof data.iot_hub_name === 'string' && data.iot_hub_name.length > 0
+      ? (data.iot_hub_name as string)
+      : undefined;
+  const createdAt =
+    typeof data.created_at === 'string' && data.created_at.length > 0
+      ? (data.created_at as string)
+      : undefined;
+
+  return {
+    source,
+    fileUploadId: fileUploadId !== null ? fileUploadId : undefined,
+    originalFileName,
+    deviceId: deviceId !== null ? deviceId : undefined,
+    deviceName,
+    deviceSlug,
+    iotHubDeviceId,
+    iotHubName,
+    createdAt,
+  };
+};
 
 export interface CoordinateSeries {
   dinsight_x: number[];
@@ -50,6 +117,7 @@ export const normalizeDinsightDatasetSummary = (
     name: `DInsight ID ${resolvedId}`,
     type: 'dinsight',
     records: Math.min(x.length, y.length),
+    source: extractDatasetSource(data),
   };
 };
 
