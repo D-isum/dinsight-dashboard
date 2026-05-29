@@ -16,7 +16,6 @@ import {
   Tag,
   X,
 } from 'lucide-react';
-import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -65,12 +64,13 @@ interface DatasetMetadataItem {
   created_at: string;
 }
 
+// The parent app/dashboard/layout.tsx already wraps every dashboard
+// route in DashboardLayout (which renders the sidebar + header). The
+// earlier version of this page wrapped a second time, producing a
+// nested duplicate sidebar inside the main content area — visible as
+// a "page within a page" with two Default Organization labels.
 export default function CatalogPage() {
-  return (
-    <DashboardLayout>
-      <CatalogView />
-    </DashboardLayout>
-  );
+  return <CatalogView />;
 }
 
 function CatalogView() {
