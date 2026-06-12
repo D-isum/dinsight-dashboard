@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertOctagon, Loader2, Plus } from 'lucide-react';
 import {
   AlertDialog,
@@ -17,7 +17,10 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api, type CreateDatasetMetadataRequest } from '@/lib/api-client';
-import { apiClient } from '@/lib/api-client';
+import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
+import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
+import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
+import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 
 // RegisterMetadataDialog lets an operator+admin attach metadata to a
 // dinsight_data row that doesn't have any yet. The catalog page lists
@@ -65,18 +68,25 @@ export function RegisterMetadataDialog({
   const [tagsRaw, setTagsRaw] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const idsQuery = useQuery<number[]>({
-    queryKey: ['dinsight', 'ids'],
-    queryFn: async () => {
-      // /dinsight returns { ids: number[] }. Org-scoped server-side.
-      const res = await apiClient.get('/dinsight');
-      const ids = res?.data?.data?.ids;
-      return Array.isArray(ids) ? ids : [];
-    },
+  const { datasets, isLoading } = useDatasetDiscovery({
+    queryKey: ['dinsight', 'metadata-registration-sources'],
     enabled: open,
+    refetchInterval: 30_000,
   });
+  const {
+    groups: datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
+    filteredDatasets,
+  } = useDatasetSourceFilter(datasets);
 
-  const candidateIds = (idsQuery.data ?? []).filter((id) => !excludedDatasetIds.includes(id));
+  const candidateDatasets = filteredDatasets.filter(
+    (dataset) => !excludedDatasetIds.includes(dataset.dinsight_id)
+  );
+
+  useEffect(() => {
+    setDatasetId(null);
+  }, [selectedSourceKey]);
 
   const mutation = useMutation({
     mutationFn: (data: CreateDatasetMetadataRequest) => api.datasets.createMetadata(data),
@@ -153,24 +163,35 @@ export function RegisterMetadataDialog({
 
         <div className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="reg-source">Device / source</Label>
+            <DatasetSourceSelect
+              groups={datasetSourceGroups}
+              selectedSourceKey={selectedSourceKey}
+              onChange={setSelectedSourceKey}
+              disabled={isLoading}
+              className="w-full rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus disabled:opacity-60"
+            />
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="reg-dataset">Dataset</Label>
             <select
               id="reg-dataset"
               value={datasetId ?? ''}
               onChange={(e) => setDatasetId(e.target.value ? Number(e.target.value) : null)}
-              disabled={idsQuery.isLoading}
+              disabled={isLoading}
               className="w-full rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus disabled:opacity-60"
             >
               <option value="">
-                {idsQuery.isLoading
+                {isLoading
                   ? 'Loading datasets…'
-                  : candidateIds.length === 0
-                    ? 'All datasets already have metadata'
+                  : candidateDatasets.length === 0
+                    ? 'All datasets for this source already have metadata'
                     : 'Pick a dataset…'}
               </option>
-              {candidateIds.map((id) => (
-                <option key={id} value={id}>
-                  Dataset #{id}
+              {candidateDatasets.map((dataset) => (
+                <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
+                  {formatDatasetOptionLabel(dataset)}
                 </option>
               ))}
             </select>

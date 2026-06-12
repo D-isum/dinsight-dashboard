@@ -20,13 +20,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { MetadataHoverControls } from '@/components/metadata-hover-controls';
 import { useMetadataHover } from '@/hooks/useMetadataHover';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
+import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useMachineHealthStatus } from '@/hooks/useMachineHealthStatus';
 import { api } from '@/lib/api-client';
 import type { CoordinateSeries } from '@/lib/dataset-normalizers';
+import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/utils/cn';
@@ -367,7 +370,6 @@ export default function LiveMonitorPage() {
 
   const {
     datasets,
-    latestDatasetId,
     isLoading: isLoadingDatasets,
     refetch: refetchDatasets,
   } = useDatasetDiscovery({
@@ -375,6 +377,14 @@ export default function LiveMonitorPage() {
     refetchInterval: 30_000,
     staleTime: 10_000,
   });
+  const {
+    groups: datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
+    filteredDatasets,
+    filteredDatasetIds,
+    latestFilteredDatasetId,
+  } = useDatasetSourceFilter(datasets);
 
   const {
     baselineData,
@@ -770,10 +780,11 @@ export default function LiveMonitorPage() {
   );
 
   useEffect(() => {
-    if (selectedId === null && latestDatasetId) {
-      setSelectedId(latestDatasetId);
+    if (selectedId === null || !filteredDatasetIds.includes(selectedId)) {
+      setSelectedId(latestFilteredDatasetId);
+      setDatasetError(null);
     }
-  }, [latestDatasetId, selectedId]);
+  }, [filteredDatasetIds, latestFilteredDatasetId, selectedId]);
 
   useEffect(() => {
     if (selectedId) {
@@ -1397,6 +1408,10 @@ export default function LiveMonitorPage() {
       setDatasetError('Enter a valid dataset ID.');
       return;
     }
+    if (!filteredDatasetIds.includes(parsed)) {
+      setDatasetError('Select the dataset device/source before applying this ID.');
+      return;
+    }
 
     setDatasetError(null);
     setSelectedId(parsed);
@@ -1524,6 +1539,15 @@ export default function LiveMonitorPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
+              <label className="text-sm font-medium">Device / source</label>
+              <DatasetSourceSelect
+                groups={datasetSourceGroups}
+                selectedSourceKey={selectedSourceKey}
+                onChange={setSelectedSourceKey}
+              />
+            </div>
+
+            <div className="space-y-2">
               <label className="text-sm font-medium">Dataset</label>
               <select
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
@@ -1534,16 +1558,16 @@ export default function LiveMonitorPage() {
                 }}
               >
                 <option value="">Select dataset</option>
-                {datasets.map((dataset) => (
+                {filteredDatasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    {formatLiveDatasetLabel(dataset)}
+                    {formatDatasetOptionLabel(dataset)}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">
                 {isLoadingDatasets
                   ? 'Loading datasets...'
-                  : `${datasets.length} dataset(s) available`}
+                  : `${filteredDatasets.length} dataset(s) available for this source`}
               </p>
             </div>
 
@@ -1884,29 +1908,4 @@ export default function LiveMonitorPage() {
       </Card>
     </div>
   );
-}
-
-// formatLiveDatasetLabel mirrors the label format used on the Data
-// Ingestion + Insights pickers so source attribution (device + file
-// + Auto/Manual) is consistent across the dashboard. Trailing path
-// component only — the live monitor labels stay compact.
-function formatLiveDatasetLabel(dataset: {
-  dinsight_id: number;
-  name: string;
-  source: {
-    source: 'auto' | 'manual' | 'unknown';
-    deviceSlug?: string;
-    originalFileName?: string;
-  };
-}): string {
-  const id = `#${dataset.dinsight_id}`;
-  if (dataset.source.source === 'auto') {
-    const dev = dataset.source.deviceSlug ?? 'device';
-    const file = dataset.source.originalFileName?.split('/').pop() ?? '';
-    return file ? `${id} · ${dev} · ${file} · Auto` : `${id} · ${dev} · Auto`;
-  }
-  if (dataset.source.source === 'manual') {
-    return `${id} · Manual upload`;
-  }
-  return `${id} · ${dataset.name}`;
 }

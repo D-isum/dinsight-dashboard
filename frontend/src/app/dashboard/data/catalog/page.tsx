@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -31,6 +31,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { CompatibilityCheckDialog } from '@/components/datasets/compatibility-check-dialog';
+import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { EditMetadataDialog } from '@/components/datasets/edit-metadata-dialog';
 import { RegisterMetadataDialog } from '@/components/datasets/register-metadata-dialog';
 import { ValidationRulesPanel } from '@/components/datasets/validation-rules-panel';
@@ -39,6 +40,7 @@ import { Actions } from '@/lib/permissions';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api-client';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
+import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import type { DinsightDatasetSource } from '@/lib/dataset-normalizers';
 
 // Catalog browses the dataset metadata + lineage + validation that
@@ -77,7 +79,6 @@ function CatalogView() {
   const { currentOrg } = useAuth();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
-  const [sourceFilter, setSourceFilter] = useState<string>('');
   const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const canCreate = usePermission(Actions.DatasetCreate);
@@ -91,6 +92,12 @@ function CatalogView() {
     refetchInterval: 60_000,
     staleTime: 30_000,
   });
+  const {
+    groups: datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
+    filteredDatasetIds,
+  } = useDatasetSourceFilter(dinsightSummaries);
   const sourceByDinsightId = useMemo(() => {
     const map = new Map<number, DinsightDatasetSource>();
     for (const summary of dinsightSummaries) {
@@ -99,19 +106,9 @@ function CatalogView() {
     return map;
   }, [dinsightSummaries]);
 
-  const sourceDevices = useMemo(() => {
-    const seen = new Map<string, string>(); // slug → name
-    for (const summary of dinsightSummaries) {
-      const slug = summary.source.deviceSlug;
-      if (!slug) continue;
-      if (!seen.has(slug)) {
-        seen.set(slug, summary.source.deviceName ?? slug);
-      }
-    }
-    return Array.from(seen.entries())
-      .map(([slug, name]) => ({ slug, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [dinsightSummaries]);
+  useEffect(() => {
+    setSelectedDatasetId(null);
+  }, [selectedSourceKey]);
 
   const listQuery = useQuery<DatasetMetadataItem[]>({
     queryKey: ['datasets', 'metadata', currentOrg?.id, typeFilter],
@@ -139,15 +136,9 @@ function CatalogView() {
   });
 
   const filtered = useMemo(() => {
-    let items = listQuery.data ?? [];
-    if (sourceFilter) {
-      items = items.filter((item) => {
-        const src = sourceByDinsightId.get(item.dataset_id);
-        if (sourceFilter === '__manual__') return src?.source === 'manual';
-        if (sourceFilter === '__auto__') return src?.source === 'auto';
-        return src?.deviceSlug === sourceFilter;
-      });
-    }
+    let items = (listQuery.data ?? []).filter((item) =>
+      filteredDatasetIds.includes(item.dataset_id)
+    );
     if (search.trim()) {
       const q = search.toLowerCase();
       items = items.filter((item) => {
@@ -163,7 +154,7 @@ function CatalogView() {
       });
     }
     return items;
-  }, [listQuery.data, search, sourceFilter, sourceByDinsightId]);
+  }, [filteredDatasetIds, listQuery.data, search, sourceByDinsightId]);
 
   return (
     <div className="space-y-6">
@@ -214,25 +205,12 @@ function CatalogView() {
               <option value="comparison">Comparison</option>
               <option value="monitoring">Monitoring</option>
             </select>
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
+            <DatasetSourceSelect
+              groups={datasetSourceGroups}
+              selectedSourceKey={selectedSourceKey}
+              onChange={setSelectedSourceKey}
               className="rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
-              title="Filter by source"
-            >
-              <option value="">All sources</option>
-              <option value="__auto__">📡 Auto (IoT Hub)</option>
-              <option value="__manual__">📁 Manual uploads</option>
-              {sourceDevices.length > 0 && (
-                <optgroup label="By device">
-                  {sourceDevices.map((dev) => (
-                    <option key={dev.slug} value={dev.slug}>
-                      {dev.name}
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
+            />
             {listQuery.data && (
               <span className="text-sm text-fg-muted">
                 {filtered.length} of {listQuery.data.length} datasets

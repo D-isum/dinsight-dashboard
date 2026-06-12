@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRight, CheckCircle2, Database, Download, Loader2, Upload } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +9,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ConfigDialog } from '@/components/ui/config-dialog';
 import { ProcessingDialog } from '@/components/ui/processing-dialog';
+import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
+import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useUploadWorkflow } from '@/hooks/useUploadWorkflow';
 import { api } from '@/lib/api-client';
+import { formatDatasetOptionLabel, getDatasetSourceGroupKey } from '@/lib/dataset-source-groups';
 
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 
@@ -63,37 +66,21 @@ function sortByCreatedAtDesc(
   return b.dinsight_id - a.dinsight_id;
 }
 
-// Compact label for the picker's <option> rows (native <option>
-// can't render multi-line typography). For the full source-detail
-// card, see DatasetSourceCard below.
-function formatDatasetOptionLabel(dataset: {
-  dinsight_id: number;
-  name: string;
-  source: {
-    source: 'auto' | 'manual' | 'unknown';
-    deviceSlug?: string;
-    originalFileName?: string;
-  };
-}): string {
-  const id = `#${dataset.dinsight_id}`;
-  if (dataset.source.source === 'auto') {
-    const dev = dataset.source.deviceSlug ?? 'device';
-    const file = dataset.source.originalFileName ?? '';
-    return file ? `${id} · ${dev} · ${file} · Auto` : `${id} · ${dev} · Auto`;
-  }
-  if (dataset.source.source === 'manual') {
-    return `${id} · Manual upload`;
-  }
-  return `${id} · ${dataset.name}`;
-}
-
 export default function DataIngestionPage() {
   const { state, uploadBaseline, uploadMonitoring, resetWorkflow } = useUploadWorkflow();
-  const { datasets, latestDatasetId, refetch } = useDatasetDiscovery({
+  const { datasets, refetch } = useDatasetDiscovery({
     queryKey: ['available-dinsight-ids'],
     refetchInterval: 30_000,
     staleTime: 10_000,
   });
+  const {
+    groups: datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
+    filteredDatasets: sourceFilteredDatasets,
+    filteredDatasetIds,
+    latestFilteredDatasetId,
+  } = useDatasetSourceFilter(datasets);
 
   const [baselineFile, setBaselineFile] = useState<File | null>(null);
   const [monitoringFile, setMonitoringFile] = useState<File | null>(null);
@@ -121,6 +108,7 @@ export default function DataIngestionPage() {
   const [savedPreviewId, setSavedPreviewId] = useState<number | null>(null);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [lastAutoOpenedPreviewId, setLastAutoOpenedPreviewId] = useState<number | null>(null);
+  const lastSourceSyncedWorkflowIdRef = useRef<number | null>(null);
 
   const {
     data: config,
@@ -155,58 +143,50 @@ export default function DataIngestionPage() {
   });
 
   useEffect(() => {
-    if (selectedBaselineDatasetId == null && latestDatasetId) {
-      setSelectedBaselineDatasetId(latestDatasetId);
+    const isPendingWorkflowDataset =
+      selectedBaselineDatasetId === state.dinsightId &&
+      !datasets.some((dataset) => dataset.dinsight_id === state.dinsightId);
+    if (
+      selectedBaselineDatasetId == null ||
+      (!filteredDatasetIds.includes(selectedBaselineDatasetId) && !isPendingWorkflowDataset)
+    ) {
+      setSelectedBaselineDatasetId(latestFilteredDatasetId);
     }
-  }, [latestDatasetId, selectedBaselineDatasetId]);
+  }, [
+    datasets,
+    filteredDatasetIds,
+    latestFilteredDatasetId,
+    selectedBaselineDatasetId,
+    state.dinsightId,
+  ]);
 
   useEffect(() => {
-    if (savedPreviewId == null && latestDatasetId) {
-      setSavedPreviewId(latestDatasetId);
+    if (savedPreviewId == null || !filteredDatasetIds.includes(savedPreviewId)) {
+      setSavedPreviewId(latestFilteredDatasetId);
     }
-  }, [latestDatasetId, savedPreviewId]);
+  }, [filteredDatasetIds, latestFilteredDatasetId, savedPreviewId]);
 
   useEffect(() => {
-    if (state.dinsightId) {
+    if (state.dinsightId && lastSourceSyncedWorkflowIdRef.current !== state.dinsightId) {
+      const uploadedDataset = datasets.find((dataset) => dataset.dinsight_id === state.dinsightId);
+      if (uploadedDataset) {
+        setSelectedSourceKey(getDatasetSourceGroupKey(uploadedDataset));
+        lastSourceSyncedWorkflowIdRef.current = state.dinsightId;
+      }
       setManualBaselineId(String(state.dinsightId));
       setSelectedBaselineDatasetId(state.dinsightId);
       setManualBaselineError(null);
       setUseManualBaselineId(false);
     }
-  }, [state.dinsightId]);
+  }, [datasets, setSelectedSourceKey, state.dinsightId]);
 
-  // Device filter for the picker — populated from the device_slug
-  // field that comes back on each dataset's source attribution.
-  // "" = no filter (all sources, including manual uploads).
-  const [deviceFilter, setDeviceFilter] = useState<string>('');
   // Sort mode for the picker. Newest first matches "what did I just
   // upload?"; oldest first is occasionally useful when scrolling
   // back through history.
   const [datasetSort, setDatasetSort] = useState<'newest' | 'oldest' | 'id-asc'>('newest');
 
-  // Devices that appear in the dataset set, derived for the filter
-  // dropdown. Deduped by slug; ordered alphabetically.
-  const datasetDevices = useMemo(() => {
-    const seen = new Map<string, string>(); // slug → display name
-    for (const dataset of datasets) {
-      const slug = dataset.source.deviceSlug;
-      if (!slug) continue;
-      if (!seen.has(slug)) {
-        seen.set(slug, dataset.source.deviceName ?? slug);
-      }
-    }
-    return Array.from(seen.entries())
-      .map(([slug, name]) => ({ slug, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [datasets]);
-
   const filteredDatasets = useMemo(() => {
-    let working = datasets;
-    if (deviceFilter === '__manual__') {
-      working = working.filter((d) => d.source.source === 'manual');
-    } else if (deviceFilter) {
-      working = working.filter((d) => d.source.deviceSlug === deviceFilter);
-    }
+    let working = sourceFilteredDatasets;
     if (datasetSearch.trim()) {
       const query = datasetSearch.toLowerCase();
       working = working.filter((dataset) => {
@@ -228,7 +208,7 @@ export default function DataIngestionPage() {
       sorted.sort((a, b) => a.dinsight_id - b.dinsight_id);
     }
     return sorted;
-  }, [datasetSearch, datasets, deviceFilter, datasetSort]);
+  }, [datasetSearch, datasetSort, sourceFilteredDatasets]);
 
   const selectedDatasetMeta = useMemo(() => {
     return datasets.find((dataset) => dataset.dinsight_id === selectedBaselineDatasetId) ?? null;
@@ -236,21 +216,30 @@ export default function DataIngestionPage() {
 
   const suggestedBaselineId = useMemo(() => {
     if (state.dinsightId) {
-      return state.dinsightId;
+      const workflowDatasetIsKnown = datasets.some(
+        (dataset) => dataset.dinsight_id === state.dinsightId
+      );
+      if (!workflowDatasetIsKnown || filteredDatasetIds.includes(state.dinsightId)) {
+        return state.dinsightId;
+      }
     }
 
     if (useManualBaselineId) {
       const parsed = Number(manualBaselineId.trim());
-      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+      return Number.isFinite(parsed) && parsed > 0 && filteredDatasetIds.includes(parsed)
+        ? parsed
+        : null;
     }
 
     if (selectedBaselineDatasetId) {
       return selectedBaselineDatasetId;
     }
 
-    return latestDatasetId;
+    return latestFilteredDatasetId;
   }, [
-    latestDatasetId,
+    filteredDatasetIds,
+    datasets,
+    latestFilteredDatasetId,
     manualBaselineId,
     selectedBaselineDatasetId,
     state.dinsightId,
@@ -502,7 +491,13 @@ export default function DataIngestionPage() {
   const baselineReady = state.step === 'monitoring' || state.step === 'complete';
   const monitoringComplete = state.step === 'complete' && state.status === 'completed';
   const isActiveProcessing = state.status === 'uploading' || state.status === 'processing';
-  const latestProcessedPreviewId = state.dinsightId ?? latestDatasetId ?? null;
+  const workflowDatasetIsKnown = datasets.some(
+    (dataset) => dataset.dinsight_id === state.dinsightId
+  );
+  const latestProcessedPreviewId =
+    state.dinsightId && (!workflowDatasetIsKnown || filteredDatasetIds.includes(state.dinsightId))
+      ? state.dinsightId
+      : latestFilteredDatasetId;
   const previewDatasetId = previewMode === 'latest' ? latestProcessedPreviewId : savedPreviewId;
 
   const {
@@ -882,7 +877,7 @@ export default function DataIngestionPage() {
                 className="rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Select saved dataset</option>
-                {datasets.map((dataset) => (
+                {sourceFilteredDatasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
                     {formatDatasetOptionLabel(dataset)}
                   </option>
@@ -1129,20 +1124,12 @@ export default function DataIngestionPage() {
                         placeholder="Search by ID, device, or filename"
                       />
                       <div className="grid grid-cols-2 gap-2">
-                        <select
-                          value={deviceFilter}
-                          onChange={(event) => setDeviceFilter(event.target.value)}
+                        <DatasetSourceSelect
+                          groups={datasetSourceGroups}
+                          selectedSourceKey={selectedSourceKey}
+                          onChange={setSelectedSourceKey}
                           className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                          title="Filter by source device"
-                        >
-                          <option value="">All sources</option>
-                          {datasetDevices.map((dev) => (
-                            <option key={dev.slug} value={dev.slug}>
-                              📡 {dev.name}
-                            </option>
-                          ))}
-                          <option value="__manual__">📁 Manual uploads only</option>
-                        </select>
+                        />
                         <select
                           value={datasetSort}
                           onChange={(event) =>

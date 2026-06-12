@@ -20,9 +20,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
+import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
 import { api } from '@/lib/api-client';
+import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { STREAMING_MONITORING_EMPHASIS_POINTS } from '@/lib/chart-focus-config';
@@ -100,6 +103,7 @@ export default function HealthInsightsPage() {
   const userId = user?.id;
   const [datasetId, setDatasetId] = useState<number | null>(null);
   const [manualDatasetId, setManualDatasetId] = useState('');
+  const [datasetError, setDatasetError] = useState<string | null>(null);
   const [metadataColumn, setMetadataColumn] = useState<string>('');
   const [includeMonitoring, setIncludeMonitoring] = useState(true);
   const [selectedClusterValues, setSelectedClusterValues] = useState<string[]>([]);
@@ -130,14 +134,31 @@ export default function HealthInsightsPage() {
   const pendingDraftRef = useRef<DraftWearTrendConfig | null>(null);
   const draftPersistTimerRef = useRef<number | null>(null);
 
-  const { datasets, latestDatasetId, isLoading } = useDatasetDiscovery({
+  const { datasets, isLoading } = useDatasetDiscovery({
     queryKey: ['available-dinsight-ids'],
     staleTime: 15_000,
     refetchInterval: 30_000,
   });
-  const datasetIds = useMemo(() => datasets.map((dataset) => dataset.dinsight_id), [datasets]);
-  const { activeStreamingDatasetId, statusesByDatasetId } = useActiveStreamingDataset(datasetIds);
-  const preferredDatasetId = activeStreamingDatasetId ?? latestDatasetId ?? null;
+  const {
+    groups: datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
+    filteredDatasets,
+    filteredDatasetIds,
+    latestFilteredDatasetId,
+  } = useDatasetSourceFilter(datasets);
+  const { activeStreamingDatasetId, statusesByDatasetId } =
+    useActiveStreamingDataset(filteredDatasetIds);
+  const preferredDatasetId = activeStreamingDatasetId ?? latestFilteredDatasetId ?? null;
+
+  useEffect(() => {
+    if (datasetId == null || !filteredDatasetIds.includes(datasetId)) {
+      hasPinnedDatasetRef.current = false;
+      setDatasetId(preferredDatasetId);
+      setManualDatasetId(preferredDatasetId ? String(preferredDatasetId) : '');
+      setDatasetError(null);
+    }
+  }, [datasetId, filteredDatasetIds, preferredDatasetId]);
 
   useEffect(() => {
     if (hasPinnedDatasetRef.current) {
@@ -795,8 +816,14 @@ export default function HealthInsightsPage() {
   const applyManualDataset = () => {
     const parsed = Number(manualDatasetId.trim());
     if (!Number.isFinite(parsed) || parsed <= 0) {
+      setDatasetError('Enter a valid dataset ID.');
       return;
     }
+    if (!filteredDatasetIds.includes(parsed)) {
+      setDatasetError('Select the dataset device/source before applying this ID.');
+      return;
+    }
+    setDatasetError(null);
     hasPinnedDatasetRef.current = true;
     setDatasetId(parsed);
   };
@@ -1347,7 +1374,16 @@ export default function HealthInsightsPage() {
           </div>
 
           <div className="grid gap-3 xl:grid-cols-12">
-            <div className="space-y-2 xl:col-span-4">
+            <div className="space-y-2 xl:col-span-3">
+              <label className="text-sm font-medium">Device / source</label>
+              <DatasetSourceSelect
+                groups={datasetSourceGroups}
+                selectedSourceKey={selectedSourceKey}
+                onChange={setSelectedSourceKey}
+              />
+            </div>
+
+            <div className="space-y-2 xl:col-span-3">
               <label className="text-sm font-medium">Dataset</label>
               <select
                 value={datasetId != null ? String(datasetId) : ''}
@@ -1359,18 +1395,20 @@ export default function HealthInsightsPage() {
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Select dataset</option>
-                {datasets.map((dataset) => (
+                {filteredDatasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    {formatInsightsDatasetLabel(dataset)}
+                    {formatDatasetOptionLabel(dataset)}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">
-                {isLoading ? 'Loading datasets...' : `${datasets.length} dataset(s) found`}
+                {isLoading
+                  ? 'Loading datasets...'
+                  : `${filteredDatasets.length} dataset(s) found for this source`}
               </p>
             </div>
 
-            <div className="space-y-2 xl:col-span-3">
+            <div className="space-y-2 xl:col-span-2">
               <label className="text-sm font-medium">Manual dataset ID</label>
               <div className="flex gap-2">
                 <input
@@ -1383,9 +1421,10 @@ export default function HealthInsightsPage() {
                   Apply
                 </Button>
               </div>
+              {datasetError && <p className="text-xs text-danger-text">{datasetError}</p>}
             </div>
 
-            <div className="rounded-lg border border-input bg-muted/20 p-3 xl:col-span-5">
+            <div className="rounded-lg border border-input bg-muted/20 p-3 xl:col-span-4">
               <p className="text-sm font-medium">Workflow guide</p>
               <p className="text-sm text-muted-foreground">
                 Step 1: choose data. Step 2: define baseline cluster. Step 3: review results on the
@@ -2006,29 +2045,4 @@ export default function HealthInsightsPage() {
       </Card>
     </div>
   );
-}
-
-// formatInsightsDatasetLabel mirrors the dataset-picker label used on
-// the Data Ingestion page so the source attribution (device + filename
-// + auto/manual tag) appears consistently across pages. Pure function
-// to keep the page-level useMemo dependencies simple.
-function formatInsightsDatasetLabel(dataset: {
-  dinsight_id: number;
-  name: string;
-  source: {
-    source: 'auto' | 'manual' | 'unknown';
-    deviceSlug?: string;
-    originalFileName?: string;
-  };
-}): string {
-  const id = `#${dataset.dinsight_id}`;
-  if (dataset.source.source === 'auto') {
-    const dev = dataset.source.deviceSlug ?? 'device';
-    const file = dataset.source.originalFileName?.split('/').pop() ?? '';
-    return file ? `${id} · ${dev} · ${file} · Auto` : `${id} · ${dev} · Auto`;
-  }
-  if (dataset.source.source === 'manual') {
-    return `${id} · Manual upload`;
-  }
-  return `${id} · ${dataset.name}`;
 }

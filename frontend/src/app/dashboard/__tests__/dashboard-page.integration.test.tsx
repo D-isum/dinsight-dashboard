@@ -5,6 +5,9 @@ import DashboardPage from '@/app/dashboard/page';
 
 vi.mock('@/hooks/useDashboardOverview', () => ({
   useDashboardOverview: () => ({
+    datasetSourceGroups: [],
+    selectedSourceKey: null,
+    setSelectedSourceKey: vi.fn(),
     selectedLiveDatasetId: 14,
     streamingStatus: {
       total_points: 500,

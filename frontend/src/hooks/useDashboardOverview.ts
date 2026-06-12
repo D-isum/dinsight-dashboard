@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
+import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
 import { normalizeCoordinateSeriesFromMonitoringRows } from '@/lib/dataset-normalizers';
 import { buildScopedKey, readScoped, writeScoped } from '@/lib/scoped-storage';
@@ -354,7 +355,6 @@ export function useDashboardOverview() {
 
   const {
     datasets,
-    latestDatasetId,
     isLoading: isLoadingDatasets,
     refetch: refetchDatasets,
   } = useDatasetDiscovery({
@@ -363,6 +363,14 @@ export function useDashboardOverview() {
     refetchInterval: 30_000,
     refetchOnWindowFocus: true,
   });
+  const {
+    groups: datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
+    filteredDatasets,
+    filteredDatasetIds,
+    latestFilteredDatasetId,
+  } = useDatasetSourceFilter(datasets);
 
   const { data: serverLivePrefs } = useQuery<DashboardLivePrefs | null>({
     queryKey: ['dashboard-live-monitor-preferences'],
@@ -413,16 +421,23 @@ export function useDashboardOverview() {
     [localLivePrefs, serverLivePrefs]
   );
   const liveRefreshMs = resolveRefreshMs(livePrefs?.streamSpeed);
-  const datasetIds = useMemo(() => datasets.map((dataset) => dataset.dinsight_id), [datasets]);
-  const { activeStreamingDatasetId } = useActiveStreamingDataset(datasetIds, liveRefreshMs);
+  const { activeStreamingDatasetId } = useActiveStreamingDataset(filteredDatasetIds, liveRefreshMs);
+  const selectedLivePreferenceId =
+    livePrefs?.selectedId && filteredDatasetIds.includes(livePrefs.selectedId)
+      ? livePrefs.selectedId
+      : null;
   const activeDatasetId =
-    activeStreamingDatasetId ?? livePrefs?.selectedId ?? latestDatasetId ?? null;
+    activeStreamingDatasetId ?? selectedLivePreferenceId ?? latestFilteredDatasetId ?? null;
   const resolvedWearConfig = useMemo(
     () => pickNewestWearConfig(appliedWearConfig, livePrefs?.insightsWearConfig ?? null),
     [appliedWearConfig, livePrefs?.insightsWearConfig]
   );
+  const configuredWearDatasetId =
+    resolvedWearConfig?.datasetId && filteredDatasetIds.includes(resolvedWearConfig.datasetId)
+      ? resolvedWearConfig.datasetId
+      : null;
   const wearDatasetId =
-    activeStreamingDatasetId ?? resolvedWearConfig?.datasetId ?? latestDatasetId ?? null;
+    activeStreamingDatasetId ?? configuredWearDatasetId ?? latestFilteredDatasetId ?? null;
   const wearColumn = resolvedWearConfig?.metadataColumn ?? '';
   const wearClusterValues = resolvedWearConfig?.baselineClusterValues ?? [];
   const wearRange = resolvedWearConfig?.baselineRange;
@@ -924,8 +939,11 @@ export function useDashboardOverview() {
   }, [activeDatasetId, history, persistTimelineHistoryToServer, userId]);
 
   return {
-    datasets,
-    latestDatasetId,
+    datasets: filteredDatasets,
+    latestDatasetId: latestFilteredDatasetId,
+    datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
     selectedLiveDatasetId: activeDatasetId,
     streamingStatus,
     alerts,

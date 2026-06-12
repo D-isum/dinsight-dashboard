@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { useDashboardOverview } from '@/hooks/useDashboardOverview';
 import { buildSparklinePath } from '@/lib/dashboard-overview';
 import { cn } from '@/utils/cn';
@@ -201,6 +202,9 @@ function WearPreview({
 
 export default function DashboardPage() {
   const {
+    datasetSourceGroups,
+    selectedSourceKey,
+    setSelectedSourceKey,
     selectedLiveDatasetId,
     streamingStatus,
     alerts,
@@ -251,6 +255,12 @@ export default function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <DatasetSourceSelect
+            groups={datasetSourceGroups}
+            selectedSourceKey={selectedSourceKey}
+            onChange={setSelectedSourceKey}
+            className="min-w-56 rounded-md border border-input bg-background px-3 py-2 text-sm"
+          />
           <Button variant="outline" onClick={() => void handleRefresh()} disabled={isRefreshing}>
             <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
             Refresh
