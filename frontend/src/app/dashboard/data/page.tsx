@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, CheckCircle2, Database, Loader2, Upload } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Database, Download, Loader2, Upload } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,6 +107,8 @@ export default function DataIngestionPage() {
   const [selectedBaselineDatasetId, setSelectedBaselineDatasetId] = useState<number | null>(null);
   const [datasetSearch, setDatasetSearch] = useState('');
   const [manualBaselineError, setManualBaselineError] = useState<string | null>(null);
+  const [exportingDatasetId, setExportingDatasetId] = useState<number | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
   const [editedConfig, setEditedConfig] = useState<ProcessingConfig | null>(null);
@@ -448,6 +450,53 @@ export default function DataIngestionPage() {
 
     setManualBaselineError(null);
     await uploadMonitoring(suggestedBaselineId, monitoringFile);
+  };
+
+  const onExportSelectedDataset = async () => {
+    if (!suggestedBaselineId) {
+      setExportError('Select a valid DInsight ID before exporting.');
+      return;
+    }
+
+    setExportError(null);
+    setExportingDatasetId(suggestedBaselineId);
+
+    try {
+      const response = await api.analysis.exportDinsight(suggestedBaselineId);
+      const blob =
+        response.data instanceof Blob
+          ? response.data
+          : new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const disposition = String(response.headers['content-disposition'] ?? '');
+      const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+      const filename =
+        filenameMatch?.[1] ?? `dinsight-${suggestedBaselineId}-features-and-coordinates.csv`;
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      let message = 'Unable to export the selected processed dataset.';
+      const payload = error?.response?.data;
+      if (payload instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await payload.text());
+          message = parsed?.error ?? parsed?.message ?? message;
+        } catch {
+          // Keep the generic message for non-JSON error responses.
+        }
+      } else {
+        message = payload?.error ?? payload?.message ?? message;
+      }
+      setExportError(message);
+    } finally {
+      setExportingDatasetId(null);
+    }
   };
 
   const baselineReady = state.step === 'monitoring' || state.step === 'complete';
@@ -1130,12 +1179,28 @@ export default function DataIngestionPage() {
                     </>
                   )}
 
-                  <p className="text-xs text-muted-foreground">
-                    Effective baseline ID: {suggestedBaselineId ?? 'Not selected'}
-                  </p>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">
+                      Effective baseline ID: {suggestedBaselineId ?? 'Not selected'}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void onExportSelectedDataset()}
+                      disabled={!suggestedBaselineId || exportingDatasetId != null}
+                    >
+                      {exportingDatasetId != null ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Download className="mr-2 h-4 w-4" />
+                      )}
+                      Export processed CSV
+                    </Button>
+                  </div>
                   {manualBaselineError && (
                     <p className="text-sm text-danger-text">{manualBaselineError}</p>
                   )}
+                  {exportError && <p className="text-sm text-danger-text">{exportError}</p>}
                 </div>
 
                 <Input

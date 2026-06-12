@@ -348,6 +348,11 @@ export const api = {
     updateConfig: (config: any) => apiClient.post('/config', config),
     listDinsightIds: () => apiClient.get('/dinsight'),
     getDinsight: (id: number) => apiClient.get(`/dinsight/${id}`),
+    exportDinsight: (id: number) =>
+      apiClient.get(`/dinsight/${id}/export`, {
+        responseType: 'blob',
+        timeout: 0,
+      }),
   },
 
   // Monitoring endpoints
