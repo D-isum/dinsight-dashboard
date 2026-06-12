@@ -470,7 +470,7 @@ export default function DataIngestionPage() {
       const disposition = String(response.headers['content-disposition'] ?? '');
       const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
       const filename =
-        filenameMatch?.[1] ?? `dinsight-${suggestedBaselineId}-features-and-coordinates.csv`;
+        filenameMatch?.[1] ?? `dinsight-${suggestedBaselineId}-baseline-and-monitoring.csv`;
 
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -1194,7 +1194,7 @@ export default function DataIngestionPage() {
                       ) : (
                         <Download className="mr-2 h-4 w-4" />
                       )}
-                      Export processed CSV
+                      Export baseline + monitoring CSV
                     </Button>
                   </div>
                   {manualBaselineError && (
