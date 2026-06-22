@@ -4,6 +4,70 @@ import { ApiResponse } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
 
+const licenseIssueCodes = new Set([
+  'LICENSE_EXPIRED',
+  'LICENSE_INVALID',
+  'LICENSE_UNAVAILABLE',
+  'LICENSE_DEVICE_LIMIT_REACHED',
+  'LICENSE_DEVICE_REGISTRATION_FAILED',
+  'LICENSE_READ_FAILED',
+]);
+
+export interface LicenseIssue {
+  code: string;
+  message: string;
+  status?: number;
+  detectedAt: string;
+}
+
+export const LICENSE_ISSUE_EVENT = 'dinsight:license-issue';
+
+const getErrorPayload = (error: AxiosError<ApiResponse<any>>): any => error.response?.data ?? null;
+
+export const getLicenseIssueFromError = (
+  error: AxiosError<ApiResponse<any>>
+): LicenseIssue | null => {
+  const payload = getErrorPayload(error);
+  const rawError = payload?.error;
+  const code = typeof rawError?.code === 'string' ? rawError.code : undefined;
+  const message =
+    typeof rawError?.message === 'string'
+      ? rawError.message
+      : typeof rawError === 'string'
+        ? rawError
+        : typeof payload?.message === 'string'
+          ? payload.message
+          : undefined;
+  const status = error.response?.status;
+
+  if (code && licenseIssueCodes.has(code)) {
+    return {
+      code,
+      message: message || 'The deployment license needs administrator attention.',
+      status,
+      detectedAt: new Date().toISOString(),
+    };
+  }
+
+  // Compatibility with older API builds that returned a bare
+  // 401 {"error":"Invalid license"} from the license middleware.
+  if (status === 401 && message && /license/i.test(message)) {
+    return {
+      code: /expired/i.test(message) ? 'LICENSE_EXPIRED' : 'LICENSE_INVALID',
+      message,
+      status,
+      detectedAt: new Date().toISOString(),
+    };
+  }
+
+  return null;
+};
+
+const publishLicenseIssue = (issue: LicenseIssue) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent<LicenseIssue>(LICENSE_ISSUE_EVENT, { detail: issue }));
+};
+
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
   baseURL: API_URL,
@@ -107,6 +171,12 @@ apiClient.interceptors.response.use(
   (response) => response,
   async (error: AxiosError<ApiResponse<any>>) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
+    const licenseIssue = getLicenseIssueFromError(error);
+
+    if (licenseIssue) {
+      publishLicenseIssue(licenseIssue);
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
