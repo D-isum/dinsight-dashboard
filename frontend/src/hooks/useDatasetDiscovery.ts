@@ -89,6 +89,12 @@ export function useDatasetDiscovery(options?: DatasetDiscoveryOptions): DatasetD
                 dinsight_id: id,
                 name: `DInsight ID ${id}`,
                 type: 'dinsight',
+                records:
+                  typeof data.records === 'number'
+                    ? data.records
+                    : typeof data.record_count === 'number'
+                      ? data.record_count
+                      : undefined,
                 source: extractDatasetSource(data),
               });
             }

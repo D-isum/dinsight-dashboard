@@ -397,8 +397,9 @@ export default function LiveMonitorPage() {
     refetchMonitoring,
   } = useBaselineMonitoringData({
     dinsightId: selectedId,
-    includeMetadata: true,
-    monitoringMode: 'rows',
+    includeMetadata: false,
+    monitoringMode: 'coordinates',
+    maxPoints: 100_000,
   });
 
   const { data: streamingStatus, refetch: refetchStatus } = useQuery<StreamingStatus | null>({

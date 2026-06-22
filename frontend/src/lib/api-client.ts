@@ -417,7 +417,17 @@ export const api = {
     getConfig: () => apiClient.get('/config'),
     updateConfig: (config: any) => apiClient.post('/config', config),
     listDinsightIds: () => apiClient.get('/dinsight'),
-    getDinsight: (id: number) => apiClient.get(`/dinsight/${id}`),
+    getDinsight: (
+      id: number,
+      params?: {
+        include_metadata?: boolean;
+        max_points?: number;
+      }
+    ) =>
+      apiClient.get(`/dinsight/${id}`, {
+        params,
+        timeout: 0,
+      }),
     exportDinsight: (id: number) =>
       apiClient.get(`/dinsight/${id}/export`, {
         responseType: 'blob',
@@ -436,8 +446,23 @@ export const api = {
         timeout: 0,
       });
     },
-    get: (dinsightId: number) => apiClient.get(`/monitor/${dinsightId}`),
-    getCoordinates: (dinsightId: number) => apiClient.get(`/monitor/${dinsightId}/coordinates`),
+    get: (
+      dinsightId: number,
+      params?: {
+        include_values?: boolean;
+        include_metadata?: boolean;
+        max_points?: number;
+      }
+    ) =>
+      apiClient.get(`/monitor/${dinsightId}`, {
+        params,
+        timeout: 0,
+      }),
+    getCoordinates: (dinsightId: number, params?: { max_points?: number }) =>
+      apiClient.get(`/monitor/${dinsightId}/coordinates`, {
+        params,
+        timeout: 0,
+      }),
   },
 
   // Deterioration endpoints
@@ -515,6 +540,7 @@ export const api = {
       apiClient.post('/datasets/metadata', data),
     updateMetadata: (datasetId: number, data: Partial<CreateDatasetMetadataRequest>) =>
       apiClient.put(`/datasets/${datasetId}/metadata`, data),
+    delete: (datasetId: number) => apiClient.delete(`/datasets/${datasetId}`),
     getLineage: (datasetId: number) => apiClient.get(`/datasets/${datasetId}/lineage`),
     getImpact: (datasetId: number) => apiClient.get(`/datasets/${datasetId}/lineage/impact`),
     getValidationResults: (datasetId: number) =>

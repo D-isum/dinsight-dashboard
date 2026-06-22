@@ -12,6 +12,7 @@ export interface BaselineMonitoringDataOptions {
   includeMonitoring?: boolean;
   includeMetadata?: boolean;
   monitoringMode?: 'rows' | 'coordinates';
+  maxPoints?: number;
   refreshKey?: number;
 }
 
@@ -35,13 +36,17 @@ export function useBaselineMonitoringData(
   const includeMonitoring = options.includeMonitoring ?? true;
   const includeMetadata = options.includeMetadata ?? true;
   const monitoringMode = options.monitoringMode ?? 'rows';
+  const maxPoints = options.maxPoints;
 
   const baselineQuery = useQuery<CoordinateSeries | null, Error>({
-    queryKey: ['baseline-data', options.dinsightId, includeMetadata, options.refreshKey],
+    queryKey: ['baseline-data', options.dinsightId, includeMetadata, maxPoints, options.refreshKey],
     enabled: !!options.dinsightId,
     retry: false,
     queryFn: async () => {
-      const response = await api.analysis.getDinsight(options.dinsightId as number);
+      const response = await api.analysis.getDinsight(options.dinsightId as number, {
+        include_metadata: includeMetadata,
+        max_points: maxPoints,
+      });
       const normalized = normalizeCoordinateSeriesFromDinsightPayload(
         response?.data?.data,
         includeMetadata
@@ -62,6 +67,7 @@ export function useBaselineMonitoringData(
       includeMonitoring,
       includeMetadata,
       monitoringMode,
+      maxPoints,
       options.refreshKey,
     ],
     enabled: !!options.dinsightId && includeMonitoring,
@@ -72,7 +78,9 @@ export function useBaselineMonitoringData(
       }
 
       if (monitoringMode === 'coordinates') {
-        const response = await api.monitoring.getCoordinates(options.dinsightId);
+        const response = await api.monitoring.getCoordinates(options.dinsightId, {
+          max_points: maxPoints,
+        });
         const normalized = normalizeCoordinateSeriesFromMonitoringCoordinates(
           response?.data,
           includeMetadata
@@ -85,7 +93,11 @@ export function useBaselineMonitoringData(
         return normalized;
       }
 
-      const response = await api.monitoring.get(options.dinsightId);
+      const response = await api.monitoring.get(options.dinsightId, {
+        include_values: false,
+        include_metadata: includeMetadata,
+        max_points: maxPoints,
+      });
       const normalized = normalizeCoordinateSeriesFromMonitoringRows(
         response?.data,
         includeMetadata

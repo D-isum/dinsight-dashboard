@@ -108,7 +108,10 @@ export function useUploadWorkflow(options?: UploadWorkflowOptions) {
             }
 
             try {
-              const dinsightResponse = await api.analysis.getDinsight(fileUploadId);
+              const dinsightResponse = await api.analysis.getDinsight(fileUploadId, {
+                include_metadata: false,
+                max_points: 1,
+              });
               const dinsightPayload = dinsightResponse?.data?.data;
 
               if (dinsightResponse?.data?.success && hasValidCoordinates(dinsightPayload)) {
@@ -202,7 +205,10 @@ export function useUploadWorkflow(options?: UploadWorkflowOptions) {
       }));
 
       try {
-        const baselineCheck = await api.analysis.getDinsight(baselineId);
+        const baselineCheck = await api.analysis.getDinsight(baselineId, {
+          include_metadata: false,
+          max_points: 1,
+        });
         if (!baselineCheck?.data?.success || !hasValidCoordinates(baselineCheck?.data?.data)) {
           throw new Error('Baseline data is still processing or invalid.');
         }

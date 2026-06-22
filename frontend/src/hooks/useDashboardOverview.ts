@@ -4,7 +4,10 @@ import { api } from '@/lib/api-client';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
-import { normalizeCoordinateSeriesFromMonitoringRows } from '@/lib/dataset-normalizers';
+import {
+  normalizeCoordinateSeriesFromMonitoringCoordinates,
+  normalizeCoordinateSeriesFromMonitoringRows,
+} from '@/lib/dataset-normalizers';
 import { buildScopedKey, readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import {
@@ -547,8 +550,12 @@ export function useDashboardOverview() {
         return { anomalyPercentage: null, anomalyCount: 0, totalPoints: 0 };
       }
       try {
-        const response = await api.monitoring.get(activeDatasetId);
-        const monitoring = normalizeCoordinateSeriesFromMonitoringRows(response?.data, false);
+        const response = await api.monitoring.getCoordinates(activeDatasetId, {
+          max_points: 100_000,
+        });
+        const monitoring =
+          normalizeCoordinateSeriesFromMonitoringCoordinates(response?.data, false) ??
+          normalizeCoordinateSeriesFromMonitoringRows(response?.data, false);
         const xValues = monitoring?.dinsight_x ?? [];
         const yValues = monitoring?.dinsight_y ?? [];
         const total = Math.min(xValues.length, yValues.length);

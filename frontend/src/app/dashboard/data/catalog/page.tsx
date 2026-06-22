@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Calendar,
@@ -14,6 +14,7 @@ import {
   ShieldCheck,
   ShieldQuestion,
   Tag,
+  Trash2,
   X,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -35,7 +36,7 @@ import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select
 import { EditMetadataDialog } from '@/components/datasets/edit-metadata-dialog';
 import { RegisterMetadataDialog } from '@/components/datasets/register-metadata-dialog';
 import { ValidationRulesPanel } from '@/components/datasets/validation-rules-panel';
-import { RequirePermission, usePermission } from '@/components/auth/require-permission';
+import { usePermission } from '@/components/auth/require-permission';
 import { Actions } from '@/lib/permissions';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api-client';
@@ -81,7 +82,11 @@ function CatalogView() {
   const [typeFilter, setTypeFilter] = useState('');
   const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [deleteDatasetId, setDeleteDatasetId] = useState('');
+  const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null);
   const canCreate = usePermission(Actions.DatasetCreate);
+  const canDelete = usePermission(Actions.DatasetDelete);
+  const queryClient = useQueryClient();
 
   // Pull source attribution (device / file / created_at) from the
   // /dinsight list endpoint and key it by dinsight_id so we can show
@@ -134,6 +139,47 @@ function CatalogView() {
     },
     enabled: Boolean(currentOrg?.id) && registerOpen,
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: (datasetId: number) => api.datasets.delete(datasetId),
+    onSuccess: (_data, datasetId) => {
+      setDeleteDatasetId('');
+      setDeleteFeedback(`Dataset #${datasetId} deleted.`);
+      setSelectedDatasetId((current) => (current === datasetId ? null : current));
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
+      queryClient.invalidateQueries({ queryKey: ['available-dinsight-ids'] });
+      queryClient.invalidateQueries({ queryKey: ['catalog'] });
+    },
+    onError: (error: any) => {
+      const message =
+        error?.response?.data?.error?.message ||
+        error?.response?.data?.message ||
+        error?.message ||
+        'Unable to delete dataset.';
+      setDeleteFeedback(message);
+    },
+  });
+
+  const requestDelete = (datasetId: number) => {
+    if (!Number.isInteger(datasetId) || datasetId <= 0) {
+      setDeleteFeedback('Enter a valid dataset ID.');
+      return;
+    }
+    if (
+      !window.confirm(
+        `Delete dataset #${datasetId} and all related baseline, monitoring, coordinate, visualization, lineage, validation, and analysis records? This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setDeleteFeedback(null);
+    deleteMutation.mutate(datasetId);
+  };
+
+  const requestManualDelete = () => {
+    const datasetId = Number(deleteDatasetId.trim());
+    requestDelete(datasetId);
+  };
 
   const filtered = useMemo(() => {
     let items = (listQuery.data ?? []).filter((item) =>
@@ -217,6 +263,30 @@ function CatalogView() {
               </span>
             )}
           </div>
+          {canDelete && (
+            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+              <Input
+                inputMode="numeric"
+                placeholder="Dataset ID"
+                value={deleteDatasetId}
+                onChange={(event) => setDeleteDatasetId(event.target.value)}
+                className="max-w-40"
+              />
+              <Button
+                variant="destructive"
+                onClick={requestManualDelete}
+                disabled={deleteMutation.isPending}
+              >
+                {deleteMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete by ID
+              </Button>
+              {deleteFeedback && <span className="text-sm text-fg-muted">{deleteFeedback}</span>}
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -232,6 +302,7 @@ function CatalogView() {
                 <TableHead>Validation</TableHead>
                 <TableHead>Records</TableHead>
                 <TableHead>Registered</TableHead>
+                {canDelete && <TableHead className="w-16 text-right">Delete</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -280,6 +351,23 @@ function CatalogView() {
                         day: 'numeric',
                       })}
                     </TableCell>
+                    {canDelete && (
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
+                          aria-label={`Delete dataset ${item.dataset_id}`}
+                          disabled={deleteMutation.isPending}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            requestDelete(item.dataset_id);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               )}

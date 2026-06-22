@@ -510,7 +510,8 @@ export default function DataIngestionPage() {
   } = useBaselineMonitoringData({
     dinsightId: isResultsModalOpen ? previewDatasetId : null,
     includeMetadata: false,
-    monitoringMode: 'rows',
+    monitoringMode: 'coordinates',
+    maxPoints: 75_000,
     refreshKey: previewRefreshKey,
   });
 
