@@ -8,7 +8,6 @@ import {
   BarChart3,
   CheckCircle2,
   Database,
-  Download,
   FileSpreadsheet,
   Eye,
   Loader2,
@@ -24,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfigDialog } from '@/components/ui/config-dialog';
 import { ProcessingDialog } from '@/components/ui/processing-dialog';
+import { DatasetCatalog } from '@/components/datasets/dataset-catalog';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
@@ -122,10 +122,9 @@ export default function DataIngestionPage() {
   const [selectedBaselineDatasetId, setSelectedBaselineDatasetId] = useState<number | null>(null);
   const [datasetSearch, setDatasetSearch] = useState('');
   const [manualBaselineError, setManualBaselineError] = useState<string | null>(null);
-  const [exportingDatasetId, setExportingDatasetId] = useState<number | null>(null);
-  const [exportError, setExportError] = useState<string | null>(null);
 
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+  const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [editedConfig, setEditedConfig] = useState<ProcessingConfig | null>(null);
   const [isSavingConfig, setIsSavingConfig] = useState(false);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -533,53 +532,6 @@ export default function DataIngestionPage() {
       await uploadCombinedSplit(split.baselineFile, split.monitoringFile);
     } catch (error: any) {
       setCombinedSplitError(error?.message || 'Unable to split combined file.');
-    }
-  };
-
-  const onExportSelectedDataset = async () => {
-    if (!suggestedBaselineId) {
-      setExportError('Select a valid DInsight ID before exporting.');
-      return;
-    }
-
-    setExportError(null);
-    setExportingDatasetId(suggestedBaselineId);
-
-    try {
-      const response = await api.analysis.exportDinsight(suggestedBaselineId);
-      const blob =
-        response.data instanceof Blob
-          ? response.data
-          : new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
-      const disposition = String(response.headers['content-disposition'] ?? '');
-      const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
-      const filename =
-        filenameMatch?.[1] ?? `dinsight-${suggestedBaselineId}-baseline-and-monitoring.csv`;
-
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error: any) {
-      let message = 'Unable to export the selected processed dataset.';
-      const payload = error?.response?.data;
-      if (payload instanceof Blob) {
-        try {
-          const parsed = JSON.parse(await payload.text());
-          message = parsed?.error ?? parsed?.message ?? message;
-        } catch {
-          // Keep the generic message for non-JSON error responses.
-        }
-      } else {
-        message = payload?.error ?? payload?.message ?? message;
-      }
-      setExportError(message);
-    } finally {
-      setExportingDatasetId(null);
     }
   };
 
@@ -1028,6 +980,16 @@ export default function DataIngestionPage() {
         </div>
       </ConfigDialog>
 
+      <ConfigDialog
+        open={isCatalogOpen}
+        onOpenChange={setIsCatalogOpen}
+        title="Dataset Catalog"
+        description="Browse processed datasets, export CSVs, register metadata, inspect lineage, run validation, and delete obsolete datasets."
+        contentClassName="w-[94vw] sm:max-w-[1180px]"
+      >
+        <DatasetCatalog variant="modal" />
+      </ConfigDialog>
+
       <div className="space-y-5">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-2">
@@ -1062,11 +1024,9 @@ export default function DataIngestionPage() {
               <RefreshCw className="mr-2 h-4 w-4" />
               Refresh
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/dashboard/data/catalog">
-                <Database className="mr-2 h-4 w-4" />
-                Catalog
-              </Link>
+            <Button variant="outline" onClick={() => setIsCatalogOpen(true)}>
+              <Database className="mr-2 h-4 w-4" />
+              Catalog
             </Button>
           </div>
         </div>
@@ -1464,24 +1424,10 @@ export default function DataIngestionPage() {
                             <p className="text-xs text-muted-foreground">
                               Effective baseline ID: {suggestedBaselineId ?? 'Not selected'}
                             </p>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void onExportSelectedDataset()}
-                              disabled={!suggestedBaselineId || exportingDatasetId != null}
-                            >
-                              {exportingDatasetId != null ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              ) : (
-                                <Download className="mr-2 h-4 w-4" />
-                              )}
-                              Export CSV
-                            </Button>
                           </div>
                           {manualBaselineError && (
                             <p className="text-sm text-danger-text">{manualBaselineError}</p>
                           )}
-                          {exportError && <p className="text-sm text-danger-text">{exportError}</p>}
                         </div>
 
                         <Input
@@ -1644,11 +1590,13 @@ export default function DataIngestionPage() {
                 <CardTitle className="text-base">Actions</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-2">
-                <Button variant="outline" asChild className="justify-start">
-                  <Link href="/dashboard/data/catalog">
-                    <Database className="mr-2 h-4 w-4" />
-                    Open catalog
-                  </Link>
+                <Button
+                  variant="outline"
+                  className="justify-start"
+                  onClick={() => setIsCatalogOpen(true)}
+                >
+                  <Database className="mr-2 h-4 w-4" />
+                  Open catalog
                 </Button>
                 <Button variant="outline" asChild className="justify-start">
                   <Link href="/dashboard/live">
