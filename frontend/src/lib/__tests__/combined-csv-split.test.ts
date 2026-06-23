@@ -45,6 +45,31 @@ describe('combined-csv-split', () => {
     expect(split.monitoringFile.name).toBe('combined-monitoring.csv');
   });
 
+  it('accepts pasted slash-date timestamps with repeated spaces', async () => {
+    const file = fileLike(
+      [
+        'timestamp,asset,f_0',
+        '2003/10/22  12:06:24,A,1',
+        '2003/10/23  12:06:24,A,2',
+        '2003/10/24  12:06:24,A,3',
+        '2003/10/25  12:06:24,A,4',
+      ].join('\n'),
+      'copied-timestamps.csv'
+    );
+
+    const split = await splitCombinedCsvFile(file, {
+      splitColumn: 'timestamp',
+      rangeType: 'datetime',
+      baselineStart: '2003/10/22  12:06:24',
+      baselineEnd: '2003/10/23  12:06:24',
+      monitoringStart: '2003/10/24  12:06:24',
+      monitoringEnd: '2003/10/25  12:06:24',
+    });
+
+    expect(split.baselineRows).toBe(2);
+    expect(split.monitoringRows).toBe(2);
+  });
+
   it('splits by numeric day ranges', async () => {
     const file = fileLike('day,asset,f_0\n1,A,10\n2,A,20\n3,A,30\n', 'days.csv');
 

@@ -1613,7 +1613,7 @@ function RangeInput({
         type={rangeType === 'number' ? 'number' : 'text'}
         value={value}
         disabled={disabled}
-        placeholder={rangeType === 'number' ? '1' : '2026-06-01 08:00'}
+        placeholder={rangeType === 'number' ? '1' : '2003/10/22  12:06:24'}
         onChange={(event) => onChange(event.target.value)}
       />
     </div>

@@ -161,19 +161,67 @@ const resolveColumnIndex = (headers: string[], splitColumn: string): number => {
   return headers.findIndex((header) => header.toLowerCase() === lower);
 };
 
+const parseDelimitedDateTime = (value: string): number | null => {
+  const match = value.match(
+    /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/
+  );
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hours = Number(match[4] ?? 0);
+  const minutes = Number(match[5] ?? 0);
+  const seconds = Number(match[6] ?? 0);
+
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hours > 23 ||
+    minutes > 59 ||
+    seconds > 59
+  ) {
+    return null;
+  }
+
+  const parsed = new Date(year, month - 1, day, hours, minutes, seconds, 0);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day ||
+    parsed.getHours() !== hours ||
+    parsed.getMinutes() !== minutes ||
+    parsed.getSeconds() !== seconds
+  ) {
+    return null;
+  }
+
+  return parsed.getTime();
+};
+
 const parseTimeLikeValue = (value: string): number => {
-  const trimmed = value.trim();
-  const parsed = Date.parse(trimmed);
+  const normalized = value.trim().replace(/\s+/g, ' ');
+
+  const delimitedDateTime = parseDelimitedDateTime(normalized);
+  if (delimitedDateTime !== null) {
+    return delimitedDateTime;
+  }
+
+  const parsed = Date.parse(normalized);
   if (Number.isFinite(parsed)) {
     return parsed;
   }
 
-  const normalizedSpace = Date.parse(trimmed.replace(' ', 'T'));
+  const normalizedSpace = Date.parse(normalized.replace(' ', 'T'));
   if (Number.isFinite(normalizedSpace)) {
     return normalizedSpace;
   }
 
-  const timeOnly = trimmed.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  const timeOnly = normalized.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
   if (timeOnly) {
     const hours = Number(timeOnly[1]);
     const minutes = Number(timeOnly[2]);
