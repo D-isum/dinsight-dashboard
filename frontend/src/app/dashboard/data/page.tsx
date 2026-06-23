@@ -1,20 +1,27 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowRight,
+  BarChart3,
   CheckCircle2,
   Database,
   Download,
+  FileSpreadsheet,
+  Eye,
   Loader2,
+  RefreshCw,
   Scissors,
+  Settings2,
   Upload,
 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfigDialog } from '@/components/ui/config-dialog';
 import { ProcessingDialog } from '@/components/ui/processing-dialog';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
@@ -1021,568 +1028,653 @@ export default function DataIngestionPage() {
         </div>
       </ConfigDialog>
 
-      <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-semibold text-fg">Data Ingestion</h1>
-            <p className="text-sm text-fg-muted">
-              Upload baseline and monitoring datasets, then browse the catalog for lineage and
-              validation history.
+      <div className="space-y-5">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-semibold text-fg">Data Ingestion</h1>
+              <Badge
+                variant={
+                  state.status === 'error'
+                    ? 'danger'
+                    : isActiveProcessing
+                      ? 'info'
+                      : monitoringComplete
+                        ? 'success'
+                        : 'outline'
+                }
+              >
+                {state.status === 'idle'
+                  ? 'Idle'
+                  : state.status === 'completed'
+                    ? 'Complete'
+                    : state.status}
+              </Badge>
+            </div>
+            <p className="max-w-3xl text-sm text-fg-muted">
+              Configure processing, upload combined or split CSV files, and review generated
+              DInsight results from one workspace.
             </p>
           </div>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/data/catalog">
-              <Database className="mr-2 h-4 w-4" />
-              View catalog
-            </Link>
-          </Button>
-        </div>
 
-        <div className="space-y-6">
-          <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="text-lg">Configuration Set</CardTitle>
-              <CardDescription>Processing parameters for new uploads.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isConfigLoading ? (
-                <p className="text-sm text-muted-foreground">Loading configuration set...</p>
-              ) : (
-                <div className="space-y-3 rounded-md border border-input p-3">
-                  <div className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="rounded-full bg-success-bg px-2 py-0.5 text-success-text">
-                      Active
-                    </span>
-                    <span className="text-muted-foreground">
-                      Optimizer: <strong>{config?.optimizer ?? DEFAULT_CONFIG.optimizer}</strong>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Alpha: <strong>{config?.alpha ?? DEFAULT_CONFIG.alpha}</strong>
-                    </span>
-                    <span className="text-muted-foreground">
-                      Gamma0: <strong>{config?.gamma0 ?? DEFAULT_CONFIG.gamma0}</strong>
-                    </span>
-                  </div>
-                  <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
-                    <div className="rounded-md border border-input bg-muted/20 p-2">
-                      End metadata: <strong>{config?.end_meta ?? DEFAULT_CONFIG.end_meta}</strong>
-                    </div>
-                    <div className="rounded-md border border-input bg-muted/20 p-2">
-                      Start feature:{' '}
-                      <strong>{config?.start_dim ?? DEFAULT_CONFIG.start_dim}</strong>
-                    </div>
-                    <div className="rounded-md border border-input bg-muted/20 p-2">
-                      End feature: <strong>{config?.end_dim ?? DEFAULT_CONFIG.end_dim}</strong>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={onEditConfig}>
-                    Update configuration
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/60">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Scissors className="h-5 w-5" />
-                Combined CSV
-              </CardTitle>
-              <CardDescription>
-                Upload one CSV and split it into baseline and monitoring ranges.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
-                <div className="space-y-4">
-                  <Input
-                    type="file"
-                    accept=".csv,text/csv"
-                    disabled={isActiveProcessing}
-                    onChange={(event) => void onCombinedFileChange(event.target.files?.[0] ?? null)}
-                  />
-                  <div className="rounded-md border border-input bg-muted/20 p-3 text-xs text-muted-foreground">
-                    Selected file:{' '}
-                    <span className="font-medium text-foreground">
-                      {combinedFile?.name ?? 'None'}
-                    </span>
-                  </div>
-
-                  {(validatingCombined || combinedValidation) && (
-                    <div className="rounded-md border border-input p-3 text-xs">
-                      {validatingCombined ? (
-                        <p className="text-muted-foreground">Validating combined file...</p>
-                      ) : (
-                        <div className="space-y-2">
-                          <p>
-                            <strong>Size:</strong> {combinedValidation?.fileSizeMb} MB |{' '}
-                            <strong>Preview rows:</strong> {combinedValidation?.previewRows}
-                          </p>
-                          {combinedValidation?.headers.length ? (
-                            <p className="truncate">
-                              <strong>Headers:</strong>{' '}
-                              {combinedValidation.headers.slice(0, 8).join(', ')}
-                            </p>
-                          ) : null}
-                          {combinedValidation?.warnings.map((warning) => (
-                            <p key={warning} className="text-warning-text">
-                              {warning}
-                            </p>
-                          ))}
-                          {combinedValidation?.errors.map((error) => (
-                            <p key={error} className="text-danger-text">
-                              {error}
-                            </p>
-                          ))}
-                          {combinedValidation?.valid && (
-                            <p className="text-success-text">Combined file validation passed.</p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-3 rounded-md border border-input p-3">
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium" htmlFor="combined-split-column">
-                      Split column
-                    </label>
-                    <select
-                      id="combined-split-column"
-                      value={combinedSplitColumn}
-                      onChange={(event) => setCombinedSplitColumn(event.target.value)}
-                      disabled={!combinedValidation?.headers.length || isActiveProcessing}
-                      className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">Select column</option>
-                      {combinedValidation?.headers.map((header) => (
-                        <option key={header} value={header}>
-                          {header}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <label className="text-sm font-medium" htmlFor="combined-range-type">
-                      Range type
-                    </label>
-                    <select
-                      id="combined-range-type"
-                      value={combinedRangeType}
-                      onChange={(event) =>
-                        setCombinedRangeType(event.target.value as CombinedRangeType)
-                      }
-                      disabled={isActiveProcessing}
-                      className="rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="datetime">Timestamp / date / time</option>
-                      <option value="number">Numeric / day index</option>
-                    </select>
-                  </div>
-
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <RangeInput
-                      id="combined-baseline-start"
-                      label="Baseline start"
-                      value={combinedBaselineStart}
-                      rangeType={combinedRangeType}
-                      disabled={isActiveProcessing}
-                      onChange={setCombinedBaselineStart}
-                    />
-                    <RangeInput
-                      id="combined-baseline-end"
-                      label="Baseline stop"
-                      value={combinedBaselineEnd}
-                      rangeType={combinedRangeType}
-                      disabled={isActiveProcessing}
-                      onChange={setCombinedBaselineEnd}
-                    />
-                    <RangeInput
-                      id="combined-monitoring-start"
-                      label="Monitoring start"
-                      value={combinedMonitoringStart}
-                      rangeType={combinedRangeType}
-                      disabled={isActiveProcessing}
-                      onChange={setCombinedMonitoringStart}
-                    />
-                    <RangeInput
-                      id="combined-monitoring-end"
-                      label="Monitoring stop"
-                      value={combinedMonitoringEnd}
-                      rangeType={combinedRangeType}
-                      disabled={isActiveProcessing}
-                      onChange={setCombinedMonitoringEnd}
-                    />
-                  </div>
-
-                  {combinedSplitError && (
-                    <p className="text-sm text-danger-text">{combinedSplitError}</p>
-                  )}
-                  {combinedSplitSummary && (
-                    <p className="text-sm text-success-text">{combinedSplitSummary}</p>
-                  )}
-
-                  <Button
-                    onClick={() => void onCombinedUpload()}
-                    disabled={!combinedFile || !combinedValidation?.valid || isActiveProcessing}
-                    className="w-full"
-                  >
-                    {isActiveProcessing ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing combined CSV...
-                      </>
-                    ) : (
-                      'Split and upload'
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  {baselineReady ? (
-                    <CheckCircle2 className="h-5 w-5 text-success-text" />
-                  ) : (
-                    <Upload className="h-5 w-5" />
-                  )}
-                  1. Upload Baseline
-                </CardTitle>
-                <CardDescription>
-                  Upload the baseline CSV that represents healthy machine behavior.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex h-full flex-col space-y-4">
-                <Input
-                  type="file"
-                  accept=".csv,text/csv"
-                  disabled={state.status === 'uploading' || state.status === 'processing'}
-                  onChange={(event) => void onBaselineFileChange(event.target.files?.[0] ?? null)}
-                />
-
-                <div className="rounded-md border border-input bg-muted/20 p-3 text-xs text-muted-foreground">
-                  Selected file:{' '}
-                  <span className="font-medium text-foreground">
-                    {baselineFile?.name ?? 'None'}
-                  </span>
-                </div>
-
-                {(validatingBaseline || baselineValidation) && (
-                  <div className="rounded-md border border-input p-3 text-xs">
-                    {validatingBaseline ? (
-                      <p className="text-muted-foreground">Validating baseline file...</p>
-                    ) : (
-                      <div className="space-y-2">
-                        <p>
-                          <strong>Size:</strong> {baselineValidation?.fileSizeMb} MB |{' '}
-                          <strong>Preview rows:</strong> {baselineValidation?.previewRows}
-                        </p>
-                        {baselineValidation?.headers.length ? (
-                          <p className="truncate">
-                            <strong>Headers:</strong>{' '}
-                            {baselineValidation.headers.slice(0, 6).join(', ')}
-                          </p>
-                        ) : null}
-                        {baselineValidation?.warnings.map((warning) => (
-                          <p key={warning} className="text-warning-text">
-                            {warning}
-                          </p>
-                        ))}
-                        {baselineValidation?.errors.map((error) => (
-                          <p key={error} className="text-danger-text">
-                            {error}
-                          </p>
-                        ))}
-                        {baselineValidation?.valid && (
-                          <p className="text-success-text">Baseline file validation passed.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="mt-auto border-t border-border pt-3">
-                  <Button
-                    onClick={() => void onBaselineUpload()}
-                    disabled={
-                      !baselineFile ||
-                      !baselineValidation?.valid ||
-                      state.status === 'uploading' ||
-                      state.status === 'processing' ||
-                      baselineReady
-                    }
-                    className="w-full"
-                  >
-                    {state.status === 'uploading' || state.status === 'processing' ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing baseline...
-                      </>
-                    ) : (
-                      'Upload baseline CSV'
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  {monitoringComplete ? (
-                    <CheckCircle2 className="h-5 w-5 text-success-text" />
-                  ) : (
-                    <Upload className="h-5 w-5" />
-                  )}
-                  2. Upload Monitoring
-                </CardTitle>
-                <CardDescription>
-                  Select baseline target, then upload monitoring CSV for comparison.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex h-full flex-col space-y-4">
-                <div className="space-y-3 rounded-md border border-input p-3">
-                  <div className="flex items-center justify-between">
-                    <label className="text-sm font-medium">Baseline target</label>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setUseManualBaselineId((prev) => !prev)}
-                    >
-                      {useManualBaselineId ? 'Use dataset selector' : 'Manual ID'}
-                    </Button>
-                  </div>
-
-                  {useManualBaselineId ? (
-                    <Input
-                      value={manualBaselineId}
-                      onChange={(event) => setManualBaselineId(event.target.value)}
-                      placeholder="Enter baseline ID"
-                    />
-                  ) : (
-                    <>
-                      <Input
-                        value={datasetSearch}
-                        onChange={(event) => setDatasetSearch(event.target.value)}
-                        placeholder="Search by ID, device, or filename"
-                      />
-                      <div className="grid grid-cols-2 gap-2">
-                        <DatasetSourceSelect
-                          groups={datasetSourceGroups}
-                          selectedSourceKey={selectedSourceKey}
-                          onChange={setSelectedSourceKey}
-                          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                        />
-                        <select
-                          value={datasetSort}
-                          onChange={(event) =>
-                            setDatasetSort(event.target.value as typeof datasetSort)
-                          }
-                          className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                          title="Sort order"
-                        >
-                          <option value="newest">Newest first</option>
-                          <option value="oldest">Oldest first</option>
-                          <option value="id-asc">ID ascending</option>
-                        </select>
-                      </div>
-                      <select
-                        value={
-                          selectedBaselineDatasetId != null ? String(selectedBaselineDatasetId) : ''
-                        }
-                        onChange={(event) =>
-                          setSelectedBaselineDatasetId(
-                            event.target.value ? Number(event.target.value) : null
-                          )
-                        }
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        size={Math.min(8, Math.max(3, filteredDatasets.length))}
-                      >
-                        <option value="">Select dataset</option>
-                        {filteredDatasets.map((dataset) => (
-                          <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                            {formatDatasetOptionLabel(dataset)}
-                          </option>
-                        ))}
-                      </select>
-                      {selectedDatasetMeta && <DatasetSourceCard dataset={selectedDatasetMeta} />}
-                    </>
-                  )}
-
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground">
-                      Effective baseline ID: {suggestedBaselineId ?? 'Not selected'}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void onExportSelectedDataset()}
-                      disabled={!suggestedBaselineId || exportingDatasetId != null}
-                    >
-                      {exportingDatasetId != null ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : (
-                        <Download className="mr-2 h-4 w-4" />
-                      )}
-                      Export baseline + monitoring CSV
-                    </Button>
-                  </div>
-                  {manualBaselineError && (
-                    <p className="text-sm text-danger-text">{manualBaselineError}</p>
-                  )}
-                  {exportError && <p className="text-sm text-danger-text">{exportError}</p>}
-                </div>
-
-                <Input
-                  type="file"
-                  accept=".csv,text/csv"
-                  disabled={
-                    !baselineReady || state.status === 'uploading' || state.status === 'processing'
-                  }
-                  onChange={(event) => void onMonitoringFileChange(event.target.files?.[0] ?? null)}
-                />
-
-                <div className="rounded-md border border-input bg-muted/20 p-3 text-xs text-muted-foreground">
-                  Selected file:{' '}
-                  <span className="font-medium text-foreground">
-                    {monitoringFile?.name ?? 'None'}
-                  </span>
-                </div>
-
-                {(validatingMonitoring || monitoringValidation) && (
-                  <div className="rounded-md border border-input p-3 text-xs">
-                    {validatingMonitoring ? (
-                      <p className="text-muted-foreground">Validating monitoring file...</p>
-                    ) : (
-                      <div className="space-y-2">
-                        <p>
-                          <strong>Size:</strong> {monitoringValidation?.fileSizeMb} MB |{' '}
-                          <strong>Preview rows:</strong> {monitoringValidation?.previewRows}
-                        </p>
-                        {monitoringValidation?.headers.length ? (
-                          <p className="truncate">
-                            <strong>Headers:</strong>{' '}
-                            {monitoringValidation.headers.slice(0, 6).join(', ')}
-                          </p>
-                        ) : null}
-                        {monitoringValidation?.warnings.map((warning) => (
-                          <p key={warning} className="text-warning-text">
-                            {warning}
-                          </p>
-                        ))}
-                        {monitoringValidation?.errors.map((error) => (
-                          <p key={error} className="text-danger-text">
-                            {error}
-                          </p>
-                        ))}
-                        {monitoringValidation?.valid && (
-                          <p className="text-success-text">Monitoring file validation passed.</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                <div className="mt-auto border-t border-border pt-3">
-                  <Button
-                    onClick={() => void onMonitoringUpload()}
-                    disabled={
-                      !baselineReady ||
-                      !monitoringFile ||
-                      !monitoringValidation?.valid ||
-                      state.status === 'uploading' ||
-                      state.status === 'processing'
-                    }
-                    className="w-full"
-                  >
-                    {state.step === 'monitoring' &&
-                    (state.status === 'uploading' || state.status === 'processing') ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Processing monitoring...
-                      </>
-                    ) : (
-                      'Upload monitoring CSV'
-                    )}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/data/catalog">
+                <Database className="mr-2 h-4 w-4" />
+                Catalog
+              </Link>
+            </Button>
           </div>
         </div>
 
-        <Card className="border-border/60">
-          <CardHeader>
-            <CardTitle className="text-lg">Results Visualization</CardTitle>
-            <CardDescription>
-              Open a modal to preview latest processed or previously saved datasets.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-3">
-            <Button
-              onClick={() => {
-                setPreviewMode('latest');
-                setIsResultsModalOpen(true);
-                setPreviewRefreshKey((prev) => prev + 1);
-              }}
-              variant="outline"
-            >
-              View latest visualization
-            </Button>
-            <Button
-              onClick={() => {
-                setPreviewMode('saved');
-                setIsResultsModalOpen(true);
-                setPreviewRefreshKey((prev) => prev + 1);
-              }}
-              variant="outline"
-            >
-              View saved results
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <MetricTile
+            icon={<Settings2 className="h-4 w-4" />}
+            label="Configuration"
+            value={config?.optimizer ?? DEFAULT_CONFIG.optimizer}
+            detail={`${config?.start_dim ?? DEFAULT_CONFIG.start_dim} to ${
+              config?.end_dim ?? DEFAULT_CONFIG.end_dim
+            }`}
+          />
+          <MetricTile
+            icon={<Upload className="h-4 w-4" />}
+            label="Workflow"
+            value={state.step}
+            detail={state.statusMessage || state.status}
+          />
+          <MetricTile
+            icon={<Database className="h-4 w-4" />}
+            label="Baseline target"
+            value={suggestedBaselineId ? `#${suggestedBaselineId}` : 'Not selected'}
+            detail={`${filteredDatasets.length.toLocaleString()} matching datasets`}
+          />
+          <MetricTile
+            icon={<BarChart3 className="h-4 w-4" />}
+            label="Preview dataset"
+            value={previewDatasetId ? `#${previewDatasetId}` : 'None'}
+            detail={`${sourceFilteredDatasets.length.toLocaleString()} saved results`}
+          />
+        </div>
 
-        {monitoringComplete && (
-          <Card className="border-success-border bg-success-bg/40 ">
-            <CardHeader>
-              <CardTitle className="text-lg text-success-text">Ready for Live Operation</CardTitle>
-              <CardDescription>
-                Baseline and monitoring uploads are complete and validated.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <p>
-                Generated baseline ID:{' '}
-                <strong>#{state.dinsightId ?? suggestedBaselineId ?? 'N/A'}</strong>
-              </p>
-              <p className="text-muted-foreground">
-                Recommended next step: open live monitor and verify machine trajectory is within
-                expected behavior.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <Button asChild>
-                  <Link href="/dashboard/live">
-                    Open live monitor
-                    <ArrowRight className="ml-2 h-4 w-4" />
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-5">
+            <Card className="border-border/60">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <Settings2 className="h-5 w-5" />
+                    Configuration Set
+                  </CardTitle>
+                  <CardDescription>Processing parameters applied to new uploads.</CardDescription>
+                </div>
+                <Button variant="outline" size="sm" onClick={onEditConfig}>
+                  Update configuration
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {isConfigLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading configuration set...</p>
+                ) : (
+                  <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+                    <ConfigValue
+                      label="Optimizer"
+                      value={config?.optimizer ?? DEFAULT_CONFIG.optimizer}
+                    />
+                    <ConfigValue label="Alpha" value={config?.alpha ?? DEFAULT_CONFIG.alpha} />
+                    <ConfigValue label="Gamma0" value={config?.gamma0 ?? DEFAULT_CONFIG.gamma0} />
+                    <ConfigValue
+                      label="End metadata"
+                      value={config?.end_meta ?? DEFAULT_CONFIG.end_meta}
+                    />
+                    <ConfigValue
+                      label="Start feature"
+                      value={config?.start_dim ?? DEFAULT_CONFIG.start_dim}
+                    />
+                    <ConfigValue
+                      label="End feature"
+                      value={config?.end_dim ?? DEFAULT_CONFIG.end_dim}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FileSpreadsheet className="h-5 w-5" />
+                  Upload Data
+                </CardTitle>
+                <CardDescription>
+                  Choose the upload mode that matches the source file.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="combined" className="space-y-4">
+                  <TabsList className="grid h-auto w-full grid-cols-2 rounded-lg">
+                    <TabsTrigger value="combined" className="gap-2 py-2">
+                      <Scissors className="h-4 w-4" />
+                      Combined CSV
+                    </TabsTrigger>
+                    <TabsTrigger value="two-file" className="gap-2 py-2">
+                      <Upload className="h-4 w-4" />
+                      Baseline + Monitoring
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="combined" className="mt-0">
+                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,420px)]">
+                      <section className="space-y-4 rounded-lg border border-border bg-surface/50 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h2 className="text-base font-semibold">Combined source file</h2>
+                            <p className="text-xs text-muted-foreground">
+                              One CSV becomes baseline and monitoring uploads.
+                            </p>
+                          </div>
+                          <Badge variant={combinedValidation?.valid ? 'success' : 'outline'}>
+                            {combinedValidation?.valid ? 'Ready' : 'CSV'}
+                          </Badge>
+                        </div>
+                        <Input
+                          type="file"
+                          accept=".csv,text/csv"
+                          disabled={isActiveProcessing}
+                          onChange={(event) =>
+                            void onCombinedFileChange(event.target.files?.[0] ?? null)
+                          }
+                        />
+                        <FileValidationSummary
+                          file={combinedFile}
+                          validation={combinedValidation}
+                          isValidating={validatingCombined}
+                          validatingLabel="Validating combined file..."
+                          successLabel="Combined file validation passed."
+                          headerLimit={8}
+                        />
+                      </section>
+
+                      <section className="space-y-4 rounded-lg border border-border bg-surface/50 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <h2 className="text-base font-semibold">Split rules</h2>
+                          <Badge variant="info">{combinedRangeType}</Badge>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                          <div className="grid gap-2">
+                            <label className="text-sm font-medium" htmlFor="combined-split-column">
+                              Split column
+                            </label>
+                            <select
+                              id="combined-split-column"
+                              value={combinedSplitColumn}
+                              onChange={(event) => setCombinedSplitColumn(event.target.value)}
+                              disabled={!combinedValidation?.headers.length || isActiveProcessing}
+                              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            >
+                              <option value="">Select column</option>
+                              {combinedValidation?.headers.map((header) => (
+                                <option key={header} value={header}>
+                                  {header}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div className="grid gap-2">
+                            <label className="text-sm font-medium" htmlFor="combined-range-type">
+                              Range type
+                            </label>
+                            <select
+                              id="combined-range-type"
+                              value={combinedRangeType}
+                              onChange={(event) =>
+                                setCombinedRangeType(event.target.value as CombinedRangeType)
+                              }
+                              disabled={isActiveProcessing}
+                              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                            >
+                              <option value="datetime">Timestamp / date / time</option>
+                              <option value="number">Numeric / day index</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <RangeInput
+                            id="combined-baseline-start"
+                            label="Baseline start"
+                            value={combinedBaselineStart}
+                            rangeType={combinedRangeType}
+                            disabled={isActiveProcessing}
+                            onChange={setCombinedBaselineStart}
+                          />
+                          <RangeInput
+                            id="combined-baseline-end"
+                            label="Baseline stop"
+                            value={combinedBaselineEnd}
+                            rangeType={combinedRangeType}
+                            disabled={isActiveProcessing}
+                            onChange={setCombinedBaselineEnd}
+                          />
+                          <RangeInput
+                            id="combined-monitoring-start"
+                            label="Monitoring start"
+                            value={combinedMonitoringStart}
+                            rangeType={combinedRangeType}
+                            disabled={isActiveProcessing}
+                            onChange={setCombinedMonitoringStart}
+                          />
+                          <RangeInput
+                            id="combined-monitoring-end"
+                            label="Monitoring stop"
+                            value={combinedMonitoringEnd}
+                            rangeType={combinedRangeType}
+                            disabled={isActiveProcessing}
+                            onChange={setCombinedMonitoringEnd}
+                          />
+                        </div>
+
+                        {combinedSplitError && (
+                          <p className="text-sm text-danger-text">{combinedSplitError}</p>
+                        )}
+                        {combinedSplitSummary && (
+                          <p className="text-sm text-success-text">{combinedSplitSummary}</p>
+                        )}
+
+                        <Button
+                          onClick={() => void onCombinedUpload()}
+                          disabled={
+                            !combinedFile || !combinedValidation?.valid || isActiveProcessing
+                          }
+                          className="w-full"
+                        >
+                          {isActiveProcessing ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Processing combined CSV...
+                            </>
+                          ) : (
+                            'Split and upload'
+                          )}
+                        </Button>
+                      </section>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="two-file" className="mt-0">
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <section className="flex min-h-full flex-col space-y-4 rounded-lg border border-border bg-surface/50 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h2 className="flex items-center gap-2 text-base font-semibold">
+                              {baselineReady ? (
+                                <CheckCircle2 className="h-4 w-4 text-success-text" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                              Baseline
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                              Upload the baseline CSV first.
+                            </p>
+                          </div>
+                          <Badge variant={baselineReady ? 'success' : 'outline'}>
+                            {baselineReady ? 'Complete' : 'Step 1'}
+                          </Badge>
+                        </div>
+
+                        <Input
+                          type="file"
+                          accept=".csv,text/csv"
+                          disabled={state.status === 'uploading' || state.status === 'processing'}
+                          onChange={(event) =>
+                            void onBaselineFileChange(event.target.files?.[0] ?? null)
+                          }
+                        />
+                        <FileValidationSummary
+                          file={baselineFile}
+                          validation={baselineValidation}
+                          isValidating={validatingBaseline}
+                          validatingLabel="Validating baseline file..."
+                          successLabel="Baseline file validation passed."
+                        />
+
+                        <div className="mt-auto border-t border-border pt-3">
+                          <Button
+                            onClick={() => void onBaselineUpload()}
+                            disabled={
+                              !baselineFile ||
+                              !baselineValidation?.valid ||
+                              state.status === 'uploading' ||
+                              state.status === 'processing' ||
+                              baselineReady
+                            }
+                            className="w-full"
+                          >
+                            {state.status === 'uploading' || state.status === 'processing' ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Processing baseline...
+                              </>
+                            ) : (
+                              'Upload baseline CSV'
+                            )}
+                          </Button>
+                        </div>
+                      </section>
+
+                      <section className="flex min-h-full flex-col space-y-4 rounded-lg border border-border bg-surface/50 p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <h2 className="flex items-center gap-2 text-base font-semibold">
+                              {monitoringComplete ? (
+                                <CheckCircle2 className="h-4 w-4 text-success-text" />
+                              ) : (
+                                <Upload className="h-4 w-4" />
+                              )}
+                              Monitoring
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                              Compare monitoring data with a baseline target.
+                            </p>
+                          </div>
+                          <Badge variant={monitoringComplete ? 'success' : 'outline'}>
+                            {monitoringComplete ? 'Complete' : 'Step 2'}
+                          </Badge>
+                        </div>
+
+                        <div className="space-y-3 rounded-md border border-input bg-background/60 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <label className="text-sm font-medium">Baseline target</label>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setUseManualBaselineId((prev) => !prev)}
+                            >
+                              {useManualBaselineId ? 'Use dataset selector' : 'Manual ID'}
+                            </Button>
+                          </div>
+
+                          {useManualBaselineId ? (
+                            <Input
+                              value={manualBaselineId}
+                              onChange={(event) => setManualBaselineId(event.target.value)}
+                              placeholder="Enter baseline ID"
+                            />
+                          ) : (
+                            <>
+                              <Input
+                                value={datasetSearch}
+                                onChange={(event) => setDatasetSearch(event.target.value)}
+                                placeholder="Search by ID, device, or filename"
+                              />
+                              <div className="grid grid-cols-2 gap-2">
+                                <DatasetSourceSelect
+                                  groups={datasetSourceGroups}
+                                  selectedSourceKey={selectedSourceKey}
+                                  onChange={setSelectedSourceKey}
+                                  className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                                />
+                                <select
+                                  value={datasetSort}
+                                  onChange={(event) =>
+                                    setDatasetSort(event.target.value as typeof datasetSort)
+                                  }
+                                  className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                                  title="Sort order"
+                                >
+                                  <option value="newest">Newest first</option>
+                                  <option value="oldest">Oldest first</option>
+                                  <option value="id-asc">ID ascending</option>
+                                </select>
+                              </div>
+                              <select
+                                value={
+                                  selectedBaselineDatasetId != null
+                                    ? String(selectedBaselineDatasetId)
+                                    : ''
+                                }
+                                onChange={(event) =>
+                                  setSelectedBaselineDatasetId(
+                                    event.target.value ? Number(event.target.value) : null
+                                  )
+                                }
+                                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                size={Math.min(8, Math.max(3, filteredDatasets.length))}
+                              >
+                                <option value="">Select dataset</option>
+                                {filteredDatasets.map((dataset) => (
+                                  <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
+                                    {formatDatasetOptionLabel(dataset)}
+                                  </option>
+                                ))}
+                              </select>
+                              {selectedDatasetMeta && (
+                                <DatasetSourceCard dataset={selectedDatasetMeta} />
+                              )}
+                            </>
+                          )}
+
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-muted-foreground">
+                              Effective baseline ID: {suggestedBaselineId ?? 'Not selected'}
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void onExportSelectedDataset()}
+                              disabled={!suggestedBaselineId || exportingDatasetId != null}
+                            >
+                              {exportingDatasetId != null ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <Download className="mr-2 h-4 w-4" />
+                              )}
+                              Export CSV
+                            </Button>
+                          </div>
+                          {manualBaselineError && (
+                            <p className="text-sm text-danger-text">{manualBaselineError}</p>
+                          )}
+                          {exportError && <p className="text-sm text-danger-text">{exportError}</p>}
+                        </div>
+
+                        <Input
+                          type="file"
+                          accept=".csv,text/csv"
+                          disabled={
+                            !baselineReady ||
+                            state.status === 'uploading' ||
+                            state.status === 'processing'
+                          }
+                          onChange={(event) =>
+                            void onMonitoringFileChange(event.target.files?.[0] ?? null)
+                          }
+                        />
+                        <FileValidationSummary
+                          file={monitoringFile}
+                          validation={monitoringValidation}
+                          isValidating={validatingMonitoring}
+                          validatingLabel="Validating monitoring file..."
+                          successLabel="Monitoring file validation passed."
+                        />
+
+                        <div className="mt-auto border-t border-border pt-3">
+                          <Button
+                            onClick={() => void onMonitoringUpload()}
+                            disabled={
+                              !baselineReady ||
+                              !monitoringFile ||
+                              !monitoringValidation?.valid ||
+                              state.status === 'uploading' ||
+                              state.status === 'processing'
+                            }
+                            className="w-full"
+                          >
+                            {state.step === 'monitoring' &&
+                            (state.status === 'uploading' || state.status === 'processing') ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Processing monitoring...
+                              </>
+                            ) : (
+                              'Upload monitoring CSV'
+                            )}
+                          </Button>
+                        </div>
+                      </section>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-lg">
+                    <BarChart3 className="h-5 w-5" />
+                    Results Visualization
+                  </CardTitle>
+                  <CardDescription>
+                    Preview latest output or load a saved dataset from the database.
+                  </CardDescription>
+                </div>
+                <Badge variant={previewDatasetId ? 'info' : 'outline'}>
+                  {previewDatasetId ? `#${previewDatasetId}` : 'No dataset'}
+                </Badge>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <ConfigValue
+                    label="Baseline points"
+                    value={previewBaselineData?.dinsight_x.length ?? 0}
+                  />
+                  <ConfigValue
+                    label="Monitoring points"
+                    value={previewMonitoringData?.dinsight_x.length ?? 0}
+                  />
+                  <ConfigValue label="Mode" value={previewMode} />
+                </div>
+                <div className="flex flex-wrap gap-2 md:justify-end">
+                  <Button
+                    onClick={() => {
+                      setPreviewMode('latest');
+                      setIsResultsModalOpen(true);
+                      setPreviewRefreshKey((prev) => prev + 1);
+                    }}
+                    variant="outline"
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    Latest
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setPreviewMode('saved');
+                      setIsResultsModalOpen(true);
+                      setPreviewRefreshKey((prev) => prev + 1);
+                    }}
+                    variant="outline"
+                  >
+                    <Database className="mr-2 h-4 w-4" />
+                    Saved
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            {monitoringComplete && (
+              <Card className="border-success-border bg-success-bg/40">
+                <CardHeader>
+                  <CardTitle className="text-lg text-success-text">
+                    Ready for Live Operation
+                  </CardTitle>
+                  <CardDescription>
+                    Baseline and monitoring uploads are complete and validated.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <p>
+                    Generated baseline ID:{' '}
+                    <strong>#{state.dinsightId ?? suggestedBaselineId ?? 'N/A'}</strong>
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    <Button asChild>
+                      <Link href="/dashboard/live">
+                        Open live monitor
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                    <Button variant="outline" onClick={() => void refetch()}>
+                      Refresh datasets
+                    </Button>
+                    <Button variant="outline" onClick={resetWorkflow}>
+                      Reset flow
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
+            <Card className="border-border/60">
+              <CardHeader>
+                <CardTitle className="text-base">Dataset Context</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <SideFact
+                  label="Effective baseline"
+                  value={suggestedBaselineId ?? 'Not selected'}
+                />
+                <SideFact label="Workflow ID" value={state.dinsightId ?? 'None'} />
+                <SideFact label="Saved results" value={sourceFilteredDatasets.length} />
+                <SideFact label="Matching targets" value={filteredDatasets.length} />
+                {selectedDatasetMeta && <DatasetSourceCard dataset={selectedDatasetMeta} />}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/60">
+              <CardHeader>
+                <CardTitle className="text-base">Actions</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-2">
+                <Button variant="outline" asChild className="justify-start">
+                  <Link href="/dashboard/data/catalog">
+                    <Database className="mr-2 h-4 w-4" />
+                    Open catalog
                   </Link>
                 </Button>
-                <Button variant="outline" onClick={() => void refetch()}>
-                  Refresh datasets
+                <Button variant="outline" asChild className="justify-start">
+                  <Link href="/dashboard/live">
+                    <ArrowRight className="mr-2 h-4 w-4" />
+                    Open live monitor
+                  </Link>
                 </Button>
-                <Button variant="outline" onClick={resetWorkflow}>
+                <Button variant="outline" asChild className="justify-start">
+                  <Link href="/dashboard/insights">
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Open insights
+                  </Link>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="justify-start"
+                  onClick={resetWorkflow}
+                  disabled={isActiveProcessing}
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
                   Reset flow
                 </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+              </CardContent>
+            </Card>
+          </aside>
+        </div>
       </div>
     </div>
   );
@@ -1616,6 +1708,117 @@ function RangeInput({
         placeholder={rangeType === 'number' ? '1' : '2003/10/22  12:06:24'}
         onChange={(event) => onChange(event.target.value)}
       />
+    </div>
+  );
+}
+
+function MetricTile({
+  icon,
+  label,
+  value,
+  detail,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: ReactNode;
+  detail: ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-surface p-3 shadow-sm">
+      <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
+        <span className="flex h-7 w-7 items-center justify-center rounded-md border border-border bg-background text-fg">
+          {icon}
+        </span>
+        {label}
+      </div>
+      <div className="mt-3 truncate text-lg font-semibold text-fg">{value}</div>
+      <div className="mt-1 truncate text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function ConfigValue({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="rounded-md border border-border bg-surface-muted/60 px-3 py-2">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-fg">{value}</div>
+    </div>
+  );
+}
+
+function SideFact({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-3 border-b border-border pb-2 last:border-0 last:pb-0">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className="min-w-0 truncate text-right font-semibold text-fg">{value}</span>
+    </div>
+  );
+}
+
+function FileValidationSummary({
+  file,
+  validation,
+  isValidating,
+  validatingLabel,
+  successLabel,
+  headerLimit = 6,
+}: {
+  file: File | null;
+  validation: ValidationResult | null;
+  isValidating: boolean;
+  validatingLabel: string;
+  successLabel: string;
+  headerLimit?: number;
+}) {
+  return (
+    <div className="space-y-3 rounded-md border border-input bg-background/60 p-3 text-xs">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-muted-foreground">Selected file</span>
+        <span className="min-w-0 max-w-[70%] truncate text-right font-medium text-foreground">
+          {file?.name ?? 'None'}
+        </span>
+      </div>
+
+      {(isValidating || validation) && (
+        <div className="space-y-2 border-t border-border pt-3">
+          {isValidating ? (
+            <p className="flex items-center text-muted-foreground">
+              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+              {validatingLabel}
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={validation?.valid ? 'success' : 'danger'}>
+                  {validation?.valid ? 'Valid' : 'Needs attention'}
+                </Badge>
+                <span className="text-muted-foreground">
+                  {validation?.fileSizeMb} MB | {validation?.previewRows} preview rows
+                </span>
+              </div>
+
+              {validation?.headers.length ? (
+                <p className="truncate text-muted-foreground">
+                  <strong className="text-fg">Headers:</strong>{' '}
+                  {validation.headers.slice(0, headerLimit).join(', ')}
+                </p>
+              ) : null}
+
+              {validation?.warnings.map((warning) => (
+                <p key={warning} className="text-warning-text">
+                  {warning}
+                </p>
+              ))}
+              {validation?.errors.map((error) => (
+                <p key={error} className="text-danger-text">
+                  {error}
+                </p>
+              ))}
+              {validation?.valid && <p className="text-success-text">{successLabel}</p>}
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
