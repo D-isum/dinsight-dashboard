@@ -30,6 +30,8 @@ const hasValidCoordinates = (payload: any): boolean =>
   payload.dinsight_x.length > 0 &&
   payload.dinsight_y.length > 0;
 
+const sleep = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+
 export function useUploadWorkflow(options?: UploadWorkflowOptions) {
   const pollIntervalMs = options?.pollIntervalMs ?? 3000;
   const maxPollAttempts = options?.maxPollAttempts ?? 2400;
@@ -158,6 +160,55 @@ export function useUploadWorkflow(options?: UploadWorkflowOptions) {
     [clearPolling, maxPollAttempts, pollIntervalMs]
   );
 
+  const waitForProcessing = useCallback(
+    async (fileUploadId: number, step: WorkflowStep): Promise<{ dinsightId?: number }> => {
+      for (let attempt = 1; attempt <= maxPollAttempts; attempt += 1) {
+        const statusResponse = await apiClient.get(`/analyze/${fileUploadId}/status`, {
+          timeout: 60000,
+        });
+
+        if (!statusResponse.data || statusResponse.data.code !== 200) {
+          throw new Error('Status check failed');
+        }
+
+        const upload = statusResponse.data.data;
+        const serverStatus = upload.status;
+        const progress = upload.progress || 0;
+        const statusMessage = upload.status_message || 'Processing...';
+        setState((prev) => ({ ...prev, progress, statusMessage }));
+
+        if (serverStatus === 'failed') {
+          throw new Error(upload.error_message || 'Processing failed on server.');
+        }
+
+        if (serverStatus === 'completed') {
+          if (step === 'monitoring') {
+            return {};
+          }
+
+          const dinsightResponse = await api.analysis.getDinsight(fileUploadId, {
+            include_metadata: false,
+            max_points: 1,
+          });
+          const dinsightPayload = dinsightResponse?.data?.data;
+          if (dinsightResponse?.data?.success && hasValidCoordinates(dinsightPayload)) {
+            return {
+              dinsightId:
+                typeof dinsightPayload.dinsight_id === 'number'
+                  ? dinsightPayload.dinsight_id
+                  : fileUploadId,
+            };
+          }
+        }
+
+        await sleep(pollIntervalMs);
+      }
+
+      throw new Error('Processing timeout. The operation is taking longer than expected.');
+    },
+    [maxPollAttempts, pollIntervalMs]
+  );
+
   const uploadBaseline = useCallback(
     async (files: File[]) => {
       setState((prev) => ({ ...prev, status: 'uploading', errorMessage: undefined, progress: 0 }));
@@ -244,6 +295,87 @@ export function useUploadWorkflow(options?: UploadWorkflowOptions) {
     [startPolling]
   );
 
+  const uploadCombinedSplit = useCallback(
+    async (baselineFile: File, monitoringFile: File) => {
+      clearPolling();
+      pollAttemptsRef.current = 0;
+
+      try {
+        setState({
+          step: 'baseline',
+          status: 'uploading',
+          progress: 0,
+          statusMessage: 'Uploading baseline split...',
+        });
+
+        const baselineResponse = await api.analysis.upload([baselineFile]);
+        const baselineUploadId = baselineResponse?.data?.data?.id;
+        if (!baselineUploadId) {
+          throw new Error('Baseline upload did not return a processing ID.');
+        }
+
+        setState((prev) => ({
+          ...prev,
+          step: 'baseline',
+          status: 'processing',
+          fileUploadId: baselineUploadId,
+          progress: 0,
+          statusMessage: 'Processing baseline split...',
+        }));
+
+        const baselineResult = await waitForProcessing(baselineUploadId, 'baseline');
+        if (!baselineResult.dinsightId) {
+          throw new Error('Baseline processing completed without a DInsight ID.');
+        }
+
+        setState((prev) => ({
+          ...prev,
+          step: 'monitoring',
+          status: 'uploading',
+          dinsightId: baselineResult.dinsightId,
+          progress: 0,
+          statusMessage: 'Uploading monitoring split...',
+        }));
+
+        const monitoringResponse = await api.monitoring.upload(
+          baselineResult.dinsightId,
+          monitoringFile
+        );
+        const monitoringUploadId = monitoringResponse?.data?.data?.id;
+        if (!monitoringUploadId) {
+          throw new Error('Monitoring upload did not return a processing ID.');
+        }
+
+        setState((prev) => ({
+          ...prev,
+          step: 'monitoring',
+          status: 'processing',
+          fileUploadId: monitoringUploadId,
+          progress: 0,
+          statusMessage: 'Processing monitoring split...',
+        }));
+
+        await waitForProcessing(monitoringUploadId, 'monitoring');
+
+        setState((prev) => ({
+          ...prev,
+          step: 'complete',
+          status: 'completed',
+          progress: 100,
+          statusMessage: 'Combined file processed successfully.',
+        }));
+      } catch (error: any) {
+        setState((prev) => ({
+          ...prev,
+          status: 'error',
+          errorMessage:
+            error?.response?.data?.message || error?.message || 'Combined file upload failed.',
+        }));
+      }
+    },
+    [clearPolling, waitForProcessing]
+  );
+
   useEffect(() => {
     return () => clearPolling();
   }, [clearPolling]);
@@ -252,6 +384,7 @@ export function useUploadWorkflow(options?: UploadWorkflowOptions) {
     state,
     uploadBaseline,
     uploadMonitoring,
+    uploadCombinedSplit,
     resetWorkflow,
     setStep,
   };

@@ -3,7 +3,15 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, CheckCircle2, Database, Download, Loader2, Upload } from 'lucide-react';
+import {
+  ArrowRight,
+  CheckCircle2,
+  Database,
+  Download,
+  Loader2,
+  Scissors,
+  Upload,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +23,7 @@ import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useUploadWorkflow } from '@/hooks/useUploadWorkflow';
 import { api } from '@/lib/api-client';
+import { CombinedRangeType, splitCombinedCsvFile } from '@/lib/combined-csv-split';
 import { formatDatasetOptionLabel, getDatasetSourceGroupKey } from '@/lib/dataset-source-groups';
 
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
@@ -67,7 +76,8 @@ function sortByCreatedAtDesc(
 }
 
 export default function DataIngestionPage() {
-  const { state, uploadBaseline, uploadMonitoring, resetWorkflow } = useUploadWorkflow();
+  const { state, uploadBaseline, uploadMonitoring, uploadCombinedSplit, resetWorkflow } =
+    useUploadWorkflow();
   const { datasets, refetch } = useDatasetDiscovery({
     queryKey: ['available-dinsight-ids'],
     refetchInterval: 30_000,
@@ -84,10 +94,21 @@ export default function DataIngestionPage() {
 
   const [baselineFile, setBaselineFile] = useState<File | null>(null);
   const [monitoringFile, setMonitoringFile] = useState<File | null>(null);
+  const [combinedFile, setCombinedFile] = useState<File | null>(null);
   const [baselineValidation, setBaselineValidation] = useState<ValidationResult | null>(null);
   const [monitoringValidation, setMonitoringValidation] = useState<ValidationResult | null>(null);
+  const [combinedValidation, setCombinedValidation] = useState<ValidationResult | null>(null);
   const [validatingBaseline, setValidatingBaseline] = useState(false);
   const [validatingMonitoring, setValidatingMonitoring] = useState(false);
+  const [validatingCombined, setValidatingCombined] = useState(false);
+  const [combinedSplitColumn, setCombinedSplitColumn] = useState('');
+  const [combinedRangeType, setCombinedRangeType] = useState<CombinedRangeType>('datetime');
+  const [combinedBaselineStart, setCombinedBaselineStart] = useState('');
+  const [combinedBaselineEnd, setCombinedBaselineEnd] = useState('');
+  const [combinedMonitoringStart, setCombinedMonitoringStart] = useState('');
+  const [combinedMonitoringEnd, setCombinedMonitoringEnd] = useState('');
+  const [combinedSplitError, setCombinedSplitError] = useState<string | null>(null);
+  const [combinedSplitSummary, setCombinedSplitSummary] = useState<string | null>(null);
 
   const [manualBaselineId, setManualBaselineId] = useState('');
   const [useManualBaselineId, setUseManualBaselineId] = useState(false);
@@ -420,6 +441,36 @@ export default function DataIngestionPage() {
     setValidatingMonitoring(false);
   };
 
+  const onCombinedFileChange = async (file: File | null) => {
+    setCombinedFile(file);
+    setCombinedValidation(null);
+    setCombinedSplitError(null);
+    setCombinedSplitSummary(null);
+
+    if (!file) {
+      return;
+    }
+
+    setValidatingCombined(true);
+    const result = await runValidation(file);
+    setCombinedValidation(result);
+    setValidatingCombined(false);
+
+    if (result.headers.length > 0) {
+      const currentStillExists = result.headers.some((header) => header === combinedSplitColumn);
+      if (!combinedSplitColumn || !currentStillExists) {
+        const inferred =
+          result.headers.find((header) => /timestamp|time|date|datetime/i.test(header)) ??
+          result.headers.find((header) => /day|period|sequence|index|order/i.test(header)) ??
+          result.headers[0];
+        setCombinedSplitColumn(inferred);
+        if (/day|period|sequence|index|order/i.test(inferred) && !/date|time/i.test(inferred)) {
+          setCombinedRangeType('number');
+        }
+      }
+    }
+  };
+
   const onBaselineUpload = async () => {
     if (!baselineFile || !baselineValidation?.valid) {
       return;
@@ -439,6 +490,43 @@ export default function DataIngestionPage() {
 
     setManualBaselineError(null);
     await uploadMonitoring(suggestedBaselineId, monitoringFile);
+  };
+
+  const onCombinedUpload = async () => {
+    if (!combinedFile || !combinedValidation?.valid) {
+      return;
+    }
+
+    if (
+      !combinedSplitColumn ||
+      !combinedBaselineStart ||
+      !combinedBaselineEnd ||
+      !combinedMonitoringStart ||
+      !combinedMonitoringEnd
+    ) {
+      setCombinedSplitError('Select a split column and complete all baseline/monitoring bounds.');
+      return;
+    }
+
+    setCombinedSplitError(null);
+    setCombinedSplitSummary(null);
+
+    try {
+      const split = await splitCombinedCsvFile(combinedFile, {
+        splitColumn: combinedSplitColumn,
+        rangeType: combinedRangeType,
+        baselineStart: combinedBaselineStart,
+        baselineEnd: combinedBaselineEnd,
+        monitoringStart: combinedMonitoringStart,
+        monitoringEnd: combinedMonitoringEnd,
+      });
+      setCombinedSplitSummary(
+        `Split ${split.totalRows.toLocaleString()} rows into ${split.baselineRows.toLocaleString()} baseline and ${split.monitoringRows.toLocaleString()} monitoring rows.`
+      );
+      await uploadCombinedSplit(split.baselineFile, split.monitoringFile);
+    } catch (error: any) {
+      setCombinedSplitError(error?.message || 'Unable to split combined file.');
+    }
   };
 
   const onExportSelectedDataset = async () => {
@@ -995,6 +1083,167 @@ export default function DataIngestionPage() {
             </CardContent>
           </Card>
 
+          <Card className="border-border/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Scissors className="h-5 w-5" />
+                Combined CSV
+              </CardTitle>
+              <CardDescription>
+                Upload one CSV and split it into baseline and monitoring ranges.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
+                <div className="space-y-4">
+                  <Input
+                    type="file"
+                    accept=".csv,text/csv"
+                    disabled={isActiveProcessing}
+                    onChange={(event) => void onCombinedFileChange(event.target.files?.[0] ?? null)}
+                  />
+                  <div className="rounded-md border border-input bg-muted/20 p-3 text-xs text-muted-foreground">
+                    Selected file:{' '}
+                    <span className="font-medium text-foreground">
+                      {combinedFile?.name ?? 'None'}
+                    </span>
+                  </div>
+
+                  {(validatingCombined || combinedValidation) && (
+                    <div className="rounded-md border border-input p-3 text-xs">
+                      {validatingCombined ? (
+                        <p className="text-muted-foreground">Validating combined file...</p>
+                      ) : (
+                        <div className="space-y-2">
+                          <p>
+                            <strong>Size:</strong> {combinedValidation?.fileSizeMb} MB |{' '}
+                            <strong>Preview rows:</strong> {combinedValidation?.previewRows}
+                          </p>
+                          {combinedValidation?.headers.length ? (
+                            <p className="truncate">
+                              <strong>Headers:</strong>{' '}
+                              {combinedValidation.headers.slice(0, 8).join(', ')}
+                            </p>
+                          ) : null}
+                          {combinedValidation?.warnings.map((warning) => (
+                            <p key={warning} className="text-warning-text">
+                              {warning}
+                            </p>
+                          ))}
+                          {combinedValidation?.errors.map((error) => (
+                            <p key={error} className="text-danger-text">
+                              {error}
+                            </p>
+                          ))}
+                          {combinedValidation?.valid && (
+                            <p className="text-success-text">Combined file validation passed.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3 rounded-md border border-input p-3">
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium" htmlFor="combined-split-column">
+                      Split column
+                    </label>
+                    <select
+                      id="combined-split-column"
+                      value={combinedSplitColumn}
+                      onChange={(event) => setCombinedSplitColumn(event.target.value)}
+                      disabled={!combinedValidation?.headers.length || isActiveProcessing}
+                      className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">Select column</option>
+                      {combinedValidation?.headers.map((header) => (
+                        <option key={header} value={header}>
+                          {header}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <label className="text-sm font-medium" htmlFor="combined-range-type">
+                      Range type
+                    </label>
+                    <select
+                      id="combined-range-type"
+                      value={combinedRangeType}
+                      onChange={(event) =>
+                        setCombinedRangeType(event.target.value as CombinedRangeType)
+                      }
+                      disabled={isActiveProcessing}
+                      className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="datetime">Timestamp / date / time</option>
+                      <option value="number">Numeric / day index</option>
+                    </select>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <RangeInput
+                      id="combined-baseline-start"
+                      label="Baseline start"
+                      value={combinedBaselineStart}
+                      rangeType={combinedRangeType}
+                      disabled={isActiveProcessing}
+                      onChange={setCombinedBaselineStart}
+                    />
+                    <RangeInput
+                      id="combined-baseline-end"
+                      label="Baseline stop"
+                      value={combinedBaselineEnd}
+                      rangeType={combinedRangeType}
+                      disabled={isActiveProcessing}
+                      onChange={setCombinedBaselineEnd}
+                    />
+                    <RangeInput
+                      id="combined-monitoring-start"
+                      label="Monitoring start"
+                      value={combinedMonitoringStart}
+                      rangeType={combinedRangeType}
+                      disabled={isActiveProcessing}
+                      onChange={setCombinedMonitoringStart}
+                    />
+                    <RangeInput
+                      id="combined-monitoring-end"
+                      label="Monitoring stop"
+                      value={combinedMonitoringEnd}
+                      rangeType={combinedRangeType}
+                      disabled={isActiveProcessing}
+                      onChange={setCombinedMonitoringEnd}
+                    />
+                  </div>
+
+                  {combinedSplitError && (
+                    <p className="text-sm text-danger-text">{combinedSplitError}</p>
+                  )}
+                  {combinedSplitSummary && (
+                    <p className="text-sm text-success-text">{combinedSplitSummary}</p>
+                  )}
+
+                  <Button
+                    onClick={() => void onCombinedUpload()}
+                    disabled={!combinedFile || !combinedValidation?.valid || isActiveProcessing}
+                    className="w-full"
+                  >
+                    {isActiveProcessing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Processing combined CSV...
+                      </>
+                    ) : (
+                      'Split and upload'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-6 lg:grid-cols-2">
             <Card className="border-border/60">
               <CardHeader>
@@ -1335,6 +1584,38 @@ export default function DataIngestionPage() {
           </Card>
         )}
       </div>
+    </div>
+  );
+}
+
+function RangeInput({
+  id,
+  label,
+  value,
+  rangeType,
+  disabled,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  rangeType: CombinedRangeType;
+  disabled: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-1.5">
+      <label className="text-xs font-medium text-muted-foreground" htmlFor={id}>
+        {label}
+      </label>
+      <Input
+        id={id}
+        type={rangeType === 'number' ? 'number' : 'text'}
+        value={value}
+        disabled={disabled}
+        placeholder={rangeType === 'number' ? '1' : '2026-06-01 08:00'}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </div>
   );
 }
