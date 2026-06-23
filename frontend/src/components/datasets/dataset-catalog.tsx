@@ -323,8 +323,8 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
     <div className={isModal ? 'space-y-4' : 'space-y-6'}>
       <Card className="border-border/60">
         <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
               <CardTitle className="flex items-center gap-2 text-2xl">
                 <Database className="h-6 w-6" />
                 Dataset catalog
@@ -334,7 +334,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 status. Mutations happen in the ingestion + processing pipelines.
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
               {canCreate && (
                 <Button
                   onClick={() => {
@@ -358,12 +358,12 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto] lg:items-center">
             <Input
               placeholder="Search by name, description, or tag"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="max-w-md"
+              className="min-w-0"
             />
             <select
               value={typeFilter}
@@ -382,63 +382,80 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
               className="rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             />
             {catalogItems.length > 0 && (
-              <span className="text-sm text-fg-muted">
+              <span className="whitespace-nowrap text-sm text-fg-muted">
                 {filtered.length} of {catalogItems.length} datasets
               </span>
             )}
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
-            <Input
-              inputMode="numeric"
-              placeholder="Dataset ID"
-              value={exportDatasetId}
-              onChange={(event) => setExportDatasetId(event.target.value)}
-              className="max-w-40"
-            />
-            <Button
-              variant="outline"
-              onClick={requestManualExport}
-              disabled={exportingDatasetId != null}
-            >
-              {exportingDatasetId != null ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="mr-2 h-4 w-4" />
-              )}
-              Export by ID
-            </Button>
-            {exportFeedback && <span className="text-sm text-fg-muted">{exportFeedback}</span>}
-          </div>
-          {canDelete && (
-            <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+          <div className="mt-4 grid gap-3 border-t border-border pt-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
               <Input
                 inputMode="numeric"
                 placeholder="Dataset ID"
-                value={deleteDatasetId}
-                onChange={(event) => setDeleteDatasetId(event.target.value)}
-                className="max-w-40"
+                value={exportDatasetId}
+                onChange={(event) => setExportDatasetId(event.target.value)}
+                className="w-36"
               />
               <Button
-                variant="destructive"
-                onClick={requestManualDelete}
-                disabled={deleteMutation.isPending}
+                variant="outline"
+                onClick={requestManualExport}
+                disabled={exportingDatasetId != null}
               >
-                {deleteMutation.isPending ? (
+                {exportingDatasetId != null ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Download className="mr-2 h-4 w-4" />
                 )}
-                Delete by ID
+                Export by ID
               </Button>
-              {deleteFeedback && <span className="text-sm text-fg-muted">{deleteFeedback}</span>}
+              {exportFeedback && (
+                <span className="min-w-0 text-sm text-fg-muted">{exportFeedback}</span>
+              )}
             </div>
-          )}
+            {canDelete && (
+              <div className="flex min-w-0 flex-wrap items-center gap-2 md:justify-end">
+                <Input
+                  inputMode="numeric"
+                  placeholder="Dataset ID"
+                  value={deleteDatasetId}
+                  onChange={(event) => setDeleteDatasetId(event.target.value)}
+                  className="w-36"
+                />
+                <Button
+                  variant="destructive"
+                  onClick={requestManualDelete}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="mr-2 h-4 w-4" />
+                  )}
+                  Delete by ID
+                </Button>
+                {deleteFeedback && (
+                  <span className="min-w-0 text-sm text-fg-muted">{deleteFeedback}</span>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
 
       <Card className="border-border/60">
         <CardContent className="p-0">
-          <Table>
+          <Table className="table-fixed">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[23%]" />
+              <col className="w-[12%]" />
+              <col className="w-[9%]" />
+              <col className="w-[10%]" />
+              <col className="w-[8%]" />
+              <col className="w-[10%]" />
+              <col className="w-14" />
+              {canDelete && <col className="w-14" />}
+            </colgroup>
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
@@ -454,9 +471,10 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
             </TableHeader>
             <TableBody>
               {listQuery.isLoading || isLoadingDinsightSummaries ? (
-                <TableLoading message="Loading dataset catalog" />
+                <TableLoading message="Loading dataset catalog" rowSpan={canDelete ? 9 : 8} />
               ) : filtered.length === 0 ? (
                 <TableEmpty
+                  rowSpan={canDelete ? 9 : 8}
                   message={
                     search || typeFilter
                       ? 'No datasets match the current filters.'
@@ -470,13 +488,17 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     className="cursor-pointer hover:bg-surface-muted"
                     onClick={() => setSelectedDatasetId(item.dataset_id)}
                   >
-                    <TableCell>
-                      <div className="font-medium text-fg">{item.name}</div>
+                    <TableCell className="min-w-0">
+                      <div className="truncate font-medium text-fg" title={item.name}>
+                        {item.name}
+                      </div>
                       {item.description && (
-                        <div className="text-xs text-fg-muted">{item.description}</div>
+                        <div className="truncate text-xs text-fg-muted" title={item.description}>
+                          {item.description}
+                        </div>
                       )}
                       {!item.has_metadata && (
-                        <div className="mt-1 text-xs text-warning-text">
+                        <div className="mt-1 line-clamp-2 text-xs text-warning-text">
                           Register metadata to unlock curation, validation, and compatibility
                           workflows.
                         </div>

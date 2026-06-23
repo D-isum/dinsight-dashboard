@@ -1233,7 +1233,7 @@ export default function DataIngestionPage() {
           />
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid min-w-0 gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
           <WorkflowStepper
             isConfigured={!isConfigLoading}
             baselineReady={baselineReady}
@@ -1243,7 +1243,9 @@ export default function DataIngestionPage() {
             isActiveProcessing={isActiveProcessing}
             hasError={state.status === 'error'}
           />
-          <DeploymentStatusCard compact />
+          <div className="self-start">
+            <DeploymentStatusCard compact />
+          </div>
         </div>
 
         {metadataRegistrationStatus && (
@@ -1252,8 +1254,8 @@ export default function DataIngestionPage() {
           </div>
         )}
 
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="space-y-5">
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-5">
             <Card className="border-border/60">
               <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -1319,7 +1321,7 @@ export default function DataIngestionPage() {
                   </TabsList>
 
                   <TabsContent value="combined" className="mt-0">
-                    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(300px,420px)]">
+                    <div className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(280px,0.8fr)_minmax(420px,1.2fr)]">
                       <section className="space-y-4 rounded-lg border border-border bg-surface/50 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
@@ -1457,7 +1459,7 @@ export default function DataIngestionPage() {
                           <p className="text-sm text-success-text">{combinedSplitSummary}</p>
                         )}
 
-                        <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
+                        <div className="grid gap-2 sm:grid-cols-[minmax(0,auto)_minmax(0,1fr)]">
                           <Button
                             variant="outline"
                             onClick={() => void onPreviewCombinedSplit()}
@@ -1836,7 +1838,7 @@ export default function DataIngestionPage() {
             )}
           </div>
 
-          <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
+          <aside className="min-w-0 space-y-5 xl:sticky xl:top-5 xl:self-start">
             <Card className="border-border/60">
               <CardHeader>
                 <CardTitle className="text-base">Dataset Context</CardTitle>
@@ -1975,7 +1977,7 @@ function WorkflowStepper({
   return (
     <Card className="border-border/60">
       <CardContent className="p-3">
-        <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+        <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(128px,1fr))]">
           {steps.map((step, index) => (
             <div
               key={step.label}
@@ -1995,7 +1997,7 @@ function WorkflowStepper({
                 {step.complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}
               </span>
               <div className="min-w-0">
-                <div className="truncate text-sm font-medium text-fg">{step.label}</div>
+                <div className="text-sm font-medium leading-tight text-fg">{step.label}</div>
                 <div className="text-[11px] text-muted-foreground">
                   {step.complete ? 'Done' : step.active ? 'Current' : 'Pending'}
                 </div>

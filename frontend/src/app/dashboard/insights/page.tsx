@@ -48,6 +48,7 @@ import {
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 const INSIGHTS_UI_PREFS_KEY = 'insights-ui-prefs-v1';
 const DISTANCE_AXIS_BASE_MAX = 2;
+const BASELINE_CLUSTER_PAGE_SIZE = 40;
 
 type DatasetType = 'baseline' | 'monitoring';
 
@@ -110,6 +111,7 @@ export default function HealthInsightsPage() {
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
   const [clusterFilterText, setClusterFilterText] = useState('');
+  const [clusterPage, setClusterPage] = useState(1);
   const [hasUserAdjustedCluster, setHasUserAdjustedCluster] = useState(false);
   const [showIntervalTable, setShowIntervalTable] = useState(false);
   const [showTransitionTable, setShowTransitionTable] = useState(false);
@@ -305,6 +307,7 @@ export default function HealthInsightsPage() {
     setRangeStart('');
     setRangeEnd('');
     setHasUserAdjustedCluster(false);
+    setClusterPage(1);
     setIntervalPage(1);
     setTransitionPage(1);
     setClusterReadyContext(null);
@@ -660,6 +663,27 @@ export default function HealthInsightsPage() {
     const search = clusterFilterText.toLowerCase();
     return baselineIntervalValues.filter((value) => value.toLowerCase().includes(search));
   }, [baselineIntervalValues, clusterFilterText]);
+  const clusterTotalPages = Math.max(
+    1,
+    Math.ceil(filteredBaselineIntervalValues.length / BASELINE_CLUSTER_PAGE_SIZE)
+  );
+  const currentClusterPage = Math.min(Math.max(clusterPage, 1), clusterTotalPages);
+  const clusterPageStartIndex = (currentClusterPage - 1) * BASELINE_CLUSTER_PAGE_SIZE;
+  const pagedBaselineIntervalValues = useMemo(() => {
+    return filteredBaselineIntervalValues.slice(
+      clusterPageStartIndex,
+      clusterPageStartIndex + BASELINE_CLUSTER_PAGE_SIZE
+    );
+  }, [clusterPageStartIndex, filteredBaselineIntervalValues]);
+  const selectedClusterSet = useMemo(() => new Set(selectedClusterValues), [selectedClusterValues]);
+
+  useEffect(() => {
+    setClusterPage(1);
+  }, [clusterFilterText, metadataColumn]);
+
+  useEffect(() => {
+    setClusterPage((page) => Math.min(Math.max(page, 1), clusterTotalPages));
+  }, [clusterTotalPages]);
 
   const toggleClusterValue = (value: string) => {
     setSelectedClusterValues((current) => {
@@ -1038,7 +1062,7 @@ export default function HealthInsightsPage() {
     return {
       data: traces,
       layout: {
-        height: 640,
+        height: 540,
         template: 'plotly_white',
         title: `Distance from Baseline (G0→Gi) by ${wearResult.metadata_column}`,
         xaxis: {
@@ -1224,7 +1248,7 @@ export default function HealthInsightsPage() {
         },
       ],
       layout: {
-        height: 640,
+        height: 540,
         template: 'plotly_white',
         title: `Interval Transitions (Gi→Gi+1) by ${wearResult?.metadata_column ?? 'selected interval'}`,
         xaxis: {
@@ -1435,9 +1459,13 @@ export default function HealthInsightsPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+      <div
+        className={`grid grid-cols-1 gap-6 ${
+          isControlsCollapsed ? '' : 'xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]'
+        }`}
+      >
         {!isControlsCollapsed && (
-          <Card className="border-border/60 xl:col-span-3 xl:sticky xl:top-20 xl:h-fit">
+          <Card className="min-w-0 border-border/60 xl:sticky xl:top-20 xl:h-fit">
             <CardHeader>
               <CardTitle className="text-lg">Controls</CardTitle>
               <CardDescription>
@@ -1486,7 +1514,7 @@ export default function HealthInsightsPage() {
                   />
                 </div>
 
-                <div className="max-h-44 space-y-2 overflow-y-auto rounded-md border border-input p-2">
+                <div className="max-h-60 space-y-2 overflow-y-auto rounded-md border border-input p-2">
                   {!metadataColumn ? (
                     <p className="text-xs text-muted-foreground">
                       Select wear trend column to load baseline intervals.
@@ -1498,18 +1526,52 @@ export default function HealthInsightsPage() {
                       No baseline intervals found for this selection.
                     </p>
                   ) : (
-                    filteredBaselineIntervalValues.map((value) => (
+                    pagedBaselineIntervalValues.map((value) => (
                       <label key={value} className="flex items-center gap-2 text-sm">
                         <input
                           type="checkbox"
-                          checked={selectedClusterValues.includes(value)}
+                          checked={selectedClusterSet.has(value)}
                           onChange={() => toggleClusterValue(value)}
                         />
-                        <span className="truncate">{value}</span>
+                        <span className="min-w-0 truncate" title={value}>
+                          {value}
+                        </span>
                       </label>
                     ))
                   )}
                 </div>
+                {filteredBaselineIntervalValues.length > BASELINE_CLUSTER_PAGE_SIZE && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span>
+                      Showing {clusterPageStartIndex + 1}-
+                      {Math.min(
+                        currentClusterPage * BASELINE_CLUSTER_PAGE_SIZE,
+                        filteredBaselineIntervalValues.length
+                      )}{' '}
+                      of {filteredBaselineIntervalValues.length}
+                    </span>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setClusterPage((page) => Math.max(1, page - 1))}
+                        disabled={currentClusterPage <= 1}
+                      >
+                        Prev
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setClusterPage((page) => Math.min(clusterTotalPages, page + 1))
+                        }
+                        disabled={currentClusterPage >= clusterTotalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-2">
                   <Button variant="outline" size="sm" onClick={selectFilteredClusters}>
@@ -1586,9 +1648,7 @@ export default function HealthInsightsPage() {
           </Card>
         )}
 
-        <div
-          className={`${isControlsCollapsed ? 'xl:col-span-12' : 'xl:col-span-9'} min-w-0 space-y-6`}
-        >
+        <div className="min-w-0 space-y-6">
           <Card className="border-border/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">

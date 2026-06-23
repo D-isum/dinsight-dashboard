@@ -215,10 +215,10 @@ function CommandMetric({
   detail: ReactNode;
 }) {
   return (
-    <div className="rounded-md border border-border bg-surface px-3 py-2">
+    <div className="min-h-[92px] rounded-md border border-border bg-surface px-3 py-2">
       <div className="text-xs font-medium uppercase text-muted-foreground">{label}</div>
-      <div className="mt-1 truncate text-lg font-semibold text-fg">{value}</div>
-      <div className="mt-1 truncate text-xs text-muted-foreground">{detail}</div>
+      <div className="mt-1 break-words text-lg font-semibold leading-snug text-fg">{value}</div>
+      <div className="mt-1 break-words text-xs leading-snug text-muted-foreground">{detail}</div>
     </div>
   );
 }
@@ -505,7 +505,9 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <DeploymentStatusCard compact />
+        <div className="self-start">
+          <DeploymentStatusCard compact />
+        </div>
       </div>
 
       <RecommendedActions

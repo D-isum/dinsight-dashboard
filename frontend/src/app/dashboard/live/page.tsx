@@ -1361,7 +1361,7 @@ export default function LiveMonitorPage() {
     return {
       data: traces,
       layout: {
-        height: 700,
+        height: 560,
         template: 'plotly_white',
         title: '',
         xaxis: { title: "D'insight X Coordinate" },
@@ -1527,8 +1527,8 @@ export default function LiveMonitorPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-4">
-        <Card className="xl:col-span-1 border-border/60">
+      <div className="grid gap-6 xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]">
+        <Card className="min-w-0 border-border/60">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Activity className="h-5 w-5" />
@@ -1819,7 +1819,7 @@ export default function LiveMonitorPage() {
           </CardContent>
         </Card>
 
-        <Card className="xl:col-span-3 border-border/60">
+        <Card className="min-w-0 border-border/60">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <ShieldAlert className="h-5 w-5" />
@@ -1857,7 +1857,7 @@ export default function LiveMonitorPage() {
             )}
 
             {isLoadingBaseline || (selectedId && isLoadingMonitoring) ? (
-              <div className="flex h-[700px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
+              <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
                 Loading monitor view...
               </div>
             ) : plotData ? (
@@ -1865,7 +1865,8 @@ export default function LiveMonitorPage() {
                 data={plotData.data}
                 layout={plotData.layout as any}
                 config={plotData.config as any}
-                style={{ width: '100%', height: '700px' }}
+                useResizeHandler
+                style={{ width: '100%', height: 'min(62vh, 560px)', minHeight: '420px' }}
                 onSelecting={() => {
                   if (manualSelectionEnabled) {
                     setIsSelecting(true);
@@ -1880,7 +1881,7 @@ export default function LiveMonitorPage() {
                 }}
               />
             ) : (
-              <div className="flex h-[700px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
+              <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
                 Select a dataset with baseline coordinates to start live monitoring.
               </div>
             )}

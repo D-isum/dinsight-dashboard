@@ -145,19 +145,19 @@ function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="h-screen flex bg-canvas">
+    <div className="h-screen flex min-w-0 bg-canvas">
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
         {/* Header */}
         <Header onMenuClick={() => setSidebarOpen(true)} isSidebarOpen={sidebarOpen} />
 
         {/* Page content — wrapped so a render-time crash in one page surfaces
             the ErrorBoundary fallback instead of breaking the entire app shell. */}
-        <main className="flex-1 overflow-y-auto bg-canvas">
-          <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-canvas">
+          <div className="mx-auto w-full max-w-7xl min-w-0 px-4 py-6">
             {licenseIssue && showingAccountSettings && (
               <Alert variant="danger" className="mb-4">
                 <AlertTriangle aria-hidden="true" />
