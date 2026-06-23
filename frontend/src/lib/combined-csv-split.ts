@@ -23,6 +23,19 @@ export interface CombinedCsvSplitResult {
   totalRows: number;
 }
 
+export interface CombinedCsvSplitPreview {
+  baselineRows: number;
+  monitoringRows: number;
+  overlapRows: number;
+  unmatchedRows: number;
+  totalRows: number;
+  splitColumn: string;
+  firstValue: string;
+  lastValue: string;
+  minValue: string;
+  maxValue: string;
+}
+
 const delimiterCandidates = [',', ';', '\t', '|'];
 
 const normalizeText = (raw: string) =>
@@ -245,6 +258,27 @@ const parseComparableValue = (value: string, rangeType: CombinedRangeType): numb
   return parseTimeLikeValue(value);
 };
 
+const parseRangeBounds = (options: CombinedCsvSplitOptions) => {
+  const baselineStart = parseComparableValue(options.baselineStart, options.rangeType);
+  const baselineEnd = parseComparableValue(options.baselineEnd, options.rangeType);
+  const monitoringStart = parseComparableValue(options.monitoringStart, options.rangeType);
+  const monitoringEnd = parseComparableValue(options.monitoringEnd, options.rangeType);
+
+  if (baselineStart > baselineEnd) {
+    throw new Error('Baseline start must be before or equal to baseline stop.');
+  }
+  if (monitoringStart > monitoringEnd) {
+    throw new Error('Monitoring start must be before or equal to monitoring stop.');
+  }
+
+  return {
+    baselineStart,
+    baselineEnd,
+    monitoringStart,
+    monitoringEnd,
+  };
+};
+
 const inInclusiveRange = (
   value: string,
   start: string,
@@ -256,6 +290,9 @@ const inInclusiveRange = (
   const endValue = parseComparableValue(end, rangeType);
   return comparable >= startValue && comparable <= endValue;
 };
+
+const inParsedRange = (value: number, start: number, end: number): boolean =>
+  value >= start && value <= end;
 
 const csvEscape = (value: string): string => {
   if (/[",\n\r]/.test(value)) {
@@ -272,6 +309,68 @@ const buildCsv = (headers: string[], rows: string[][]): string => {
 
 const splitBaseName = (name: string): string => name.replace(/\.[^.]+$/, '') || 'combined';
 
+export const previewCombinedCsvSplitFile = async (
+  file: File,
+  options: CombinedCsvSplitOptions
+): Promise<CombinedCsvSplitPreview> => {
+  const parsed = parseCsv(await decodeFileText(file));
+  const splitIndex = resolveColumnIndex(parsed.headers, options.splitColumn);
+  if (splitIndex < 0) {
+    throw new Error('Selected split column was not found in the CSV headers.');
+  }
+
+  const bounds = parseRangeBounds(options);
+  let baselineRows = 0;
+  let monitoringRows = 0;
+  let overlapRows = 0;
+  let unmatchedRows = 0;
+  let minComparable = Number.POSITIVE_INFINITY;
+  let maxComparable = Number.NEGATIVE_INFINITY;
+  let minValue = '';
+  let maxValue = '';
+
+  for (const row of parsed.rows) {
+    const rawValue = row[splitIndex] ?? '';
+    const comparable = parseComparableValue(rawValue, options.rangeType);
+    if (comparable < minComparable) {
+      minComparable = comparable;
+      minValue = rawValue;
+    }
+    if (comparable > maxComparable) {
+      maxComparable = comparable;
+      maxValue = rawValue;
+    }
+
+    const isBaseline = inParsedRange(comparable, bounds.baselineStart, bounds.baselineEnd);
+    const isMonitoring = inParsedRange(comparable, bounds.monitoringStart, bounds.monitoringEnd);
+    if (isBaseline) {
+      baselineRows += 1;
+    }
+    if (isMonitoring) {
+      monitoringRows += 1;
+    }
+    if (isBaseline && isMonitoring) {
+      overlapRows += 1;
+    }
+    if (!isBaseline && !isMonitoring) {
+      unmatchedRows += 1;
+    }
+  }
+
+  return {
+    baselineRows,
+    monitoringRows,
+    overlapRows,
+    unmatchedRows,
+    totalRows: parsed.rows.length,
+    splitColumn: parsed.headers[splitIndex],
+    firstValue: parsed.rows[0]?.[splitIndex] ?? '',
+    lastValue: parsed.rows[parsed.rows.length - 1]?.[splitIndex] ?? '',
+    minValue,
+    maxValue,
+  };
+};
+
 export const splitCombinedCsvFile = async (
   file: File,
   options: CombinedCsvSplitOptions
@@ -281,6 +380,8 @@ export const splitCombinedCsvFile = async (
   if (splitIndex < 0) {
     throw new Error('Selected split column was not found in the CSV headers.');
   }
+
+  parseRangeBounds(options);
 
   const baselineRows: string[][] = [];
   const monitoringRows: string[][] = [];

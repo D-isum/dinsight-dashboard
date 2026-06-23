@@ -49,12 +49,14 @@ export interface RegisterMetadataDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Dataset IDs that already have metadata. Excluded from the picker. */
   excludedDatasetIds: number[];
+  initialDatasetId?: number | null;
 }
 
 export function RegisterMetadataDialog({
   open,
   onOpenChange,
   excludedDatasetIds,
+  initialDatasetId,
 }: RegisterMetadataDialogProps) {
   const queryClient = useQueryClient();
 
@@ -85,8 +87,12 @@ export function RegisterMetadataDialog({
   );
 
   useEffect(() => {
+    if (open && initialDatasetId && !excludedDatasetIds.includes(initialDatasetId)) {
+      setDatasetId(initialDatasetId);
+      return;
+    }
     setDatasetId(null);
-  }, [selectedSourceKey]);
+  }, [excludedDatasetIds, initialDatasetId, open, selectedSourceKey]);
 
   const mutation = useMutation({
     mutationFn: (data: CreateDatasetMetadataRequest) => api.datasets.createMetadata(data),

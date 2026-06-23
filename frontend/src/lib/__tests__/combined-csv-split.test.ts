@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { detectCsvDelimiter, parseCsv, splitCombinedCsvFile } from '@/lib/combined-csv-split';
+import {
+  detectCsvDelimiter,
+  parseCsv,
+  previewCombinedCsvSplitFile,
+  splitCombinedCsvFile,
+} from '@/lib/combined-csv-split';
 
 const fileLike = (content: string, name: string): File =>
   ({
@@ -68,6 +73,57 @@ describe('combined-csv-split', () => {
 
     expect(split.baselineRows).toBe(2);
     expect(split.monitoringRows).toBe(2);
+  });
+
+  it('previews split counts and source value bounds', async () => {
+    const file = fileLike(
+      [
+        'timestamp,asset,f_0',
+        '2003/10/22  12:06:24,A,1',
+        '2003/10/23  12:06:24,A,2',
+        '2003/10/24  12:06:24,A,3',
+        '2003/10/25  12:06:24,A,4',
+      ].join('\n'),
+      'preview.csv'
+    );
+
+    const preview = await previewCombinedCsvSplitFile(file, {
+      splitColumn: 'timestamp',
+      rangeType: 'datetime',
+      baselineStart: '2003/10/22  12:06:24',
+      baselineEnd: '2003/10/23  12:06:24',
+      monitoringStart: '2003/10/24  12:06:24',
+      monitoringEnd: '2003/10/25  12:06:24',
+    });
+
+    expect(preview).toMatchObject({
+      baselineRows: 2,
+      monitoringRows: 2,
+      overlapRows: 0,
+      unmatchedRows: 0,
+      totalRows: 4,
+      splitColumn: 'timestamp',
+      minValue: '2003/10/22  12:06:24',
+      maxValue: '2003/10/25  12:06:24',
+    });
+  });
+
+  it('previews overlapping split ranges', async () => {
+    const file = fileLike('day,asset,f_0\n1,A,10\n2,A,20\n3,A,30\n', 'overlap.csv');
+
+    const preview = await previewCombinedCsvSplitFile(file, {
+      splitColumn: 'day',
+      rangeType: 'number',
+      baselineStart: '1',
+      baselineEnd: '2',
+      monitoringStart: '2',
+      monitoringEnd: '3',
+    });
+
+    expect(preview.baselineRows).toBe(2);
+    expect(preview.monitoringRows).toBe(2);
+    expect(preview.overlapRows).toBe(1);
+    expect(preview.unmatchedRows).toBe(0);
   });
 
   it('splits by numeric day ranges', async () => {

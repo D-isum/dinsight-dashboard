@@ -2,8 +2,9 @@
 
 import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   ArrowRight,
   BarChart3,
   CheckCircle2,
@@ -23,15 +24,23 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfigDialog } from '@/components/ui/config-dialog';
 import { ProcessingDialog } from '@/components/ui/processing-dialog';
+import { DeploymentStatusCard } from '@/components/deployment/deployment-status-card';
 import { DatasetCatalog } from '@/components/datasets/dataset-catalog';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
+import { usePermission } from '@/components/auth/require-permission';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useUploadWorkflow } from '@/hooks/useUploadWorkflow';
 import { api } from '@/lib/api-client';
-import { CombinedRangeType, splitCombinedCsvFile } from '@/lib/combined-csv-split';
+import {
+  CombinedCsvSplitPreview,
+  CombinedRangeType,
+  previewCombinedCsvSplitFile,
+  splitCombinedCsvFile,
+} from '@/lib/combined-csv-split';
 import { formatDatasetOptionLabel, getDatasetSourceGroupKey } from '@/lib/dataset-source-groups';
+import { Actions } from '@/lib/permissions';
 
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 
@@ -82,7 +91,64 @@ function sortByCreatedAtDesc(
   return b.dinsight_id - a.dinsight_id;
 }
 
+function createDinsightPreviewPlot(
+  baselineData: { dinsight_x: number[]; dinsight_y: number[] } | null | undefined,
+  monitoringData: { dinsight_x: number[]; dinsight_y: number[] } | null | undefined,
+  compact = false
+) {
+  if (!baselineData || baselineData.dinsight_x.length === 0) {
+    return null;
+  }
+
+  const traces: any[] = [
+    {
+      x: baselineData.dinsight_x,
+      y: baselineData.dinsight_y,
+      type: 'scattergl',
+      mode: 'markers',
+      name: 'Baseline',
+      marker: { color: '#2563EB', size: compact ? 4 : 6, opacity: 0.45 },
+      hovertemplate: 'Baseline<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
+    },
+  ];
+
+  if (monitoringData && monitoringData.dinsight_x.length > 0) {
+    traces.push({
+      x: monitoringData.dinsight_x,
+      y: monitoringData.dinsight_y,
+      type: 'scattergl',
+      mode: 'markers',
+      name: 'Monitoring',
+      marker: { color: '#DC2626', size: compact ? 4 : 6, opacity: 0.65 },
+      hovertemplate: 'Monitoring<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
+    });
+  }
+
+  return {
+    data: traces,
+    layout: {
+      template: 'plotly_white',
+      autosize: true,
+      margin: compact ? { t: 8, r: 8, b: 28, l: 36 } : { t: 18, r: 20, b: 50, l: 55 },
+      xaxis: { title: compact ? '' : 'DInsight X' },
+      yaxis: { title: compact ? '' : 'DInsight Y' },
+      legend: compact
+        ? { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 }
+        : {
+            orientation: 'h',
+            yanchor: 'bottom',
+            y: 1.02,
+            xanchor: 'right',
+            x: 1,
+          },
+    } as any,
+    config: { responsive: true, displayModeBar: false },
+  };
+}
+
 export default function DataIngestionPage() {
+  const queryClient = useQueryClient();
+  const canCreateDatasetMetadata = usePermission(Actions.DatasetCreate);
   const { state, uploadBaseline, uploadMonitoring, uploadCombinedSplit, resetWorkflow } =
     useUploadWorkflow();
   const { datasets, refetch } = useDatasetDiscovery({
@@ -116,6 +182,10 @@ export default function DataIngestionPage() {
   const [combinedMonitoringEnd, setCombinedMonitoringEnd] = useState('');
   const [combinedSplitError, setCombinedSplitError] = useState<string | null>(null);
   const [combinedSplitSummary, setCombinedSplitSummary] = useState<string | null>(null);
+  const [combinedSplitPreview, setCombinedSplitPreview] = useState<CombinedCsvSplitPreview | null>(
+    null
+  );
+  const [isPreviewingSplit, setIsPreviewingSplit] = useState(false);
 
   const [manualBaselineId, setManualBaselineId] = useState('');
   const [useManualBaselineId, setUseManualBaselineId] = useState(false);
@@ -136,6 +206,8 @@ export default function DataIngestionPage() {
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [lastAutoOpenedPreviewId, setLastAutoOpenedPreviewId] = useState<number | null>(null);
   const lastSourceSyncedWorkflowIdRef = useRef<number | null>(null);
+  const autoRegisteredMetadataIdsRef = useRef<Set<number>>(new Set());
+  const [metadataRegistrationStatus, setMetadataRegistrationStatus] = useState<string | null>(null);
 
   const {
     data: config,
@@ -206,6 +278,93 @@ export default function DataIngestionPage() {
       setUseManualBaselineId(false);
     }
   }, [datasets, setSelectedSourceKey, state.dinsightId]);
+
+  useEffect(() => {
+    const datasetId = state.dinsightId;
+    if (!datasetId || autoRegisteredMetadataIdsRef.current.has(datasetId)) {
+      return;
+    }
+
+    autoRegisteredMetadataIdsRef.current.add(datasetId);
+
+    let cancelled = false;
+    const sourceFile = combinedFile ?? baselineFile;
+    const sourceName = sourceFile?.name?.replace(/\.[^.]+$/, '') || `Dataset ${datasetId}`;
+
+    const registerMetadata = async () => {
+      try {
+        await api.datasets.getMetadata(datasetId);
+        if (!cancelled) {
+          setMetadataRegistrationStatus(
+            `Catalog metadata already exists for dataset #${datasetId}.`
+          );
+        }
+        return;
+      } catch (error: any) {
+        const status = error?.response?.status;
+        const code = error?.response?.data?.error?.code;
+        if (status !== 404 && code !== 'METADATA_NOT_FOUND') {
+          if (!cancelled) {
+            setMetadataRegistrationStatus(
+              `Metadata check skipped for dataset #${datasetId}; catalog export/delete still works.`
+            );
+          }
+          return;
+        }
+      }
+
+      if (!canCreateDatasetMetadata) {
+        if (!cancelled) {
+          setMetadataRegistrationStatus(
+            `Dataset #${datasetId} is processed but metadata registration requires operator/admin access.`
+          );
+        }
+        return;
+      }
+
+      try {
+        await api.datasets.createMetadata({
+          dataset_id: datasetId,
+          dataset_type: 'baseline',
+          name: sourceName,
+          description: `Auto-registered from Data Ingestion upload${sourceFile ? ` (${sourceFile.name})` : ''}.`,
+          processing_stage: 'processed',
+          version: '1.0',
+          tags: ['auto-registered', 'data-ingestion'],
+        });
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: ['datasets'] }),
+          queryClient.invalidateQueries({ queryKey: ['catalog'] }),
+        ]);
+        if (!cancelled) {
+          setMetadataRegistrationStatus(`Catalog metadata registered for dataset #${datasetId}.`);
+        }
+      } catch (error: any) {
+        const status = error?.response?.status;
+        const code = error?.response?.data?.error?.code;
+        if (status === 409 || code === 'METADATA_EXISTS') {
+          if (!cancelled) {
+            setMetadataRegistrationStatus(
+              `Catalog metadata already exists for dataset #${datasetId}.`
+            );
+          }
+          return;
+        }
+        if (!cancelled) {
+          setMetadataRegistrationStatus(
+            error?.response?.data?.message ||
+              `Dataset #${datasetId} processed; metadata can be registered from Catalog.`
+          );
+        }
+      }
+    };
+
+    void registerMetadata();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baselineFile, canCreateDatasetMetadata, combinedFile, queryClient, state.dinsightId]);
 
   // Sort mode for the picker. Newest first matches "what did I just
   // upload?"; oldest first is occasionally useful when scrolling
@@ -452,6 +611,7 @@ export default function DataIngestionPage() {
     setCombinedValidation(null);
     setCombinedSplitError(null);
     setCombinedSplitSummary(null);
+    setCombinedSplitPreview(null);
 
     if (!file) {
       return;
@@ -474,6 +634,42 @@ export default function DataIngestionPage() {
           setCombinedRangeType('number');
         }
       }
+    }
+  };
+
+  const onPreviewCombinedSplit = async () => {
+    if (!combinedFile || !combinedValidation?.valid) {
+      return;
+    }
+
+    if (
+      !combinedSplitColumn ||
+      !combinedBaselineStart ||
+      !combinedBaselineEnd ||
+      !combinedMonitoringStart ||
+      !combinedMonitoringEnd
+    ) {
+      setCombinedSplitError('Select a split column and complete all baseline/monitoring bounds.');
+      return;
+    }
+
+    setCombinedSplitError(null);
+    setCombinedSplitPreview(null);
+    setIsPreviewingSplit(true);
+    try {
+      const preview = await previewCombinedCsvSplitFile(combinedFile, {
+        splitColumn: combinedSplitColumn,
+        rangeType: combinedRangeType,
+        baselineStart: combinedBaselineStart,
+        baselineEnd: combinedBaselineEnd,
+        monitoringStart: combinedMonitoringStart,
+        monitoringEnd: combinedMonitoringEnd,
+      });
+      setCombinedSplitPreview(preview);
+    } catch (error: any) {
+      setCombinedSplitError(error?.message || 'Unable to preview combined file split.');
+    } finally {
+      setIsPreviewingSplit(false);
     }
   };
 
@@ -516,6 +712,7 @@ export default function DataIngestionPage() {
 
     setCombinedSplitError(null);
     setCombinedSplitSummary(null);
+    setCombinedSplitPreview(null);
 
     try {
       const split = await splitCombinedCsvFile(combinedFile, {
@@ -546,6 +743,22 @@ export default function DataIngestionPage() {
       ? state.dinsightId
       : latestFilteredDatasetId;
   const previewDatasetId = previewMode === 'latest' ? latestProcessedPreviewId : savedPreviewId;
+  const inlinePreviewDatasetId = latestProcessedPreviewId ?? savedPreviewId;
+
+  const {
+    baselineData: inlineBaselineData,
+    monitoringData: inlineMonitoringData,
+    isLoadingBaseline: isInlineLoadingBaseline,
+    isLoadingMonitoring: isInlineLoadingMonitoring,
+    baselineError: inlineBaselineError,
+    monitoringError: inlineMonitoringError,
+  } = useBaselineMonitoringData({
+    dinsightId: inlinePreviewDatasetId ?? null,
+    includeMetadata: false,
+    monitoringMode: 'coordinates',
+    maxPoints: 20_000,
+    refreshKey: previewRefreshKey,
+  });
 
   const {
     baselineData: previewBaselineData,
@@ -661,54 +874,14 @@ export default function DataIngestionPage() {
       : state.status === 'error'
         ? 'Review the error details below and retry when ready.'
         : 'Please wait while we process your files. This can take a few minutes for large datasets.';
-  const previewPlot = useMemo(() => {
-    if (!previewBaselineData || previewBaselineData.dinsight_x.length === 0) {
-      return null;
-    }
-
-    const traces: any[] = [
-      {
-        x: previewBaselineData.dinsight_x,
-        y: previewBaselineData.dinsight_y,
-        type: 'scattergl',
-        mode: 'markers',
-        name: 'Baseline',
-        marker: { color: '#2563EB', size: 6, opacity: 0.45 },
-        hovertemplate: 'Baseline<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
-      },
-    ];
-
-    if (previewMonitoringData && previewMonitoringData.dinsight_x.length > 0) {
-      traces.push({
-        x: previewMonitoringData.dinsight_x,
-        y: previewMonitoringData.dinsight_y,
-        type: 'scattergl',
-        mode: 'markers',
-        name: 'Monitoring',
-        marker: { color: '#DC2626', size: 6, opacity: 0.65 },
-        hovertemplate: 'Monitoring<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
-      });
-    }
-
-    return {
-      data: traces,
-      layout: {
-        template: 'plotly_white',
-        autosize: true,
-        margin: { t: 18, r: 20, b: 50, l: 55 },
-        xaxis: { title: 'DInsight X' },
-        yaxis: { title: 'DInsight Y' },
-        legend: {
-          orientation: 'h',
-          yanchor: 'bottom',
-          y: 1.02,
-          xanchor: 'right',
-          x: 1,
-        },
-      } as any,
-      config: { responsive: true, displayModeBar: false },
-    };
-  }, [previewBaselineData, previewMonitoringData]);
+  const previewPlot = useMemo(
+    () => createDinsightPreviewPlot(previewBaselineData, previewMonitoringData),
+    [previewBaselineData, previewMonitoringData]
+  );
+  const inlinePreviewPlot = useMemo(
+    () => createDinsightPreviewPlot(inlineBaselineData, inlineMonitoringData, true),
+    [inlineBaselineData, inlineMonitoringData]
+  );
 
   return (
     <div className="space-y-6">
@@ -1060,6 +1233,25 @@ export default function DataIngestionPage() {
           />
         </div>
 
+        <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <WorkflowStepper
+            isConfigured={!isConfigLoading}
+            baselineReady={baselineReady}
+            monitoringComplete={monitoringComplete}
+            catalogReady={Boolean(metadataRegistrationStatus)}
+            hasVisualization={Boolean(inlinePreviewPlot)}
+            isActiveProcessing={isActiveProcessing}
+            hasError={state.status === 'error'}
+          />
+          <DeploymentStatusCard compact />
+        </div>
+
+        {metadataRegistrationStatus && (
+          <div className="rounded-md border border-info-border bg-info-bg px-3 py-2 text-sm text-info-text">
+            {metadataRegistrationStatus}
+          </div>
+        )}
+
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="space-y-5">
             <Card className="border-border/60">
@@ -1172,7 +1364,10 @@ export default function DataIngestionPage() {
                             <select
                               id="combined-split-column"
                               value={combinedSplitColumn}
-                              onChange={(event) => setCombinedSplitColumn(event.target.value)}
+                              onChange={(event) => {
+                                setCombinedSplitColumn(event.target.value);
+                                setCombinedSplitPreview(null);
+                              }}
                               disabled={!combinedValidation?.headers.length || isActiveProcessing}
                               className="rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
@@ -1192,9 +1387,10 @@ export default function DataIngestionPage() {
                             <select
                               id="combined-range-type"
                               value={combinedRangeType}
-                              onChange={(event) =>
-                                setCombinedRangeType(event.target.value as CombinedRangeType)
-                              }
+                              onChange={(event) => {
+                                setCombinedRangeType(event.target.value as CombinedRangeType);
+                                setCombinedSplitPreview(null);
+                              }}
                               disabled={isActiveProcessing}
                               className="rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
@@ -1211,7 +1407,10 @@ export default function DataIngestionPage() {
                             value={combinedBaselineStart}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
-                            onChange={setCombinedBaselineStart}
+                            onChange={(value) => {
+                              setCombinedBaselineStart(value);
+                              setCombinedSplitPreview(null);
+                            }}
                           />
                           <RangeInput
                             id="combined-baseline-end"
@@ -1219,7 +1418,10 @@ export default function DataIngestionPage() {
                             value={combinedBaselineEnd}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
-                            onChange={setCombinedBaselineEnd}
+                            onChange={(value) => {
+                              setCombinedBaselineEnd(value);
+                              setCombinedSplitPreview(null);
+                            }}
                           />
                           <RangeInput
                             id="combined-monitoring-start"
@@ -1227,7 +1429,10 @@ export default function DataIngestionPage() {
                             value={combinedMonitoringStart}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
-                            onChange={setCombinedMonitoringStart}
+                            onChange={(value) => {
+                              setCombinedMonitoringStart(value);
+                              setCombinedSplitPreview(null);
+                            }}
                           />
                           <RangeInput
                             id="combined-monitoring-end"
@@ -1235,10 +1440,16 @@ export default function DataIngestionPage() {
                             value={combinedMonitoringEnd}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
-                            onChange={setCombinedMonitoringEnd}
+                            onChange={(value) => {
+                              setCombinedMonitoringEnd(value);
+                              setCombinedSplitPreview(null);
+                            }}
                           />
                         </div>
 
+                        {combinedSplitPreview && (
+                          <SplitPreviewPanel preview={combinedSplitPreview} />
+                        )}
                         {combinedSplitError && (
                           <p className="text-sm text-danger-text">{combinedSplitError}</p>
                         )}
@@ -1246,22 +1457,41 @@ export default function DataIngestionPage() {
                           <p className="text-sm text-success-text">{combinedSplitSummary}</p>
                         )}
 
-                        <Button
-                          onClick={() => void onCombinedUpload()}
-                          disabled={
-                            !combinedFile || !combinedValidation?.valid || isActiveProcessing
-                          }
-                          className="w-full"
-                        >
-                          {isActiveProcessing ? (
-                            <>
+                        <div className="grid gap-2 sm:grid-cols-[auto_1fr]">
+                          <Button
+                            variant="outline"
+                            onClick={() => void onPreviewCombinedSplit()}
+                            disabled={
+                              !combinedFile ||
+                              !combinedValidation?.valid ||
+                              isPreviewingSplit ||
+                              isActiveProcessing
+                            }
+                          >
+                            {isPreviewingSplit ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Processing combined CSV...
-                            </>
-                          ) : (
-                            'Split and upload'
-                          )}
-                        </Button>
+                            ) : (
+                              <Eye className="mr-2 h-4 w-4" />
+                            )}
+                            Preview split
+                          </Button>
+                          <Button
+                            onClick={() => void onCombinedUpload()}
+                            disabled={
+                              !combinedFile || !combinedValidation?.valid || isActiveProcessing
+                            }
+                            className="w-full"
+                          >
+                            {isActiveProcessing ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Processing combined CSV...
+                              </>
+                            ) : (
+                              'Split and upload'
+                            )}
+                          </Button>
+                        </div>
                       </section>
                     </div>
                   </TabsContent>
@@ -1495,41 +1725,79 @@ export default function DataIngestionPage() {
                   {previewDatasetId ? `#${previewDatasetId}` : 'No dataset'}
                 </Badge>
               </CardHeader>
-              <CardContent className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <ConfigValue
-                    label="Baseline points"
-                    value={previewBaselineData?.dinsight_x.length ?? 0}
-                  />
-                  <ConfigValue
-                    label="Monitoring points"
-                    value={previewMonitoringData?.dinsight_x.length ?? 0}
-                  />
-                  <ConfigValue label="Mode" value={previewMode} />
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <ConfigValue
+                      label="Baseline points"
+                      value={inlineBaselineData?.dinsight_x.length ?? 0}
+                    />
+                    <ConfigValue
+                      label="Monitoring points"
+                      value={inlineMonitoringData?.dinsight_x.length ?? 0}
+                    />
+                    <ConfigValue label="Sample cap" value="20k" />
+                  </div>
+                  <div className="flex flex-wrap gap-2 md:justify-end">
+                    <Button
+                      onClick={() => {
+                        setPreviewMode('latest');
+                        setIsResultsModalOpen(true);
+                        setPreviewRefreshKey((prev) => prev + 1);
+                      }}
+                      variant="outline"
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      Latest
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setPreviewMode('saved');
+                        setIsResultsModalOpen(true);
+                        setPreviewRefreshKey((prev) => prev + 1);
+                      }}
+                      variant="outline"
+                    >
+                      <Database className="mr-2 h-4 w-4" />
+                      Saved
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex flex-wrap gap-2 md:justify-end">
-                  <Button
-                    onClick={() => {
-                      setPreviewMode('latest');
-                      setIsResultsModalOpen(true);
-                      setPreviewRefreshKey((prev) => prev + 1);
-                    }}
-                    variant="outline"
-                  >
-                    <Eye className="mr-2 h-4 w-4" />
-                    Latest
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setPreviewMode('saved');
-                      setIsResultsModalOpen(true);
-                      setPreviewRefreshKey((prev) => prev + 1);
-                    }}
-                    variant="outline"
-                  >
-                    <Database className="mr-2 h-4 w-4" />
-                    Saved
-                  </Button>
+
+                <div className="min-h-[260px] rounded-lg border border-border bg-background p-2">
+                  {!inlinePreviewDatasetId ? (
+                    <EmptyState
+                      title="No processed result yet"
+                      description="Upload data or open the catalog to select an existing dataset."
+                    />
+                  ) : isInlineLoadingBaseline || isInlineLoadingMonitoring ? (
+                    <EmptyState
+                      title="Loading preview"
+                      description="Fetching sampled coordinates..."
+                    />
+                  ) : inlineBaselineError ? (
+                    <EmptyState title="Preview unavailable" description={inlineBaselineError} />
+                  ) : inlinePreviewPlot ? (
+                    <div className="h-[250px]">
+                      <Plot
+                        data={inlinePreviewPlot.data as any}
+                        layout={inlinePreviewPlot.layout as any}
+                        config={inlinePreviewPlot.config as any}
+                        useResizeHandler
+                        style={{ width: '100%', height: '100%' }}
+                      />
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title="No coordinates available"
+                      description="The selected dataset has no baseline visualization yet."
+                    />
+                  )}
+                  {inlineMonitoringError && (
+                    <p className="mt-2 px-2 text-xs text-muted-foreground">
+                      {inlineMonitoringError}
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1584,6 +1852,20 @@ export default function DataIngestionPage() {
                 {selectedDatasetMeta && <DatasetSourceCard dataset={selectedDatasetMeta} />}
               </CardContent>
             </Card>
+
+            <DataNextActions
+              hasConfig={!isConfigLoading}
+              baselineReady={baselineReady}
+              monitoringComplete={monitoringComplete}
+              hasMetadataStatus={Boolean(metadataRegistrationStatus)}
+              hasVisualization={Boolean(inlinePreviewPlot)}
+              onOpenCatalog={() => setIsCatalogOpen(true)}
+              onOpenResults={() => {
+                setPreviewMode('latest');
+                setIsResultsModalOpen(true);
+                setPreviewRefreshKey((prev) => prev + 1);
+              }}
+            />
 
             <Card className="border-border/60">
               <CardHeader>
@@ -1657,6 +1939,213 @@ function RangeInput({
         onChange={(event) => onChange(event.target.value)}
       />
     </div>
+  );
+}
+
+function WorkflowStepper({
+  isConfigured,
+  baselineReady,
+  monitoringComplete,
+  catalogReady,
+  hasVisualization,
+  isActiveProcessing,
+  hasError,
+}: {
+  isConfigured: boolean;
+  baselineReady: boolean;
+  monitoringComplete: boolean;
+  catalogReady: boolean;
+  hasVisualization: boolean;
+  isActiveProcessing: boolean;
+  hasError: boolean;
+}) {
+  const steps = [
+    { label: 'Configure', complete: isConfigured, active: !baselineReady },
+    { label: 'Upload', complete: baselineReady, active: isActiveProcessing },
+    {
+      label: 'Monitor',
+      complete: monitoringComplete,
+      active: baselineReady && !monitoringComplete,
+    },
+    { label: 'Catalog', complete: catalogReady, active: monitoringComplete && !catalogReady },
+    { label: 'Visualize', complete: hasVisualization, active: catalogReady && !hasVisualization },
+    { label: 'Live', complete: monitoringComplete, active: monitoringComplete },
+  ];
+
+  return (
+    <Card className="border-border/60">
+      <CardContent className="p-3">
+        <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
+          {steps.map((step, index) => (
+            <div
+              key={step.label}
+              className="flex min-w-0 items-center gap-2 rounded-md border border-border bg-surface-muted/50 px-2 py-2"
+            >
+              <span
+                className={
+                  step.complete
+                    ? 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-bg text-success-text'
+                    : hasError && step.active
+                      ? 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-danger-bg text-danger-text'
+                      : step.active
+                        ? 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-info-bg text-info-text'
+                        : 'flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background text-muted-foreground'
+                }
+              >
+                {step.complete ? <CheckCircle2 className="h-3.5 w-3.5" /> : index + 1}
+              </span>
+              <div className="min-w-0">
+                <div className="truncate text-sm font-medium text-fg">{step.label}</div>
+                <div className="text-[11px] text-muted-foreground">
+                  {step.complete ? 'Done' : step.active ? 'Current' : 'Pending'}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SplitPreviewPanel({ preview }: { preview: CombinedCsvSplitPreview }) {
+  return (
+    <div className="space-y-3 rounded-md border border-border bg-background/60 p-3 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="font-semibold text-fg">Split preview</span>
+        <span className="text-muted-foreground">
+          {preview.totalRows.toLocaleString()} total rows
+        </span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <ConfigValue label="Baseline rows" value={preview.baselineRows.toLocaleString()} />
+        <ConfigValue label="Monitoring rows" value={preview.monitoringRows.toLocaleString()} />
+        <ConfigValue label="Unmatched rows" value={preview.unmatchedRows.toLocaleString()} />
+        <ConfigValue label="Overlap rows" value={preview.overlapRows.toLocaleString()} />
+      </div>
+      <div className="grid gap-2 text-muted-foreground sm:grid-cols-2">
+        <div>
+          Column range:{' '}
+          <span className="font-medium text-fg">
+            {preview.minValue || 'N/A'} to {preview.maxValue || 'N/A'}
+          </span>
+        </div>
+        <div>
+          File order:{' '}
+          <span className="font-medium text-fg">
+            {preview.firstValue || 'N/A'} to {preview.lastValue || 'N/A'}
+          </span>
+        </div>
+      </div>
+      {preview.overlapRows > 0 && (
+        <p className="flex items-start gap-2 text-warning-text">
+          <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          {preview.overlapRows.toLocaleString()} row(s) match both ranges. Upload will place
+          overlapping rows in the baseline split first.
+        </p>
+      )}
+      {preview.unmatchedRows > 0 && (
+        <p className="text-muted-foreground">
+          {preview.unmatchedRows.toLocaleString()} row(s) are outside both ranges and will be
+          excluded.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ title, description }: { title: string; description: string }) {
+  return (
+    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-md border border-dashed border-border px-4 text-center">
+      <div className="text-sm font-semibold text-fg">{title}</div>
+      <p className="mt-1 max-w-md text-xs text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function DataNextActions({
+  hasConfig,
+  baselineReady,
+  monitoringComplete,
+  hasMetadataStatus,
+  hasVisualization,
+  onOpenCatalog,
+  onOpenResults,
+}: {
+  hasConfig: boolean;
+  baselineReady: boolean;
+  monitoringComplete: boolean;
+  hasMetadataStatus: boolean;
+  hasVisualization: boolean;
+  onOpenCatalog: () => void;
+  onOpenResults: () => void;
+}) {
+  const action = !hasConfig
+    ? {
+        title: 'Confirm processing configuration',
+        description: 'Feature and metadata columns determine whether uploads validate cleanly.',
+        command: null,
+      }
+    : !baselineReady
+      ? {
+          title: 'Upload a baseline dataset',
+          description: 'Start with a healthy reference dataset or use the combined CSV splitter.',
+          command: null,
+        }
+      : !monitoringComplete
+        ? {
+            title: 'Upload monitoring data',
+            description: 'Attach monitoring data to the selected baseline target.',
+            command: null,
+          }
+        : !hasMetadataStatus
+          ? {
+              title: 'Open catalog and review metadata',
+              description: 'Catalog metadata unlocks validation, compatibility, and curation.',
+              command: 'catalog' as const,
+            }
+          : !hasVisualization
+            ? {
+                title: 'Open result visualization',
+                description: 'Inspect baseline and monitoring coordinates before live operation.',
+                command: 'results' as const,
+              }
+            : {
+                title: 'Continue to live monitoring',
+                description: 'Processed data is ready for streaming and operational review.',
+                command: 'live' as const,
+              };
+
+  return (
+    <Card className="border-info-border bg-info-bg/40">
+      <CardHeader>
+        <CardTitle className="text-base text-info-text">Recommended Next Action</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        <div className="font-semibold text-fg">{action.title}</div>
+        <p className="text-muted-foreground">{action.description}</p>
+        {action.command === 'catalog' && (
+          <Button variant="outline" className="w-full justify-start" onClick={onOpenCatalog}>
+            <Database className="mr-2 h-4 w-4" />
+            Open catalog
+          </Button>
+        )}
+        {action.command === 'results' && (
+          <Button variant="outline" className="w-full justify-start" onClick={onOpenResults}>
+            <BarChart3 className="mr-2 h-4 w-4" />
+            Open visualization
+          </Button>
+        )}
+        {action.command === 'live' && (
+          <Button asChild variant="outline" className="w-full justify-start">
+            <Link href="/dashboard/live">
+              <ArrowRight className="mr-2 h-4 w-4" />
+              Open live monitor
+            </Link>
+          </Button>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

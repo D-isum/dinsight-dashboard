@@ -1,14 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Clock,
+  Database,
+  Eye,
   RefreshCw,
   ShieldAlert,
+  Settings2,
   TrendingDown,
   Upload,
   Waves,
@@ -17,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
+import { DeploymentStatusCard } from '@/components/deployment/deployment-status-card';
 import { useDashboardOverview } from '@/hooks/useDashboardOverview';
 import { buildSparklinePath } from '@/lib/dashboard-overview';
 import { cn } from '@/utils/cn';
@@ -200,8 +205,153 @@ function WearPreview({
   );
 }
 
+function CommandMetric({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: ReactNode;
+  detail: ReactNode;
+}) {
+  return (
+    <div className="rounded-md border border-border bg-surface px-3 py-2">
+      <div className="text-xs font-medium uppercase text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-lg font-semibold text-fg">{value}</div>
+      <div className="mt-1 truncate text-xs text-muted-foreground">{detail}</div>
+    </div>
+  );
+}
+
+function DashboardNotice({
+  tone,
+  icon,
+  title,
+  description,
+  children,
+}: {
+  tone: 'warning' | 'danger' | 'info';
+  icon: ReactNode;
+  title: string;
+  description: string;
+  children?: ReactNode;
+}) {
+  const toneClasses = {
+    warning: 'border-warning-border bg-warning-bg text-warning-text',
+    danger: 'border-danger-border bg-danger-bg text-danger-text',
+    info: 'border-info-border bg-info-bg text-info-text',
+  };
+
+  return (
+    <Card className={toneClasses[tone]}>
+      <CardContent className="flex flex-wrap items-start justify-between gap-3 py-4">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 shrink-0">{icon}</span>
+          <div className="min-w-0">
+            <p className="font-semibold">{title}</p>
+            <p className="mt-1 text-sm">{description}</p>
+          </div>
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RecommendedActions({
+  hasDatasets,
+  hasSelectedDataset,
+  hasWearConfig,
+  hasStreamingData,
+  hasCriticalAlerts,
+}: {
+  hasDatasets: boolean;
+  hasSelectedDataset: boolean;
+  hasWearConfig: boolean;
+  hasStreamingData: boolean;
+  hasCriticalAlerts: boolean;
+}) {
+  const primary = !hasDatasets
+    ? {
+        title: 'Add operational data',
+        description: 'Upload a split baseline/monitoring pair or a combined CSV.',
+        href: '/dashboard/data',
+        label: 'Open Data',
+        icon: <Upload className="mr-2 h-4 w-4" />,
+      }
+    : !hasSelectedDataset
+      ? {
+          title: 'Select a dataset source',
+          description: 'Choose the file or device stream to use for the dashboard.',
+          href: '/dashboard/data',
+          label: 'Review Catalog',
+          icon: <Database className="mr-2 h-4 w-4" />,
+        }
+      : !hasWearConfig
+        ? {
+            title: 'Configure wear trend',
+            description: 'Set the metadata column and baseline interval in Insights.',
+            href: '/dashboard/insights',
+            label: 'Open Insights',
+            icon: <Settings2 className="mr-2 h-4 w-4" />,
+          }
+        : !hasStreamingData
+          ? {
+              title: 'Start live review',
+              description: 'Stream monitoring points and watch anomaly movement.',
+              href: '/dashboard/live',
+              label: 'Open Live',
+              icon: <Activity className="mr-2 h-4 w-4" />,
+            }
+          : hasCriticalAlerts
+            ? {
+                title: 'Triage critical alerts',
+                description: 'Inspect the live monitor and validate the abnormal region.',
+                href: '/dashboard/live',
+                label: 'Investigate',
+                icon: <ShieldAlert className="mr-2 h-4 w-4" />,
+              }
+            : {
+                title: 'Review results',
+                description: 'Compare live movement, anomaly rates, and wear trend direction.',
+                href: '/dashboard/insights',
+                label: 'Open Insights',
+                icon: <Eye className="mr-2 h-4 w-4" />,
+              };
+
+  return (
+    <Card className="border-info-border bg-info-bg/40">
+      <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <div className="text-xs font-medium uppercase text-info-text">
+            Recommended next action
+          </div>
+          <div className="mt-1 text-base font-semibold text-fg">{primary.title}</div>
+          <p className="mt-1 text-sm text-muted-foreground">{primary.description}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild>
+            <Link href={primary.href}>
+              {primary.icon}
+              {primary.label}
+            </Link>
+          </Button>
+          <Button variant="outline" asChild>
+            <Link href="/dashboard/data/catalog">
+              <Database className="mr-2 h-4 w-4" />
+              Catalog
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function DashboardPage() {
   const {
+    datasets,
+    latestDatasetId,
     datasetSourceGroups,
     selectedSourceKey,
     setSelectedSourceKey,
@@ -237,6 +387,43 @@ export default function DashboardPage() {
 
   const anomalySeries = history.map((point) => point.anomalyPercentage);
   const wearSeries = history.map((point) => point.wearScore);
+  const selectedDataset = datasets.find((dataset) => dataset.dinsight_id === selectedLiveDatasetId);
+  const hasDatasets = datasets.length > 0;
+  const hasSelectedDataset = Boolean(selectedLiveDatasetId);
+  const hasWearConfig = Boolean(
+    appliedWearConfig?.metadataColumn &&
+    ((appliedWearConfig.baselineClusterValues?.length ?? 0) > 0 ||
+      (appliedWearConfig.baselineRange?.start && appliedWearConfig.baselineRange?.end))
+  );
+  const hasStreamingData = (streamingStatus?.streamed_points ?? 0) > 0;
+  const hasCriticalAlerts = alerts.some(
+    (alert) => alert.severity === 'critical' && alert.status === 'active'
+  );
+  const sourceLabel = selectedDataset
+    ? (selectedDataset.source.originalFileName ??
+      selectedDataset.source.deviceName ??
+      selectedDataset.source.deviceSlug ??
+      `Dataset #${selectedDataset.dinsight_id}`)
+    : hasDatasets
+      ? 'Source not selected'
+      : 'No processed data';
+  const sourceKindLabel =
+    selectedDataset?.source.source === 'auto'
+      ? 'IoT Hub'
+      : selectedDataset?.source.source === 'manual'
+        ? 'Manual'
+        : selectedDataset
+          ? 'Unknown'
+          : 'None';
+  const sourceDetail =
+    sourceKindLabel === 'IoT Hub'
+      ? 'IoT Hub stream'
+      : sourceKindLabel === 'Manual'
+        ? 'Manual file'
+        : sourceKindLabel === 'Unknown'
+          ? 'Unknown source'
+          : 'No source selected';
+  const lastTimelinePoint = history[history.length - 1]?.timestamp ?? null;
 
   const streamStatusLabel =
     streamingStatus?.status === 'streaming'
@@ -247,45 +434,150 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground">Operations Dashboard</h1>
-          <p className="text-sm text-muted-foreground">
-            Live stream health, deterioration trend, and prioritized alerts.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <DatasetSourceSelect
-            groups={datasetSourceGroups}
-            selectedSourceKey={selectedSourceKey}
-            onChange={setSelectedSourceKey}
-            className="min-w-56 rounded-md border border-input bg-background px-3 py-2 text-sm"
-          />
-          <Button variant="outline" onClick={() => void handleRefresh()} disabled={isRefreshing}>
-            <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
-            Refresh
-          </Button>
-        </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <Card className={cn('border', stateTone[machineStatus.state])}>
+          <CardContent className="space-y-4 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-xs font-medium uppercase">
+                  <Activity className="h-4 w-4" />
+                  Operations command center
+                </div>
+                <h1 className="mt-2 text-3xl font-semibold tracking-normal">
+                  {machineStatus.state}
+                </h1>
+                <p className="mt-1 max-w-3xl text-sm">{machineStatus.recommendation}</p>
+              </div>
+              <Badge variant={machineStatus.state === 'Failing' ? 'danger' : 'outline'}>
+                Dataset #{selectedLiveDatasetId ?? latestDatasetId ?? 'N/A'}
+              </Badge>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <CommandMetric label="Source" value={sourceLabel} detail={sourceDetail} />
+              <CommandMetric
+                label="Stream"
+                value={streamStatusLabel}
+                detail={`${streamingStatus?.streamed_points ?? 0}/${streamingStatus?.total_points ?? 0} points`}
+              />
+              <CommandMetric
+                label="Anomaly"
+                value={
+                  latestAnomalyPercentage != null ? `${latestAnomalyPercentage.toFixed(1)}%` : 'N/A'
+                }
+                detail={
+                  anomalySource === 'manual-boundary' ? 'Manual boundaries' : 'Model detection'
+                }
+              />
+              <CommandMetric
+                label="Last sync"
+                value={
+                  lastTimelinePoint != null
+                    ? formatRelativeTime(new Date(lastTimelinePoint).toISOString())
+                    : 'N/A'
+                }
+                detail={`${Math.round(liveRefreshMs / 1000)}s dashboard cadence`}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <DatasetSourceSelect
+                groups={datasetSourceGroups}
+                selectedSourceKey={selectedSourceKey}
+                onChange={setSelectedSourceKey}
+                className="min-w-56 rounded-md border border-border bg-surface px-3 py-2 text-sm"
+              />
+              <Button
+                variant="outline"
+                onClick={() => void handleRefresh()}
+                disabled={isRefreshing}
+              >
+                <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
+                Refresh
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/dashboard/live">
+                  <Eye className="mr-2 h-4 w-4" />
+                  Live Monitor
+                </Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <DeploymentStatusCard compact />
       </div>
 
+      <RecommendedActions
+        hasDatasets={hasDatasets}
+        hasSelectedDataset={hasSelectedDataset}
+        hasWearConfig={hasWearConfig}
+        hasStreamingData={hasStreamingData}
+        hasCriticalAlerts={hasCriticalAlerts}
+      />
+
+      {!isLoading && !hasDatasets && (
+        <DashboardNotice
+          tone="info"
+          icon={<Database className="h-5 w-5" />}
+          title="No processed datasets available"
+          description="Upload baseline and monitoring data, or split one combined CSV before using the live dashboard."
+        >
+          <Button asChild variant="outline">
+            <Link href="/dashboard/data">
+              <Upload className="mr-2 h-4 w-4" />
+              Open Data
+            </Link>
+          </Button>
+        </DashboardNotice>
+      )}
+
+      {!isLoading && hasDatasets && !hasSelectedDataset && (
+        <DashboardNotice
+          tone="warning"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          title="Dataset source is not selected"
+          description="Choose a file or device source so dashboard metrics stay scoped to the same dataset."
+        />
+      )}
+
+      {hasDatasets && !hasWearConfig && (
+        <DashboardNotice
+          tone="warning"
+          icon={<Settings2 className="h-5 w-5" />}
+          title="Wear trend configuration is missing"
+          description="Set a metadata column and baseline interval to enable G0-to-Gi wear trend scoring."
+        >
+          <Button asChild variant="outline">
+            <Link href="/dashboard/insights">
+              <Settings2 className="mr-2 h-4 w-4" />
+              Configure
+            </Link>
+          </Button>
+        </DashboardNotice>
+      )}
+
+      {wearError && (
+        <DashboardNotice
+          tone="danger"
+          icon={<AlertTriangle className="h-5 w-5" />}
+          title="Wear trend could not be calculated"
+          description={wearError}
+        />
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <Card className={cn('border', stateTone[machineStatus.state])}>
+        <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Machine state</CardDescription>
-            <CardTitle className="text-2xl">{machineStatus.state}</CardTitle>
+            <CardDescription>Selected dataset</CardDescription>
+            <CardTitle className="text-2xl">
+              #{selectedLiveDatasetId ?? latestDatasetId ?? 'N/A'}
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-1">
-            <p className="text-sm">{machineStatus.recommendation}</p>
+          <CardContent className="space-y-1 text-sm text-muted-foreground">
+            <p className="truncate">{sourceLabel}</p>
             <p className="text-xs">
-              Real-time anomaly rate:{' '}
-              <span className="font-semibold">
-                {latestAnomalyPercentage != null ? `${latestAnomalyPercentage.toFixed(1)}%` : 'N/A'}
-              </span>
-              {realtimeAnomaly?.totalPoints ? ` (${realtimeAnomaly.totalPoints} pts)` : ''}
-            </p>
-            <p className="text-xs">
-              Source:{' '}
-              {anomalySource === 'manual-boundary' ? 'Manual boundaries' : 'Model detection'}
+              Current source: <span className="font-semibold">{sourceKindLabel}</span>
             </p>
           </CardContent>
         </Card>
@@ -501,14 +793,23 @@ export default function DashboardPage() {
           )}
           {!isLoading && !isRefreshingWear && (
             <div className="ml-auto flex items-center text-sm text-muted-foreground">
-              <CheckCircle2 className="mr-2 h-4 w-4 text-success-text" />
-              Dashboard synced
+              {lastTimelinePoint != null ? (
+                <>
+                  <Clock className="mr-2 h-4 w-4 text-success-text" />
+                  Synced {formatRelativeTime(new Date(lastTimelinePoint).toISOString())}
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="mr-2 h-4 w-4 text-success-text" />
+                  Dashboard ready
+                </>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
 
-      {alerts.some((alert) => alert.severity === 'critical' && alert.status === 'active') && (
+      {hasCriticalAlerts && (
         <Card className="border-danger-border bg-danger-bg ">
           <CardContent className="flex items-start gap-3 py-4">
             <AlertTriangle className="mt-0.5 h-5 w-5 text-danger-text" />

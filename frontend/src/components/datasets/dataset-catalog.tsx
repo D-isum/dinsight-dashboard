@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  AlertTriangle,
   ArrowLeft,
   Calendar,
   Database,
@@ -32,6 +33,16 @@ import {
   TableLoading,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { CompatibilityCheckDialog } from '@/components/datasets/compatibility-check-dialog';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { EditMetadataDialog } from '@/components/datasets/edit-metadata-dialog';
@@ -81,7 +92,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
   const [typeFilter, setTypeFilter] = useState('');
   const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
+  const [registerInitialDatasetId, setRegisterInitialDatasetId] = useState<number | null>(null);
   const [deleteDatasetId, setDeleteDatasetId] = useState('');
+  const [pendingDeleteDatasetId, setPendingDeleteDatasetId] = useState<number | null>(null);
   const [deleteFeedback, setDeleteFeedback] = useState<string | null>(null);
   const [exportDatasetId, setExportDatasetId] = useState('');
   const [exportingDatasetId, setExportingDatasetId] = useState<number | null>(null);
@@ -147,6 +160,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
     mutationFn: (datasetId: number) => api.datasets.delete(datasetId),
     onSuccess: (_data, datasetId) => {
       setDeleteDatasetId('');
+      setPendingDeleteDatasetId(null);
       setDeleteFeedback(`Dataset #${datasetId} deleted.`);
       setSelectedDatasetId((current) => (current === datasetId ? null : current));
       queryClient.invalidateQueries({ queryKey: ['datasets'] });
@@ -168,15 +182,15 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       setDeleteFeedback('Enter a valid dataset ID.');
       return;
     }
-    if (
-      !window.confirm(
-        `Delete dataset #${datasetId} and all related baseline, monitoring, coordinate, visualization, lineage, validation, and analysis records? This cannot be undone.`
-      )
-    ) {
+    setDeleteFeedback(null);
+    setPendingDeleteDatasetId(datasetId);
+  };
+
+  const confirmDelete = () => {
+    if (pendingDeleteDatasetId == null) {
       return;
     }
-    setDeleteFeedback(null);
-    deleteMutation.mutate(datasetId);
+    deleteMutation.mutate(pendingDeleteDatasetId);
   };
 
   const requestManualDelete = () => {
@@ -322,7 +336,12 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
             </div>
             <div className="flex items-center gap-2">
               {canCreate && (
-                <Button onClick={() => setRegisterOpen(true)}>
+                <Button
+                  onClick={() => {
+                    setRegisterInitialDatasetId(null);
+                    setRegisterOpen(true);
+                  }}
+                >
                   <Plus className="mr-2 h-4 w-4" />
                   Register metadata
                 </Button>
@@ -533,15 +552,44 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       </Card>
 
       {selectedDatasetId !== null && (
-        <DetailDrawer datasetId={selectedDatasetId} onClose={() => setSelectedDatasetId(null)} />
+        <DetailDrawer
+          datasetId={selectedDatasetId}
+          onClose={() => setSelectedDatasetId(null)}
+          onExport={() => void requestExport(selectedDatasetId)}
+          onDelete={canDelete ? () => requestDelete(selectedDatasetId) : undefined}
+          onRegisterMetadata={
+            canCreate
+              ? () => {
+                  setRegisterInitialDatasetId(selectedDatasetId);
+                  setRegisterOpen(true);
+                }
+              : undefined
+          }
+          isExporting={exportingDatasetId === selectedDatasetId}
+          isDeleting={deleteMutation.isPending && pendingDeleteDatasetId === selectedDatasetId}
+        />
       )}
 
       <RegisterMetadataDialog
         open={registerOpen}
-        onOpenChange={setRegisterOpen}
+        onOpenChange={(open) => {
+          setRegisterOpen(open);
+          if (!open) {
+            setRegisterInitialDatasetId(null);
+          }
+        }}
+        initialDatasetId={registerInitialDatasetId}
         excludedDatasetIds={(allDatasetsQuery.data ?? listQuery.data ?? []).map(
           (d) => d.dataset_id
         )}
+      />
+
+      <DeleteImpactDialog
+        datasetId={pendingDeleteDatasetId}
+        open={pendingDeleteDatasetId != null}
+        isDeleting={deleteMutation.isPending}
+        onCancel={() => setPendingDeleteDatasetId(null)}
+        onConfirm={confirmDelete}
       />
     </div>
   );
@@ -552,6 +600,68 @@ function QualityBadge({ score }: { score?: number }) {
   if (score >= 90) return <Badge variant="default">{score.toFixed(0)}%</Badge>;
   if (score >= 70) return <Badge variant="secondary">{score.toFixed(0)}%</Badge>;
   return <Badge variant="destructive">{score.toFixed(0)}%</Badge>;
+}
+
+function DeleteImpactDialog({
+  datasetId,
+  open,
+  isDeleting,
+  onCancel,
+  onConfirm,
+}: {
+  datasetId: number | null;
+  open: boolean;
+  isDeleting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-danger-text">
+            <AlertTriangle className="h-5 w-5" />
+            Delete dataset #{datasetId ?? 'N/A'}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            This permanently removes the processed dataset graph for this organization.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger-text">
+          <div className="font-semibold">Deletion impact</div>
+          <ul className="mt-2 list-disc space-y-1 pl-5">
+            <li>Baseline DInsight coordinates and metadata</li>
+            <li>Monitoring rows and generated monitoring coordinates</li>
+            <li>Generated visualization/export records tied to the dataset</li>
+            <li>Dataset metadata, lineage, validation results, and analysis comparisons</li>
+            <li>Upload file references associated with this dataset</li>
+          </ul>
+        </div>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            disabled={isDeleting}
+            onClick={(event) => {
+              event.preventDefault();
+              onConfirm();
+            }}
+            className="bg-danger text-accent-contrast hover:bg-danger"
+          >
+            {isDeleting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Deleting
+              </>
+            ) : (
+              'Delete dataset'
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
 
 function ValidationBadge({ status }: { status?: string }) {
@@ -566,6 +676,11 @@ function ValidationBadge({ status }: { status?: string }) {
 interface DetailDrawerProps {
   datasetId: number;
   onClose: () => void;
+  onExport: () => void;
+  onDelete?: () => void;
+  onRegisterMetadata?: () => void;
+  isExporting: boolean;
+  isDeleting: boolean;
 }
 
 interface DetailMetadata extends DatasetMetadataItem {
@@ -596,7 +711,15 @@ interface ValidationResult {
   created_at: string;
 }
 
-function DetailDrawer({ datasetId, onClose }: DetailDrawerProps) {
+function DetailDrawer({
+  datasetId,
+  onClose,
+  onExport,
+  onDelete,
+  onRegisterMetadata,
+  isExporting,
+  isDeleting,
+}: DetailDrawerProps) {
   const [editingMetadata, setEditingMetadata] = useState(false);
   const [compatibilityOpen, setCompatibilityOpen] = useState(false);
   const canUpdateMetadata = usePermission(Actions.DatasetUpdate);
@@ -641,10 +764,28 @@ function DetailDrawer({ datasetId, onClose }: DetailDrawerProps) {
             <p className="text-xs text-fg-muted">Dataset #{datasetId}</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={onExport} disabled={isExporting}>
+              {isExporting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="mr-2 h-4 w-4" />
+              )}
+              Export
+            </Button>
             <Button variant="outline" size="sm" onClick={() => setCompatibilityOpen(true)}>
               <ShieldQuestion className="mr-2 h-4 w-4" />
               Check compatibility
             </Button>
+            {onDelete && (
+              <Button variant="destructive" size="sm" onClick={onDelete} disabled={isDeleting}>
+                {isDeleting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="mr-2 h-4 w-4" />
+                )}
+                Delete
+              </Button>
+            )}
             <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
               <X className="h-4 w-4" />
             </Button>
@@ -673,9 +814,17 @@ function DetailDrawer({ datasetId, onClose }: DetailDrawerProps) {
                   Loading metadata
                 </div>
               ) : !metadataQuery.data ? (
-                <p className="text-sm text-fg-muted">
-                  No metadata registered for this dataset yet.
-                </p>
+                <div className="space-y-3">
+                  <p className="text-sm text-fg-muted">
+                    No metadata registered for this dataset yet.
+                  </p>
+                  {onRegisterMetadata && (
+                    <Button variant="outline" size="sm" onClick={onRegisterMetadata}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Register metadata
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <MetadataPanel meta={metadataQuery.data} />
               )}
@@ -933,7 +1082,7 @@ function FieldRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Label({ children }: { children: React.ReactNode }) {
+function Label({ children }: { children: ReactNode }) {
   return <div className="text-xs uppercase tracking-wide text-fg-muted">{children}</div>;
 }
 

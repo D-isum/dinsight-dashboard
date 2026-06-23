@@ -3,6 +3,7 @@ import Cookies from 'js-cookie';
 import { ApiResponse } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+export const API_BASE_URL = API_URL;
 
 const licenseIssueCodes = new Set([
   'LICENSE_EXPIRED',
