@@ -98,6 +98,7 @@ interface StreamingStatus {
   total_points: number;
   progress_percentage: number;
   latest_glow_count: number;
+  trail_points: number;
   batch_size: number;
   delay_seconds: number;
 }

@@ -702,6 +702,12 @@ export default function DashboardPage() {
               </span>
             </p>
             <p>
+              Trail points:{' '}
+              <span className="font-medium text-foreground">
+                {streamingStatus?.trail_points ?? 0}
+              </span>
+            </p>
+            <p>
               Batch size:{' '}
               <span className="font-medium text-foreground">
                 {streamingStatus?.batch_size ?? '-'}

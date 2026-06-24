@@ -53,6 +53,7 @@ interface StreamingStatus {
   streamed_points: number;
   progress_percentage: number;
   latest_glow_count: number;
+  trail_points: number;
   batch_size: number;
   delay_seconds: number;
   is_active: boolean;
@@ -340,6 +341,7 @@ export default function LiveMonitorPage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [anomalyResult, setAnomalyResult] = useState<AnomalyDetectionResult | null>(null);
   const [latestGlowCount, setLatestGlowCount] = useState(5);
+  const [trailPoints, setTrailPoints] = useState(5);
 
   const [manualSelectionEnabled, setManualSelectionEnabled] = useState(false);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>('rectangle');
@@ -862,6 +864,9 @@ export default function LiveMonitorPage() {
     ) {
       setLatestGlowCount(streamingStatus.latest_glow_count);
     }
+    if (typeof streamingStatus.trail_points === 'number' && streamingStatus.trail_points >= 0) {
+      setTrailPoints(streamingStatus.trail_points);
+    }
   }, [streamingStatus]);
 
   // Streaming-completion side-effect: when a session transitions from
@@ -1019,14 +1024,20 @@ export default function LiveMonitorPage() {
   const baselineCount = baselineData?.dinsight_x.length ?? 0;
   const monitoringCount = effectiveMonitoringData?.dinsight_x.length ?? 0;
 
-  const latestIndices = useMemo(() => {
+  const { latestIndices, trailIndices } = useMemo(() => {
     if (!effectiveMonitoringData || effectiveMonitoringData.dinsight_x.length === 0) {
-      return new Set<number>();
+      return { latestIndices: new Set<number>(), trailIndices: new Set<number>() };
     }
     const count = effectiveMonitoringData.dinsight_x.length;
-    const tailSize = Math.min(latestGlowCount, count);
-    return new Set(Array.from({ length: tailSize }, (_, i) => count - tailSize + i));
-  }, [latestGlowCount, effectiveMonitoringData]);
+    const latestSize = Math.min(latestGlowCount, count);
+    const latestStart = count - latestSize;
+    const trailSize = Math.min(trailPoints, latestStart);
+    const trailStart = latestStart - trailSize;
+    return {
+      latestIndices: new Set(Array.from({ length: latestSize }, (_, i) => latestStart + i)),
+      trailIndices: new Set(Array.from({ length: trailSize }, (_, i) => trailStart + i)),
+    };
+  }, [latestGlowCount, trailPoints, effectiveMonitoringData]);
 
   const handleSelection = useCallback(
     (selection: any) => {
@@ -1283,10 +1294,14 @@ export default function LiveMonitorPage() {
       } else {
         const regularIndices = effectiveMonitoringData.dinsight_x
           .map((_, index) => index)
-          .filter((index) => !latestIndices.has(index));
+          .filter((index) => !latestIndices.has(index) && !trailIndices.has(index));
+        const trailOnly = effectiveMonitoringData.dinsight_x
+          .map((_, index) => index)
+          .filter((index) => trailIndices.has(index));
         const latestOnly = effectiveMonitoringData.dinsight_x
           .map((_, index) => index)
           .filter((index) => latestIndices.has(index));
+        const trajectoryLine = [...trailOnly, ...latestOnly];
 
         if (regularIndices.length > 0) {
           traces.push(
@@ -1298,22 +1313,52 @@ export default function LiveMonitorPage() {
                 mode: 'markers',
                 name: 'Monitoring',
                 marker: {
-                  color: regularIndices,
-                  colorscale: [
-                    [0, '#EF4444'],
-                    [0.5, '#FB923C'],
-                    [1, '#FACC15'],
-                  ],
-                  cmin: 0,
-                  cmax: Math.max(regularIndices.length - 1, 1),
+                  color: '#EF4444',
                   size: pointSize,
                   opacity: 0.82,
-                  showscale: false,
                 },
               },
               hoverForIndices(regularIndices)
             )
           );
+        }
+
+        if (trailOnly.length > 0) {
+          if (trajectoryLine.length > 1) {
+            traces.push({
+              x: trajectoryLine.map((index) => effectiveMonitoringData.dinsight_x[index]),
+              y: trajectoryLine.map((index) => effectiveMonitoringData.dinsight_y[index]),
+              type: 'scattergl',
+              mode: 'lines',
+              name: 'Trajectory',
+              hoverinfo: 'skip',
+              line: { color: '#F97316', width: 3 },
+              showlegend: false,
+            });
+          }
+
+          traces.push({
+            x: trailOnly.map((index) => effectiveMonitoringData.dinsight_x[index]),
+            y: trailOnly.map((index) => effectiveMonitoringData.dinsight_y[index]),
+            type: 'scattergl',
+            mode: 'markers',
+            name: `Trail (${trailOnly.length})`,
+            hoverinfo: 'skip',
+            marker: {
+              color: trailOnly.map((_, index) => index),
+              colorscale: [
+                [0, '#991B1B'],
+                [0.5, '#F97316'],
+                [1, '#FACC15'],
+              ],
+              cmin: 0,
+              cmax: Math.max(trailOnly.length - 1, 1),
+              size: pointSize + 2,
+              opacity: 0.98,
+              line: { color: '#7C2D12', width: 1 },
+              showscale: false,
+            },
+          });
         }
 
         if (latestOnly.length > 0) {
@@ -1326,10 +1371,10 @@ export default function LiveMonitorPage() {
                 mode: 'markers',
                 name: `Latest (${latestOnly.length})`,
                 marker: {
-                  color: '#F59E0B',
-                  size: pointSize + 4,
+                  color: '#FACC15',
+                  size: pointSize + 5,
                   opacity: 1,
-                  line: { color: '#111827', width: 1.5 },
+                  line: { color: '#111827', width: 2 },
                 },
               },
               hoverForIndices(latestOnly)
@@ -1395,6 +1440,7 @@ export default function LiveMonitorPage() {
     buildHoverText,
     hasActiveMetadata,
     latestIndices,
+    trailIndices,
     manualClassification,
     manualSelectionEnabled,
     effectiveMonitoringData,
@@ -1712,7 +1758,16 @@ export default function LiveMonitorPage() {
                   </p>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Latest glow points: {latestGlowCount}</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">Glow points</p>
+                  <p className="font-semibold">{latestGlowCount}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Trail points</p>
+                  <p className="font-semibold">{trailPoints}</p>
+                </div>
+              </div>
             </div>
 
             <Button
