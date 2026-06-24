@@ -24,20 +24,14 @@ export function ChartFrame({
 }: ChartFrameProps) {
   return (
     <div className={cn('min-w-0 rounded-lg border border-border bg-surface', className)}>
-      <div className="flex flex-col gap-3 border-b border-border px-4 py-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="grid min-w-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
+        <div className="grid min-w-0 flex-1 gap-3">
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-fg">{title}</h3>
-            {description && <p className="mt-1 text-xs text-fg-muted">{description}</p>}
+            {description && <p className="mt-1 max-w-3xl text-xs text-fg-muted">{description}</p>}
           </div>
-          {actions && (
-            <div className="flex min-w-0 flex-wrap items-center gap-2 lg:justify-end">
-              {actions}
-            </div>
-          )}
-          {stats && (
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:col-span-2">{stats}</div>
-          )}
+          {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
+          {stats && <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{stats}</div>}
         </div>
       </div>
       <div className={cn('min-w-0 p-3', bodyClassName)}>{children}</div>

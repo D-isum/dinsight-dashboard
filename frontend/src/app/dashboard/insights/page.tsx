@@ -60,8 +60,10 @@ import {
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 const INSIGHTS_UI_PREFS_KEY = 'insights-ui-prefs-v1';
 const DISTANCE_AXIS_BASE_MAX = 2;
-const DISTANCE_WARNING_THRESHOLD = 0.8;
-const DISTANCE_DANGER_THRESHOLD = 1.2;
+const DISTANCE_WARNING_ABOVE_BASELINE = 0.8;
+const DISTANCE_DANGER_ABOVE_BASELINE = 1.2;
+const DISTANCE_WARNING_FALLBACK = 0.8;
+const DISTANCE_DANGER_FALLBACK = 1.2;
 const BASELINE_CLUSTER_PAGE_SIZE = 40;
 
 type DatasetType = 'baseline' | 'monitoring';
@@ -119,6 +121,22 @@ interface StreamingStatus {
 
 const mean = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
+
+const deriveDistanceThresholds = (baselineMean: number | null) => {
+  if (baselineMean == null || !Number.isFinite(baselineMean) || baselineMean <= 0) {
+    return {
+      warning: DISTANCE_WARNING_FALLBACK,
+      danger: DISTANCE_DANGER_FALLBACK,
+      source: 'fallback' as const,
+    };
+  }
+
+  return {
+    warning: baselineMean * (1 + DISTANCE_WARNING_ABOVE_BASELINE),
+    danger: baselineMean * (1 + DISTANCE_DANGER_ABOVE_BASELINE),
+    source: 'baseline-relative' as const,
+  };
+};
 
 const rollingMean = (values: Array<number | null>, windowSize: number) =>
   values.map((value, index) => {
@@ -900,6 +918,54 @@ export default function HealthInsightsPage() {
     setDatasetId(parsed);
   };
 
+  const distanceSummary = useMemo(() => {
+    if (!wearResult?.intervals?.length) {
+      const thresholds = deriveDistanceThresholds(null);
+      return {
+        baseline: null as number | null,
+        monitoring: null as number | null,
+        delta: null as number | null,
+        warningDelta: null as number | null,
+        warningThreshold: thresholds.warning,
+        dangerThreshold: thresholds.danger,
+        thresholdSource: thresholds.source,
+      };
+    }
+
+    const selectedBaselineDistances = wearResult.intervals
+      .filter((interval) => interval.dataset_type === 'baseline' && interval.is_baseline_cluster)
+      .map((interval) => interval.distance_from_g0)
+      .filter((value) => Number.isFinite(value));
+    const allBaselineDistances = wearResult.intervals
+      .filter((interval) => interval.dataset_type === 'baseline')
+      .map((interval) => interval.distance_from_g0)
+      .filter((value) => Number.isFinite(value));
+    const monitoringDistances = wearResult.intervals
+      .filter((interval) => interval.dataset_type === 'monitoring')
+      .map((interval) => interval.distance_from_g0)
+      .filter((value) => Number.isFinite(value));
+
+    const baseline = mean(
+      selectedBaselineDistances.length ? selectedBaselineDistances : allBaselineDistances
+    );
+    const monitoring = mean(monitoringDistances);
+    const delta = baseline != null && monitoring != null ? monitoring - baseline : null;
+    const thresholds = deriveDistanceThresholds(baseline);
+
+    return {
+      baseline,
+      monitoring,
+      delta,
+      warningDelta:
+        baseline != null && thresholds.source === 'baseline-relative'
+          ? baseline * DISTANCE_WARNING_ABOVE_BASELINE
+          : null,
+      warningThreshold: thresholds.warning,
+      dangerThreshold: thresholds.danger,
+      thresholdSource: thresholds.source,
+    };
+  }, [wearResult?.intervals]);
+
   const distancePlot = useMemo(() => {
     if (!shouldRenderWearPlots || !wearResult?.intervals?.length) {
       return null;
@@ -930,9 +996,11 @@ export default function HealthInsightsPage() {
     const distanceValues = sorted
       .map((interval) => interval.distance_from_g0)
       .filter((value) => Number.isFinite(value) && value >= 0);
+    const warningThreshold = distanceSummary.warningThreshold;
+    const dangerThreshold = distanceSummary.dangerThreshold;
     const xAxisRange = buildPaddedAxisRange(x, { minSpan: 1, paddingRatio: 0.03 });
     const yAxisRange = buildPaddedAxisRange(
-      [...distanceValues, DISTANCE_AXIS_BASE_MAX, DISTANCE_DANGER_THRESHOLD],
+      [...distanceValues, DISTANCE_AXIS_BASE_MAX, warningThreshold, dangerThreshold],
       {
         includeZero: true,
         lowerBound: 0,
@@ -982,20 +1050,18 @@ export default function HealthInsightsPage() {
     const monitoringDistances = sorted
       .filter((interval) => interval.dataset_type === 'monitoring')
       .map((interval) => interval.distance_from_g0);
-    const baselineSelectedMean = mean(baselineSelectedDistances);
-    const monitoringMean = mean(monitoringDistances);
+    const baselineSelectedMean = distanceSummary.baseline ?? mean(baselineSelectedDistances);
+    const monitoringMean = distanceSummary.monitoring ?? mean(monitoringDistances);
     const baselineRollingSeries = rollingMean(baselineSeries, 12);
     const monitoringRollingSeries = rollingMean(monitoringSeries, 12);
     const latestMonitoringIndex = monitoringIndices.at(-1);
     const firstWarningIndex = sorted.findIndex(
       (interval) =>
-        interval.dataset_type === 'monitoring' &&
-        interval.distance_from_g0 >= DISTANCE_WARNING_THRESHOLD
+        interval.dataset_type === 'monitoring' && interval.distance_from_g0 >= warningThreshold
     );
     const firstDangerIndex = sorted.findIndex(
       (interval) =>
-        interval.dataset_type === 'monitoring' &&
-        interval.distance_from_g0 >= DISTANCE_DANGER_THRESHOLD
+        interval.dataset_type === 'monitoring' && interval.distance_from_g0 >= dangerThreshold
     );
     const crossingIndex = firstDangerIndex >= 0 ? firstDangerIndex : firstWarningIndex;
     const crossingInterval = crossingIndex >= 0 ? sorted[crossingIndex] : null;
@@ -1008,8 +1074,8 @@ export default function HealthInsightsPage() {
         yref: 'y' as const,
         x0: 0,
         x1: 1,
-        y0: DISTANCE_WARNING_THRESHOLD,
-        y1: DISTANCE_DANGER_THRESHOLD,
+        y0: warningThreshold,
+        y1: dangerThreshold,
         fillcolor: alphaColor(plotTheme.warning, 0.08),
         line: { width: 0 },
         layer: 'below' as const,
@@ -1020,33 +1086,15 @@ export default function HealthInsightsPage() {
         yref: 'y' as const,
         x0: 0,
         x1: 1,
-        y0: DISTANCE_DANGER_THRESHOLD,
-        y1: yAxisRange?.[1] ?? DISTANCE_DANGER_THRESHOLD + 0.5,
+        y0: dangerThreshold,
+        y1: yAxisRange?.[1] ?? dangerThreshold + 0.5,
         fillcolor: alphaColor(plotTheme.danger, 0.07),
         line: { width: 0 },
         layer: 'below' as const,
       },
-      {
-        type: 'line' as const,
-        xref: 'paper' as const,
-        yref: 'y' as const,
-        x0: 0,
-        x1: 1,
-        y0: DISTANCE_WARNING_THRESHOLD,
-        y1: DISTANCE_WARNING_THRESHOLD,
-        line: { color: plotTheme.warning, dash: 'dot', width: 1.5 },
-      },
-      {
-        type: 'line' as const,
-        xref: 'paper' as const,
-        yref: 'y' as const,
-        x0: 0,
-        x1: 1,
-        y0: DISTANCE_DANGER_THRESHOLD,
-        y1: DISTANCE_DANGER_THRESHOLD,
-        line: { color: plotTheme.danger, dash: 'dot', width: 1.5 },
-      },
     ];
+    const thresholdX0 = xAxisRange?.[0] ?? x[0] ?? 0;
+    const thresholdX1 = xAxisRange?.[1] ?? x.at(-1) ?? thresholdX0 + 1;
     const crossingGuideShapes =
       crossingInterval != null
         ? [
@@ -1097,6 +1145,36 @@ export default function HealthInsightsPage() {
           ]
         : []),
     ];
+    const thresholdAnnotations = [
+      {
+        xref: 'paper' as const,
+        yref: 'y' as const,
+        x: 1,
+        y: warningThreshold,
+        xanchor: 'right' as const,
+        yanchor: 'bottom' as const,
+        text: `Warning ${warningThreshold.toFixed(3)}`,
+        showarrow: false,
+        font: { color: plotTheme.warning, size: 11 },
+        bgcolor: alphaColor(plotTheme.surface, 0.86),
+        bordercolor: alphaColor(plotTheme.warning, 0.35),
+        borderpad: 4,
+      },
+      {
+        xref: 'paper' as const,
+        yref: 'y' as const,
+        x: 1,
+        y: dangerThreshold,
+        xanchor: 'right' as const,
+        yanchor: 'bottom' as const,
+        text: `Danger ${dangerThreshold.toFixed(3)}`,
+        showarrow: false,
+        font: { color: plotTheme.danger, size: 11 },
+        bgcolor: alphaColor(plotTheme.surface, 0.86),
+        bordercolor: alphaColor(plotTheme.danger, 0.35),
+        borderpad: 4,
+      },
+    ];
     const traces: any[] = [
       {
         x,
@@ -1123,8 +1201,28 @@ export default function HealthInsightsPage() {
         mode: 'lines',
         type: 'scatter',
         name: 'Baseline rolling mean',
-        line: { color: plotTheme.baselineRolling, width: 4, dash: 'dashdot' },
+        line: { color: plotTheme.baselineRolling, width: 4, dash: 'solid' },
         hovertemplate: 'Baseline rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
+        connectgaps: false,
+      },
+      {
+        x: [thresholdX0, thresholdX1],
+        y: [warningThreshold, warningThreshold],
+        mode: 'lines',
+        type: 'scatter',
+        name: `Warning threshold (${warningThreshold.toFixed(3)})`,
+        line: { color: plotTheme.warning, width: 2, dash: 'dot' },
+        hovertemplate: 'Warning threshold<br>Distance: %{y:.4f}<extra></extra>',
+        connectgaps: false,
+      },
+      {
+        x: [thresholdX0, thresholdX1],
+        y: [dangerThreshold, dangerThreshold],
+        mode: 'lines',
+        type: 'scatter',
+        name: `Danger threshold (${dangerThreshold.toFixed(3)})`,
+        line: { color: plotTheme.danger, width: 2, dash: 'dot' },
+        hovertemplate: 'Danger threshold<br>Distance: %{y:.4f}<extra></extra>',
         connectgaps: false,
       },
     ];
@@ -1256,7 +1354,7 @@ export default function HealthInsightsPage() {
           ...meanLines,
           ...crossingGuideShapes,
         ],
-        annotations: [],
+        annotations: thresholdAnnotations,
       }) as any,
       config: {
         ...createThemedPlotConfig({ modeBar: true }),
@@ -1267,7 +1365,7 @@ export default function HealthInsightsPage() {
         ],
       },
     };
-  }, [datasetId, plotTheme, shouldRenderWearPlots, wearResult]);
+  }, [datasetId, distanceSummary, plotTheme, shouldRenderWearPlots, wearResult]);
 
   const transitionPlot = useMemo(() => {
     if (!shouldRenderWearPlots) {
@@ -1511,9 +1609,9 @@ export default function HealthInsightsPage() {
   const latestMonitoringTone =
     latestMonitoringInterval == null
       ? 'neutral'
-      : latestMonitoringInterval.distance_from_g0 >= DISTANCE_DANGER_THRESHOLD
+      : latestMonitoringInterval.distance_from_g0 >= distanceSummary.dangerThreshold
         ? 'danger'
-        : latestMonitoringInterval.distance_from_g0 >= DISTANCE_WARNING_THRESHOLD
+        : latestMonitoringInterval.distance_from_g0 >= distanceSummary.warningThreshold
           ? 'warning'
           : 'success';
 
@@ -2021,9 +2119,10 @@ export default function HealthInsightsPage() {
                           <p className="mt-2">
                             X-axis = interval order ({wearResult.metadata_column}). Y-axis =
                             distance to baseline centroid (G0). Blue = baseline intervals. Red =
-                            monitoring intervals. Teal and violet lines show baseline and monitoring
-                            rolling means. The vertical dashed guide marks the first warning or
-                            danger crossing.
+                            monitoring intervals. Green and violet solid lines show baseline and
+                            monitoring rolling means. Warning and danger thresholds are calculated
+                            from the selected healthy baseline mean. The vertical dashed guide marks
+                            the first warning or danger crossing.
                           </p>
                         )}
                       </div>
@@ -2047,18 +2146,18 @@ export default function HealthInsightsPage() {
                               <ChartStat
                                 label="Baseline mean"
                                 value={
-                                  g0ToGiMeans.baseline != null
-                                    ? g0ToGiMeans.baseline.toFixed(3)
+                                  distanceSummary.baseline != null
+                                    ? distanceSummary.baseline.toFixed(3)
                                     : '—'
                                 }
-                                description="Average G0 to interval distance across baseline intervals. This is the reference level for healthy behavior."
+                                description="Average G0 to interval distance across the selected healthy baseline intervals. Thresholds are derived from this value."
                                 tone="baseline"
                               />
                               <ChartStat
                                 label="Monitoring mean"
                                 value={
-                                  g0ToGiMeans.monitoring != null
-                                    ? g0ToGiMeans.monitoring.toFixed(3)
+                                  distanceSummary.monitoring != null
+                                    ? distanceSummary.monitoring.toFixed(3)
                                     : '—'
                                 }
                                 description="Average G0 to interval distance across monitoring intervals. Compare this with the baseline mean."
@@ -2067,21 +2166,38 @@ export default function HealthInsightsPage() {
                               <ChartStat
                                 label="Delta"
                                 value={
-                                  g0ToGiMeans.delta != null ? g0ToGiMeans.delta.toFixed(3) : '—'
+                                  distanceSummary.delta != null
+                                    ? distanceSummary.delta.toFixed(3)
+                                    : '—'
                                 }
                                 description="Monitoring mean minus baseline mean. Positive values indicate monitoring intervals are farther from the healthy baseline."
                                 tone={
-                                  g0ToGiMeans.delta == null
+                                  distanceSummary.delta == null
                                     ? 'neutral'
-                                    : g0ToGiMeans.delta > 0.4
+                                    : distanceSummary.warningDelta != null &&
+                                        distanceSummary.delta >= distanceSummary.warningDelta
                                       ? 'warning'
                                       : 'success'
                                 }
                               />
                               <ChartStat
+                                label="Warning"
+                                value={distanceSummary.warningThreshold.toFixed(3)}
+                                description={
+                                  distanceSummary.thresholdSource === 'baseline-relative'
+                                    ? 'Baseline-relative threshold: selected baseline mean plus 80%.'
+                                    : 'Fallback warning threshold used because a valid selected baseline mean is unavailable.'
+                                }
+                                tone="warning"
+                              />
+                              <ChartStat
                                 label="Danger"
-                                value={DISTANCE_DANGER_THRESHOLD.toFixed(1)}
-                                description="Fixed distance threshold used to mark the danger band and the first danger crossing."
+                                value={distanceSummary.dangerThreshold.toFixed(3)}
+                                description={
+                                  distanceSummary.thresholdSource === 'baseline-relative'
+                                    ? 'Baseline-relative threshold: selected baseline mean plus 120%.'
+                                    : 'Fallback danger threshold used because a valid selected baseline mean is unavailable.'
+                                }
                                 tone="danger"
                               />
                             </>
@@ -2098,6 +2214,8 @@ export default function HealthInsightsPage() {
                                 color={plotTheme.monitoringRolling}
                                 label="Monitoring rolling"
                               />
+                              <ChartSwatch color={plotTheme.warning} label="Warning threshold" />
+                              <ChartSwatch color={plotTheme.danger} label="Danger threshold" />
                             </>
                           }
                           bodyClassName="p-2"
