@@ -702,6 +702,18 @@ export default function DashboardPage() {
               </span>
             </p>
             <p>
+              Batch size:{' '}
+              <span className="font-medium text-foreground">
+                {streamingStatus?.batch_size ?? '-'}
+              </span>
+            </p>
+            <p>
+              Delay:{' '}
+              <span className="font-medium text-foreground">
+                {streamingStatus ? `${streamingStatus.delay_seconds}s` : '-'}
+              </span>
+            </p>
+            <p>
               Stream completion:{' '}
               <span className="font-medium text-foreground">
                 {(streamingStatus?.progress_percentage ?? 0).toFixed(1)}%

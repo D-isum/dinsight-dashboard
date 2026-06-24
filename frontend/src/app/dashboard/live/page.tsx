@@ -53,6 +53,8 @@ interface StreamingStatus {
   streamed_points: number;
   progress_percentage: number;
   latest_glow_count: number;
+  batch_size: number;
+  delay_seconds: number;
   is_active: boolean;
   status: 'not_started' | 'streaming' | 'completed';
 }
@@ -1696,6 +1698,18 @@ export default function LiveMonitorPage() {
                 <div>
                   <p className="text-muted-foreground">Total</p>
                   <p className="font-semibold">{streamingStatus?.total_points ?? 0}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">Batch size</p>
+                  <p className="font-semibold">{streamingStatus?.batch_size ?? '-'}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Delay</p>
+                  <p className="font-semibold">
+                    {streamingStatus ? `${streamingStatus.delay_seconds}s` : '-'}
+                  </p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">Latest glow points: {latestGlowCount}</p>

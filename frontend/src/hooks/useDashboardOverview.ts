@@ -35,6 +35,8 @@ interface StreamingStatus {
   streamed_points: number;
   progress_percentage: number;
   latest_glow_count: number;
+  batch_size: number;
+  delay_seconds: number;
   is_active: boolean;
   status: 'not_started' | 'streaming' | 'completed';
 }
