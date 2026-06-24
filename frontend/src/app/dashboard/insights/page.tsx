@@ -64,7 +64,9 @@ const DISTANCE_WARNING_FALLBACK = 0.8;
 const DISTANCE_DANGER_FALLBACK = 1.2;
 const BASELINE_CLUSTER_PAGE_SIZE = 40;
 const DEFAULT_DISTANCE_THRESHOLD_CONFIG = {
-  mode: 'statistical',
+  mode: 'adaptive',
+  warningSpreadMultiplier: 1.5,
+  dangerSpreadMultiplier: 2.5,
   warningPercentile: 95,
   dangerPercentile: 99,
   warningRelativePercent: 30,
@@ -72,10 +74,12 @@ const DEFAULT_DISTANCE_THRESHOLD_CONFIG = {
 } as const;
 
 type DatasetType = 'baseline' | 'monitoring';
-type DistanceThresholdMode = 'statistical' | 'relative';
+type DistanceThresholdMode = 'adaptive' | 'statistical' | 'relative';
 
 interface DistanceThresholdConfig {
   mode: DistanceThresholdMode;
+  warningSpreadMultiplier: number;
+  dangerSpreadMultiplier: number;
   warningPercentile: number;
   dangerPercentile: number;
   warningRelativePercent: number;
@@ -161,10 +165,72 @@ const percentile = (values: number[], requestedPercentile: number) => {
   return sorted[lowerIndex] + (sorted[upperIndex] - sorted[lowerIndex]) * weight;
 };
 
+const standardDeviation = (values: number[]) => {
+  if (values.length === 0) {
+    return null;
+  }
+
+  const average = mean(values);
+  if (average == null) {
+    return null;
+  }
+
+  const variance = values.reduce((sum, value) => sum + (value - average) ** 2, 0) / values.length;
+  return Math.sqrt(variance);
+};
+
+const robustBaselineSpread = (values: number[], center: number) => {
+  const deviations = values.map((value) => Math.abs(value - center));
+  const medianAbsoluteDeviation = percentile(deviations, 50);
+  const robustSigma =
+    medianAbsoluteDeviation != null && medianAbsoluteDeviation > 0
+      ? medianAbsoluteDeviation * 1.4826
+      : null;
+  const stdDev = standardDeviation(values);
+
+  if (robustSigma != null && Number.isFinite(robustSigma) && robustSigma > 0) {
+    return robustSigma;
+  }
+  if (stdDev != null && Number.isFinite(stdDev) && stdDev > 0) {
+    return stdDev;
+  }
+
+  return Math.max(center * 0.05, 0.000001);
+};
+
 const sanitizeDistanceThresholdConfig = (
   input?: Partial<DistanceThresholdConfig> | null
 ): DistanceThresholdConfig => {
-  const mode: DistanceThresholdMode = input?.mode === 'relative' ? 'relative' : 'statistical';
+  const isLegacyStatisticalDefault =
+    input?.mode === 'statistical' &&
+    input.warningSpreadMultiplier == null &&
+    input.dangerSpreadMultiplier == null &&
+    (input.warningPercentile == null ||
+      Number(input.warningPercentile) === DEFAULT_DISTANCE_THRESHOLD_CONFIG.warningPercentile) &&
+    (input.dangerPercentile == null ||
+      Number(input.dangerPercentile) === DEFAULT_DISTANCE_THRESHOLD_CONFIG.dangerPercentile);
+  const mode: DistanceThresholdMode = isLegacyStatisticalDefault
+    ? DEFAULT_DISTANCE_THRESHOLD_CONFIG.mode
+    : input?.mode === 'relative'
+      ? 'relative'
+      : input?.mode === 'statistical'
+        ? 'statistical'
+        : DEFAULT_DISTANCE_THRESHOLD_CONFIG.mode;
+  const warningSpreadMultiplier = clampNumber(
+    input?.warningSpreadMultiplier,
+    0.1,
+    10,
+    DEFAULT_DISTANCE_THRESHOLD_CONFIG.warningSpreadMultiplier
+  );
+  const dangerSpreadMultiplier = Math.max(
+    warningSpreadMultiplier + 0.1,
+    clampNumber(
+      input?.dangerSpreadMultiplier,
+      0.2,
+      12,
+      DEFAULT_DISTANCE_THRESHOLD_CONFIG.dangerSpreadMultiplier
+    )
+  );
   const warningPercentile = clampNumber(
     input?.warningPercentile,
     50,
@@ -198,6 +264,8 @@ const sanitizeDistanceThresholdConfig = (
 
   return {
     mode,
+    warningSpreadMultiplier,
+    dangerSpreadMultiplier: Math.min(dangerSpreadMultiplier, 12),
     warningPercentile,
     dangerPercentile: Math.min(dangerPercentile, 99.9),
     warningRelativePercent,
@@ -213,6 +281,21 @@ const deriveDistanceThresholds = (
   const finiteBaselineDistances = baselineDistances.filter(
     (value) => Number.isFinite(value) && value >= 0
   );
+
+  if (config.mode === 'adaptive' && finiteBaselineDistances.length > 0) {
+    const baselineCenter = percentile(finiteBaselineDistances, 50) ?? baselineMean;
+    if (baselineCenter != null && Number.isFinite(baselineCenter) && baselineCenter >= 0) {
+      const spread = robustBaselineSpread(finiteBaselineDistances, baselineCenter);
+      const warning = baselineCenter + config.warningSpreadMultiplier * spread;
+      const danger = baselineCenter + config.dangerSpreadMultiplier * spread;
+
+      return {
+        warning,
+        danger: Math.max(danger, warning),
+        source: 'baseline-adaptive' as const,
+      };
+    }
+  }
 
   if (config.mode === 'statistical' && finiteBaselineDistances.length > 0) {
     const warning = percentile(finiteBaselineDistances, config.warningPercentile);
@@ -1760,29 +1843,35 @@ export default function HealthInsightsPage() {
           ? 'warning'
           : 'success';
   const distanceThresholdMethodLabel =
-    distanceSummary.thresholdSource === 'baseline-statistical'
-      ? `Baseline p${distanceThresholdConfig.warningPercentile}/p${distanceThresholdConfig.dangerPercentile}`
-      : distanceSummary.thresholdSource === 'baseline-relative'
-        ? `Baseline mean +${distanceThresholdConfig.warningRelativePercent}%/+${distanceThresholdConfig.dangerRelativePercent}%`
-        : distanceSummary.thresholdSource === 'baseline-relative-fallback'
-          ? 'Baseline-relative fallback'
-          : 'Fixed fallback';
+    distanceSummary.thresholdSource === 'baseline-adaptive'
+      ? `Adaptive baseline ${distanceThresholdConfig.warningSpreadMultiplier}x/${distanceThresholdConfig.dangerSpreadMultiplier}x spread`
+      : distanceSummary.thresholdSource === 'baseline-statistical'
+        ? `Baseline p${distanceThresholdConfig.warningPercentile}/p${distanceThresholdConfig.dangerPercentile}`
+        : distanceSummary.thresholdSource === 'baseline-relative'
+          ? `Baseline mean +${distanceThresholdConfig.warningRelativePercent}%/+${distanceThresholdConfig.dangerRelativePercent}%`
+          : distanceSummary.thresholdSource === 'baseline-relative-fallback'
+            ? 'Baseline-relative fallback'
+            : 'Fixed fallback';
   const warningThresholdDescription =
-    distanceSummary.thresholdSource === 'baseline-statistical'
-      ? `Baseline statistical threshold: ${distanceThresholdConfig.warningPercentile}th percentile of selected healthy baseline distances.`
-      : distanceSummary.thresholdSource === 'baseline-relative'
-        ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
-        : distanceSummary.thresholdSource === 'baseline-relative-fallback'
-          ? `Fallback threshold: statistical distribution was unavailable, so warning uses selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
-          : 'Fixed fallback warning threshold used because a valid selected baseline distribution is unavailable.';
+    distanceSummary.thresholdSource === 'baseline-adaptive'
+      ? `Adaptive baseline threshold: baseline median plus ${distanceThresholdConfig.warningSpreadMultiplier}x the selected baseline's robust spread.`
+      : distanceSummary.thresholdSource === 'baseline-statistical'
+        ? `Baseline statistical threshold: ${distanceThresholdConfig.warningPercentile}th percentile of selected healthy baseline distances.`
+        : distanceSummary.thresholdSource === 'baseline-relative'
+          ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
+          : distanceSummary.thresholdSource === 'baseline-relative-fallback'
+            ? `Fallback threshold: adaptive spread was unavailable, so warning uses selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
+            : 'Fixed fallback warning threshold used because a valid selected baseline distribution is unavailable.';
   const dangerThresholdDescription =
-    distanceSummary.thresholdSource === 'baseline-statistical'
-      ? `Baseline statistical threshold: ${distanceThresholdConfig.dangerPercentile}th percentile of selected healthy baseline distances.`
-      : distanceSummary.thresholdSource === 'baseline-relative'
-        ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
-        : distanceSummary.thresholdSource === 'baseline-relative-fallback'
-          ? `Fallback threshold: statistical distribution was unavailable, so danger uses selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
-          : 'Fixed fallback danger threshold used because a valid selected baseline distribution is unavailable.';
+    distanceSummary.thresholdSource === 'baseline-adaptive'
+      ? `Adaptive baseline threshold: baseline median plus ${distanceThresholdConfig.dangerSpreadMultiplier}x the selected baseline's robust spread.`
+      : distanceSummary.thresholdSource === 'baseline-statistical'
+        ? `Baseline statistical threshold: ${distanceThresholdConfig.dangerPercentile}th percentile of selected healthy baseline distances.`
+        : distanceSummary.thresholdSource === 'baseline-relative'
+          ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
+          : distanceSummary.thresholdSource === 'baseline-relative-fallback'
+            ? `Fallback threshold: adaptive spread was unavailable, so danger uses selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
+            : 'Fixed fallback danger threshold used because a valid selected baseline distribution is unavailable.';
 
   const g0ToGiMeans = useMemo(() => {
     if (!wearResult) {
@@ -2131,17 +2220,59 @@ export default function HealthInsightsPage() {
                         mode:
                           event.target.value === 'relative'
                             ? 'relative'
-                            : DEFAULT_DISTANCE_THRESHOLD_CONFIG.mode,
+                            : event.target.value === 'statistical'
+                              ? 'statistical'
+                              : DEFAULT_DISTANCE_THRESHOLD_CONFIG.mode,
                       })
                     }
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
+                    <option value="adaptive">Adaptive baseline spread</option>
                     <option value="statistical">Baseline statistical percentile</option>
                     <option value="relative">Relative % above baseline mean</option>
                   </select>
                 </div>
 
-                {distanceThresholdConfig.mode === 'statistical' ? (
+                {distanceThresholdConfig.mode === 'adaptive' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                        Warning spread x
+                        <Input
+                          type="number"
+                          min={0.1}
+                          max={10}
+                          step={0.1}
+                          value={distanceThresholdConfig.warningSpreadMultiplier}
+                          onChange={(event) =>
+                            updateDistanceThresholdConfig({
+                              warningSpreadMultiplier: Number(event.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                        Danger spread x
+                        <Input
+                          type="number"
+                          min={0.2}
+                          max={12}
+                          step={0.1}
+                          value={distanceThresholdConfig.dangerSpreadMultiplier}
+                          onChange={(event) =>
+                            updateDistanceThresholdConfig({
+                              dangerSpreadMultiplier: Number(event.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Default 1.5x/2.5x: thresholds are relative to the selected baseline median and
+                      automatically widen or tighten with baseline spread.
+                    </p>
+                  </>
+                ) : distanceThresholdConfig.mode === 'statistical' ? (
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="space-y-1 text-xs font-medium text-muted-foreground">
@@ -2176,8 +2307,8 @@ export default function HealthInsightsPage() {
                       </label>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Default p95/p99: warning starts near the upper edge of selected healthy
-                      baseline behavior; danger starts at the extreme healthy tail.
+                      Percentile mode: warning starts near the upper edge of selected healthy
+                      baseline behavior; danger starts farther into the healthy tail.
                     </p>
                   </>
                 ) : (
@@ -2215,8 +2346,8 @@ export default function HealthInsightsPage() {
                       </label>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Default +30%/+60% is earlier than the previous +80%/+120% rule and can be
-                      tuned per dataset.
+                      Relative mode: warning and danger are fixed percentages above the selected
+                      healthy baseline mean.
                     </p>
                   </>
                 )}
