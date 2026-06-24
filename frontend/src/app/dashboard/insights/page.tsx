@@ -26,6 +26,7 @@ import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
 import { api } from '@/lib/api-client';
 import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
+import { axisRangeRevisionPart, buildPaddedAxisRange } from '@/lib/plot-autoscale';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { STREAMING_MONITORING_EMPHASIS_POINTS } from '@/lib/chart-focus-config';
@@ -886,16 +887,19 @@ export default function HealthInsightsPage() {
     const distanceValues = sorted
       .map((interval) => interval.distance_from_g0)
       .filter((value) => Number.isFinite(value) && value >= 0);
-    const yAxisMax = (() => {
-      if (distanceValues.length === 0) {
-        return DISTANCE_AXIS_BASE_MAX;
-      }
-      const observedMax = Math.max(...distanceValues);
-      if (observedMax <= DISTANCE_AXIS_BASE_MAX) {
-        return DISTANCE_AXIS_BASE_MAX;
-      }
-      return observedMax * 1.15;
-    })();
+    const xAxisRange = buildPaddedAxisRange(x, { minSpan: 1, paddingRatio: 0.03 });
+    const yAxisRange = buildPaddedAxisRange([...distanceValues, DISTANCE_AXIS_BASE_MAX], {
+      includeZero: true,
+      lowerBound: 0,
+      minSpan: 0.25,
+      paddingRatio: 0.08,
+    });
+    const autoscaleRevision = [
+      'insights-distance',
+      wearResult.metadata_column,
+      axisRangeRevisionPart(xAxisRange),
+      axisRangeRevisionPart(yAxisRange),
+    ].join('|');
     const monitoringIndices = sorted
       .map((interval, index) => (interval.dataset_type === 'monitoring' ? index : -1))
       .filter((index) => index >= 0);
@@ -1071,6 +1075,8 @@ export default function HealthInsightsPage() {
         title: `Distance from Baseline (G0→Gi) by ${wearResult.metadata_column}`,
         xaxis: {
           title: `${wearResult.metadata_column} (Interval Order)`,
+          autorange: !xAxisRange,
+          ...(xAxisRange ? { range: xAxisRange } : {}),
           tickmode: 'array',
           tickvals: tickVals,
           ticktext: tickText,
@@ -1080,10 +1086,11 @@ export default function HealthInsightsPage() {
         },
         yaxis: {
           title: 'Distance from baseline reference G0',
-          range: [0, yAxisMax],
+          autorange: !yAxisRange,
+          ...(yAxisRange ? { range: yAxisRange } : {}),
         },
         margin: { t: 72, r: 20, b: 55, l: 56 },
-        uirevision: 'insights-distance',
+        uirevision: autoscaleRevision,
         transition: { duration: 120 },
         legend: {
           orientation: 'h',
@@ -1220,16 +1227,19 @@ export default function HealthInsightsPage() {
     const transitionDistances = transitions
       .map((transition) => transition.distance)
       .filter((value) => Number.isFinite(value) && value >= 0);
-    const transitionAxisMax = (() => {
-      if (transitionDistances.length === 0) {
-        return DISTANCE_AXIS_BASE_MAX;
-      }
-      const observedMax = Math.max(...transitionDistances);
-      if (observedMax <= DISTANCE_AXIS_BASE_MAX) {
-        return DISTANCE_AXIS_BASE_MAX;
-      }
-      return observedMax * 1.15;
-    })();
+    const xAxisRange = buildPaddedAxisRange(xValues, { minSpan: 1, paddingRatio: 0.03 });
+    const yAxisRange = buildPaddedAxisRange([...transitionDistances, DISTANCE_AXIS_BASE_MAX], {
+      includeZero: true,
+      lowerBound: 0,
+      minSpan: 0.25,
+      paddingRatio: 0.08,
+    });
+    const autoscaleRevision = [
+      'insights-transitions',
+      wearResult?.metadata_column ?? 'selected-interval',
+      axisRangeRevisionPart(xAxisRange),
+      axisRangeRevisionPart(yAxisRange),
+    ].join('|');
     return {
       data: [
         {
@@ -1260,6 +1270,8 @@ export default function HealthInsightsPage() {
             wearResult?.metadata_column != null
               ? `${wearResult.metadata_column} Transition # (Gi → Gi+1)`
               : 'Transition # (Gi → Gi+1)',
+          autorange: !xAxisRange,
+          ...(xAxisRange ? { range: xAxisRange } : {}),
           tickmode: 'array',
           tickvals: tickVals,
           ticktext: tickText,
@@ -1269,10 +1281,11 @@ export default function HealthInsightsPage() {
         },
         yaxis: {
           title: 'Centroid movement distance (Gi→Gi+1)',
-          range: [0, transitionAxisMax],
+          autorange: !yAxisRange,
+          ...(yAxisRange ? { range: yAxisRange } : {}),
         },
         margin: { t: 56, r: 20, b: 55, l: 56 },
-        uirevision: 'insights-transitions',
+        uirevision: autoscaleRevision,
         transition: { duration: 120 },
         showlegend: false,
         shapes: transitionMeanLines,

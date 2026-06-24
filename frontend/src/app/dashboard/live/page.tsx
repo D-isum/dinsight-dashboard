@@ -30,6 +30,7 @@ import { useMachineHealthStatus } from '@/hooks/useMachineHealthStatus';
 import { api } from '@/lib/api-client';
 import type { CoordinateSeries } from '@/lib/dataset-normalizers';
 import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
+import { axisRangeRevisionPart, buildPaddedAxisRange } from '@/lib/plot-autoscale';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/utils/cn';
@@ -1410,17 +1411,41 @@ export default function LiveMonitorPage() {
       }
     }
 
+    const xAxisRange = buildPaddedAxisRange([
+      ...(baselineData?.dinsight_x ?? []),
+      ...(effectiveMonitoringData?.dinsight_x ?? []),
+      ...(anomalyResult?.anomalous_points?.map((point) => point.x) ?? []),
+    ]);
+    const yAxisRange = buildPaddedAxisRange([
+      ...(baselineData?.dinsight_y ?? []),
+      ...(effectiveMonitoringData?.dinsight_y ?? []),
+      ...(anomalyResult?.anomalous_points?.map((point) => point.y) ?? []),
+    ]);
+    const autoscaleRevision = [
+      selectedId ?? 'live-monitor',
+      axisRangeRevisionPart(xAxisRange),
+      axisRangeRevisionPart(yAxisRange),
+    ].join('|');
+
     return {
       data: traces,
       layout: {
         height: 560,
         template: 'plotly_white',
         title: '',
-        xaxis: { title: "D'insight X Coordinate" },
-        yaxis: { title: "D'insight Y Coordinate" },
+        xaxis: {
+          title: "D'insight X Coordinate",
+          autorange: !xAxisRange,
+          ...(xAxisRange ? { range: xAxisRange } : {}),
+        },
+        yaxis: {
+          title: "D'insight Y Coordinate",
+          autorange: !yAxisRange,
+          ...(yAxisRange ? { range: yAxisRange } : {}),
+        },
         legend: { orientation: 'h', y: 1.04, x: 0, xanchor: 'left' },
         margin: { t: 52, r: 24, b: 60, l: 64 },
-        uirevision: selectedId ?? 'live-monitor',
+        uirevision: autoscaleRevision,
         dragmode: manualSelectionEnabled
           ? selectionMode === 'lasso'
             ? 'lasso'
