@@ -23,6 +23,30 @@ export interface LicenseIssue {
 
 export const LICENSE_ISSUE_EVENT = 'dinsight:license-issue';
 
+interface RefreshTokenPayload {
+  access_token: string;
+  expires_in: number;
+}
+
+export const getRefreshTokenPayload = (payload: any): RefreshTokenPayload | null => {
+  const candidate = payload?.data ?? payload;
+  const accessToken = candidate?.access_token;
+  const expiresIn = candidate?.expires_in;
+
+  if (typeof accessToken !== 'string' || accessToken.length === 0) {
+    return null;
+  }
+
+  if (typeof expiresIn !== 'number' || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+    return null;
+  }
+
+  return {
+    access_token: accessToken,
+    expires_in: expiresIn,
+  };
+};
+
 const getErrorPayload = (error: AxiosError<ApiResponse<any>>): any => error.response?.data ?? null;
 
 export const getLicenseIssueFromError = (
@@ -205,7 +229,12 @@ apiClient.interceptors.response.use(
           refresh_token: refreshToken,
         });
 
-        const { access_token, expires_in } = response.data.data;
+        const refreshPayload = getRefreshTokenPayload(response.data);
+        if (!refreshPayload) {
+          throw new Error('Refresh response did not include a valid access token');
+        }
+
+        const { access_token, expires_in } = refreshPayload;
         const currentRefreshToken = tokenManager.getRefreshToken();
 
         if (currentRefreshToken) {

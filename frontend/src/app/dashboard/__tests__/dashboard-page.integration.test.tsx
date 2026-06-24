@@ -3,8 +3,45 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import DashboardPage from '@/app/dashboard/page';
 
+vi.mock('@/hooks/useDeploymentStatus', () => ({
+  useDeploymentStatus: () => ({
+    runtime: {
+      apiBaseUrl: 'http://localhost:8080/api/v1',
+      browserHost: 'localhost:3000',
+      label: 'Local dev',
+      isSharedVm: false,
+      isLocal: true,
+      devLicenseExtensionDays: null,
+    },
+    license: {
+      isValid: true,
+      daysUntilExpiry: 30,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      customerId: 'test-customer',
+      version: 'test',
+      registeredDevices: 1,
+      maxDevices: 5,
+    },
+    isLoadingLicense: false,
+    licenseError: null,
+  }),
+}));
+
 vi.mock('@/hooks/useDashboardOverview', () => ({
   useDashboardOverview: () => ({
+    datasets: [
+      {
+        dinsight_id: 14,
+        name: 'DInsight ID 14',
+        type: 'dinsight',
+        records: 240,
+        source: {
+          source: 'manual',
+          originalFileName: 'bearing-baseline.csv',
+        },
+      },
+    ],
+    latestDatasetId: 14,
     datasetSourceGroups: [],
     selectedSourceKey: null,
     setSelectedSourceKey: vi.fn(),
@@ -14,6 +51,9 @@ vi.mock('@/hooks/useDashboardOverview', () => ({
       streamed_points: 240,
       progress_percentage: 48,
       latest_glow_count: 5,
+      trail_points: 5,
+      batch_size: 1,
+      delay_seconds: 2,
       is_active: true,
       status: 'streaming',
     },
@@ -69,13 +109,12 @@ describe('Dashboard page integration', () => {
   it('renders operator-critical cards and actions', () => {
     render(<DashboardPage />);
 
-    expect(screen.getByText('Operations Dashboard')).toBeInTheDocument();
-    expect(screen.getByText('Machine state')).toBeInTheDocument();
+    expect(screen.getByText('Operations command center')).toBeInTheDocument();
     expect(screen.getByText('Deteriorating')).toBeInTheDocument();
-    expect(screen.getByText(/Real-time anomaly rate/i)).toBeInTheDocument();
+    expect(screen.getByText(/Anomaly rate \(%\)/i)).toBeInTheDocument();
     expect(screen.getByText(/Wear Trend Preview \(G0→Gi\)/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open Live Monitor/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Open Insights/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Upload Data/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Live Monitor/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /Open Insights/i }).length).toBeGreaterThan(0);
+    expect(screen.getByRole('link', { name: /Catalog/i })).toBeInTheDocument();
   });
 });
