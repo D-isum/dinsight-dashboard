@@ -131,6 +131,21 @@ const rollingMean = (values: Array<number | null>, windowSize: number) =>
     return mean(windowValues);
   });
 
+const formatIntervalTick = (value: string) => {
+  const normalized = value.trim().replace(/\s+/g, ' ');
+  const timestamp = normalized.match(
+    /^(\d{4})[/-](\d{1,2})[/-](\d{1,2})(?:[ T]+(\d{1,2}):(\d{2})(?::\d{2})?)?/
+  );
+  if (timestamp) {
+    const [, , month, day, hour, minute] = timestamp;
+    return hour && minute
+      ? `${month.padStart(2, '0')}/${day.padStart(2, '0')}<br>${hour.padStart(2, '0')}:${minute}`
+      : `${month.padStart(2, '0')}/${day.padStart(2, '0')}`;
+  }
+
+  return normalized.length > 14 ? `${normalized.slice(0, 13)}...` : normalized;
+};
+
 export default function HealthInsightsPage() {
   const { user } = useAuth();
   const plotTheme = usePlotTheme();
@@ -893,7 +908,7 @@ export default function HealthInsightsPage() {
     const sorted = [...wearResult.intervals].sort((a, b) => a.sort_index - b.sort_index);
     const x = sorted.map((interval) => interval.sort_index);
     const fullLabels = sorted.map((interval) => interval.metadata_value);
-    const maxTicks = 8;
+    const maxTicks = 5;
     const tickStep = Math.max(1, Math.ceil(sorted.length / maxTicks));
     const tickVals: number[] = [];
     const tickText: string[] = [];
@@ -1082,41 +1097,6 @@ export default function HealthInsightsPage() {
           ]
         : []),
     ];
-    const meanAnnotations = [
-      ...(baselineSelectedMean != null
-        ? [
-            {
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x: 0.98,
-              y: baselineSelectedMean,
-              text: `Selected baseline mean: ${baselineSelectedMean.toFixed(3)}`,
-              showarrow: false,
-              align: 'right' as const,
-              font: { size: 12, color: plotTheme.mutedText },
-              bgcolor: alphaColor(plotTheme.surfaceMuted, 0.75),
-              borderpad: 4,
-            },
-          ]
-        : []),
-      ...(monitoringMean != null
-        ? [
-            {
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x: 0.02,
-              y: monitoringMean,
-              text: `Monitoring mean: ${monitoringMean.toFixed(3)}`,
-              showarrow: false,
-              align: 'left' as const,
-              font: { size: 12, color: plotTheme.mutedText },
-              bgcolor: alphaColor(plotTheme.surfaceMuted, 0.75),
-              borderpad: 4,
-            },
-          ]
-        : []),
-    ];
-
     const traces: any[] = [
       {
         x,
@@ -1250,7 +1230,7 @@ export default function HealthInsightsPage() {
           ...(xAxisRange ? { range: xAxisRange } : {}),
           tickmode: 'array',
           tickvals: tickVals,
-          ticktext: tickText,
+          ticktext: tickText.map(formatIntervalTick),
           tickangle: 0,
           automargin: true,
           tickfont: { size: 11 },
@@ -1276,7 +1256,7 @@ export default function HealthInsightsPage() {
           ...meanLines,
           ...crossingGuideShapes,
         ],
-        annotations: meanAnnotations,
+        annotations: [],
       }) as any,
       config: {
         ...createThemedPlotConfig({ modeBar: true }),
@@ -1284,8 +1264,6 @@ export default function HealthInsightsPage() {
           ...createThemedPlotConfig({ modeBar: true }).modeBarButtonsToRemove,
           'lasso2d',
           'select2d',
-          'zoomIn2d',
-          'zoomOut2d',
         ],
       },
     };
@@ -1354,40 +1332,6 @@ export default function HealthInsightsPage() {
               y0: monitoringTransitionMean,
               y1: monitoringTransitionMean,
               line: { color: plotTheme.monitoring, dash: 'dash', width: 2 },
-            },
-          ]
-        : []),
-    ];
-    const transitionMeanAnnotations = [
-      ...(baselineTransitionMean != null
-        ? [
-            {
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x: 0.98,
-              y: baselineTransitionMean,
-              text: `Selected baseline mean: ${baselineTransitionMean.toFixed(3)}`,
-              showarrow: false,
-              align: 'right' as const,
-              font: { size: 12, color: plotTheme.mutedText },
-              bgcolor: alphaColor(plotTheme.surfaceMuted, 0.75),
-              borderpad: 4,
-            },
-          ]
-        : []),
-      ...(monitoringTransitionMean != null
-        ? [
-            {
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x: 0.02,
-              y: monitoringTransitionMean,
-              text: `Monitoring mean: ${monitoringTransitionMean.toFixed(3)}`,
-              showarrow: false,
-              align: 'left' as const,
-              font: { size: 12, color: plotTheme.mutedText },
-              bgcolor: alphaColor(plotTheme.surfaceMuted, 0.75),
-              borderpad: 4,
             },
           ]
         : []),
@@ -1544,7 +1488,7 @@ export default function HealthInsightsPage() {
           x: 0.5,
         },
         shapes: transitionMeanLines,
-        annotations: transitionMeanAnnotations,
+        annotations: [],
       }) as any,
       config: {
         ...createThemedPlotConfig({ modeBar: true }),
@@ -1552,8 +1496,6 @@ export default function HealthInsightsPage() {
           ...createThemedPlotConfig({ modeBar: true }).modeBarButtonsToRemove,
           'lasso2d',
           'select2d',
-          'zoomIn2d',
-          'zoomOut2d',
         ],
       },
       spikeCount: spikeTransitions.length,
@@ -2100,6 +2042,15 @@ export default function HealthInsightsPage() {
                                     : '—'
                                 }
                                 tone={latestMonitoringTone}
+                              />
+                              <ChartStat
+                                label="Baseline mean"
+                                value={
+                                  g0ToGiMeans.baseline != null
+                                    ? g0ToGiMeans.baseline.toFixed(3)
+                                    : '—'
+                                }
+                                tone="neutral"
                               />
                               <ChartStat
                                 label="Monitoring mean"
