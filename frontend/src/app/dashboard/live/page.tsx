@@ -30,7 +30,11 @@ import { useMachineHealthStatus } from '@/hooks/useMachineHealthStatus';
 import { api } from '@/lib/api-client';
 import type { CoordinateSeries } from '@/lib/dataset-normalizers';
 import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
-import { axisRangeRevisionPart, buildPaddedAxisRange } from '@/lib/plot-autoscale';
+import {
+  axisRangeRevisionPart,
+  buildPaddedAxisRange,
+  plotRevisionFromParts,
+} from '@/lib/plot-autoscale';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/utils/cn';
@@ -1421,14 +1425,15 @@ export default function LiveMonitorPage() {
       ...(effectiveMonitoringData?.dinsight_y ?? []),
       ...(anomalyResult?.anomalous_points?.map((point) => point.y) ?? []),
     ]);
-    const autoscaleRevision = [
+    const autoscaleRevision = plotRevisionFromParts([
       selectedId ?? 'live-monitor',
       axisRangeRevisionPart(xAxisRange),
       axisRangeRevisionPart(yAxisRange),
-    ].join('|');
+    ]);
 
     return {
       data: traces,
+      revision: autoscaleRevision,
       layout: {
         height: 560,
         template: 'plotly_white',
@@ -1445,7 +1450,7 @@ export default function LiveMonitorPage() {
         },
         legend: { orientation: 'h', y: 1.04, x: 0, xanchor: 'left' },
         margin: { t: 52, r: 24, b: 60, l: 64 },
-        uirevision: autoscaleRevision,
+        uirevision: selectedId ?? 'live-monitor',
         dragmode: manualSelectionEnabled
           ? selectionMode === 'lasso'
             ? 'lasso'
@@ -1964,6 +1969,7 @@ export default function LiveMonitorPage() {
                 data={plotData.data}
                 layout={plotData.layout as any}
                 config={plotData.config as any}
+                revision={plotData.revision}
                 useResizeHandler
                 style={{ width: '100%', height: 'min(62vh, 560px)', minHeight: '420px' }}
                 onSelecting={() => {

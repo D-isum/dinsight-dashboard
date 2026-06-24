@@ -26,7 +26,11 @@ import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
 import { api } from '@/lib/api-client';
 import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
-import { axisRangeRevisionPart, buildPaddedAxisRange } from '@/lib/plot-autoscale';
+import {
+  axisRangeRevisionPart,
+  buildPaddedAxisRange,
+  plotRevisionFromParts,
+} from '@/lib/plot-autoscale';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { STREAMING_MONITORING_EMPHASIS_POINTS } from '@/lib/chart-focus-config';
@@ -894,12 +898,12 @@ export default function HealthInsightsPage() {
       minSpan: 0.25,
       paddingRatio: 0.08,
     });
-    const autoscaleRevision = [
+    const autoscaleRevision = plotRevisionFromParts([
       'insights-distance',
       wearResult.metadata_column,
       axisRangeRevisionPart(xAxisRange),
       axisRangeRevisionPart(yAxisRange),
-    ].join('|');
+    ]);
     const monitoringIndices = sorted
       .map((interval, index) => (interval.dataset_type === 'monitoring' ? index : -1))
       .filter((index) => index >= 0);
@@ -1069,6 +1073,7 @@ export default function HealthInsightsPage() {
 
     return {
       data: traces,
+      revision: autoscaleRevision,
       layout: {
         height: 540,
         template: 'plotly_white',
@@ -1090,7 +1095,7 @@ export default function HealthInsightsPage() {
           ...(yAxisRange ? { range: yAxisRange } : {}),
         },
         margin: { t: 72, r: 20, b: 55, l: 56 },
-        uirevision: autoscaleRevision,
+        uirevision: `insights-distance-${datasetId ?? 'none'}-${wearResult.metadata_column}`,
         transition: { duration: 120 },
         legend: {
           orientation: 'h',
@@ -1119,7 +1124,7 @@ export default function HealthInsightsPage() {
         ],
       },
     };
-  }, [shouldRenderWearPlots, wearResult]);
+  }, [datasetId, shouldRenderWearPlots, wearResult]);
 
   const transitionPlot = useMemo(() => {
     if (!shouldRenderWearPlots) {
@@ -1234,12 +1239,12 @@ export default function HealthInsightsPage() {
       minSpan: 0.25,
       paddingRatio: 0.08,
     });
-    const autoscaleRevision = [
+    const autoscaleRevision = plotRevisionFromParts([
       'insights-transitions',
       wearResult?.metadata_column ?? 'selected-interval',
       axisRangeRevisionPart(xAxisRange),
       axisRangeRevisionPart(yAxisRange),
-    ].join('|');
+    ]);
     return {
       data: [
         {
@@ -1261,6 +1266,7 @@ export default function HealthInsightsPage() {
           name: 'Gi → Gi+1 transition',
         },
       ],
+      revision: autoscaleRevision,
       layout: {
         height: 540,
         template: 'plotly_white',
@@ -1285,7 +1291,7 @@ export default function HealthInsightsPage() {
           ...(yAxisRange ? { range: yAxisRange } : {}),
         },
         margin: { t: 56, r: 20, b: 55, l: 56 },
-        uirevision: autoscaleRevision,
+        uirevision: `insights-transitions-${datasetId ?? 'none'}-${wearResult?.metadata_column ?? 'selected-interval'}`,
         transition: { duration: 120 },
         showlegend: false,
         shapes: transitionMeanLines,
@@ -1308,7 +1314,7 @@ export default function HealthInsightsPage() {
         ],
       },
     };
-  }, [shouldRenderWearPlots, transitionRows, wearResult?.metadata_column]);
+  }, [datasetId, shouldRenderWearPlots, transitionRows, wearResult?.metadata_column]);
 
   const g0ToGiMeans = useMemo(() => {
     if (!wearResult) {
@@ -1826,6 +1832,7 @@ export default function HealthInsightsPage() {
                           data={distancePlot.data as any}
                           layout={distancePlot.layout as any}
                           config={distancePlot.config as any}
+                          revision={distancePlot.revision}
                           useResizeHandler
                           style={{ width: '100%', height: '100%' }}
                         />
@@ -1978,6 +1985,7 @@ export default function HealthInsightsPage() {
                           data={transitionPlot.data as any}
                           layout={transitionPlot.layout as any}
                           config={transitionPlot.config as any}
+                          revision={transitionPlot.revision}
                           useResizeHandler
                           style={{ width: '100%', height: '100%' }}
                         />

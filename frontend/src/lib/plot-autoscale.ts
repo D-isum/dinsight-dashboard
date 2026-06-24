@@ -60,3 +60,15 @@ export function axisRangeRevisionPart(range: AxisRange | undefined): string {
   if (!range) return 'auto';
   return range.map((value) => value.toPrecision(8)).join(':');
 }
+
+export function plotRevisionFromParts(parts: Array<string | number | null | undefined>): number {
+  const key = parts.map((part) => (part == null ? '' : String(part))).join('|');
+  let hash = 2166136261;
+
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+
+  return hash >>> 0;
+}
