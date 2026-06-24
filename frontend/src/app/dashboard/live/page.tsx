@@ -1324,6 +1324,11 @@ export default function LiveMonitorPage() {
         }
 
         if (trailOnly.length > 0) {
+          const trailOpacity = trailOnly.map((_, index) => {
+            if (trailOnly.length === 1) return 0.7;
+            return 0.32 + (index / (trailOnly.length - 1)) * 0.48;
+          });
+
           if (trajectoryLine.length > 1) {
             traces.push({
               x: trajectoryLine.map((index) => effectiveMonitoringData.dinsight_x[index]),
@@ -1332,7 +1337,7 @@ export default function LiveMonitorPage() {
               mode: 'lines',
               name: 'Trajectory',
               hoverinfo: 'skip',
-              line: { color: '#F97316', width: 3 },
+              line: { color: 'rgba(249, 115, 22, 0.18)', width: 2 },
               showlegend: false,
             });
           }
@@ -1354,8 +1359,8 @@ export default function LiveMonitorPage() {
               cmin: 0,
               cmax: Math.max(trailOnly.length - 1, 1),
               size: pointSize + 2,
-              opacity: 0.98,
-              line: { color: '#7C2D12', width: 1 },
+              opacity: trailOpacity,
+              line: { color: 'rgba(124, 45, 18, 0.35)', width: 0.5 },
               showscale: false,
             },
           });
