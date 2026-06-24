@@ -60,13 +60,27 @@ import {
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 const INSIGHTS_UI_PREFS_KEY = 'insights-ui-prefs-v1';
 const DISTANCE_AXIS_BASE_MAX = 2;
-const DISTANCE_WARNING_ABOVE_BASELINE = 0.8;
-const DISTANCE_DANGER_ABOVE_BASELINE = 1.2;
 const DISTANCE_WARNING_FALLBACK = 0.8;
 const DISTANCE_DANGER_FALLBACK = 1.2;
 const BASELINE_CLUSTER_PAGE_SIZE = 40;
+const DEFAULT_DISTANCE_THRESHOLD_CONFIG = {
+  mode: 'statistical',
+  warningPercentile: 95,
+  dangerPercentile: 99,
+  warningRelativePercent: 30,
+  dangerRelativePercent: 60,
+} as const;
 
 type DatasetType = 'baseline' | 'monitoring';
+type DistanceThresholdMode = 'statistical' | 'relative';
+
+interface DistanceThresholdConfig {
+  mode: DistanceThresholdMode;
+  warningPercentile: number;
+  dangerPercentile: number;
+  warningRelativePercent: number;
+  dangerRelativePercent: number;
+}
 
 interface DeteriorationInterval {
   label: string;
@@ -122,19 +136,112 @@ interface StreamingStatus {
 const mean = (values: number[]) =>
   values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
 
-const deriveDistanceThresholds = (baselineMean: number | null) => {
-  if (baselineMean == null || !Number.isFinite(baselineMean) || baselineMean <= 0) {
+const clampNumber = (value: unknown, min: number, max: number, fallback: number) => {
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return fallback;
+  }
+  return Math.min(max, Math.max(min, numeric));
+};
+
+const percentile = (values: number[], requestedPercentile: number) => {
+  const sorted = values.filter((value) => Number.isFinite(value)).sort((a, b) => a - b);
+  if (sorted.length === 0) {
+    return null;
+  }
+  if (sorted.length === 1) {
+    return sorted[0];
+  }
+
+  const rank = (clampNumber(requestedPercentile, 0, 100, 95) / 100) * (sorted.length - 1);
+  const lowerIndex = Math.floor(rank);
+  const upperIndex = Math.ceil(rank);
+  const weight = rank - lowerIndex;
+
+  return sorted[lowerIndex] + (sorted[upperIndex] - sorted[lowerIndex]) * weight;
+};
+
+const sanitizeDistanceThresholdConfig = (
+  input?: Partial<DistanceThresholdConfig> | null
+): DistanceThresholdConfig => {
+  const mode: DistanceThresholdMode = input?.mode === 'relative' ? 'relative' : 'statistical';
+  const warningPercentile = clampNumber(
+    input?.warningPercentile,
+    50,
+    99.8,
+    DEFAULT_DISTANCE_THRESHOLD_CONFIG.warningPercentile
+  );
+  const dangerPercentile = Math.max(
+    warningPercentile + 0.1,
+    clampNumber(
+      input?.dangerPercentile,
+      50.1,
+      99.9,
+      DEFAULT_DISTANCE_THRESHOLD_CONFIG.dangerPercentile
+    )
+  );
+  const warningRelativePercent = clampNumber(
+    input?.warningRelativePercent,
+    1,
+    300,
+    DEFAULT_DISTANCE_THRESHOLD_CONFIG.warningRelativePercent
+  );
+  const dangerRelativePercent = Math.max(
+    warningRelativePercent + 1,
+    clampNumber(
+      input?.dangerRelativePercent,
+      2,
+      400,
+      DEFAULT_DISTANCE_THRESHOLD_CONFIG.dangerRelativePercent
+    )
+  );
+
+  return {
+    mode,
+    warningPercentile,
+    dangerPercentile: Math.min(dangerPercentile, 99.9),
+    warningRelativePercent,
+    dangerRelativePercent: Math.min(dangerRelativePercent, 400),
+  };
+};
+
+const deriveDistanceThresholds = (
+  baselineDistances: number[],
+  baselineMean: number | null,
+  config: DistanceThresholdConfig
+) => {
+  const finiteBaselineDistances = baselineDistances.filter(
+    (value) => Number.isFinite(value) && value >= 0
+  );
+
+  if (config.mode === 'statistical' && finiteBaselineDistances.length > 0) {
+    const warning = percentile(finiteBaselineDistances, config.warningPercentile);
+    const danger = percentile(finiteBaselineDistances, config.dangerPercentile);
+    if (warning != null && danger != null && danger > 0) {
+      return {
+        warning,
+        danger: Math.max(danger, warning),
+        source: 'baseline-statistical' as const,
+      };
+    }
+  }
+
+  if (baselineMean != null && Number.isFinite(baselineMean) && baselineMean > 0) {
+    const warning = baselineMean * (1 + config.warningRelativePercent / 100);
     return {
-      warning: DISTANCE_WARNING_FALLBACK,
-      danger: DISTANCE_DANGER_FALLBACK,
-      source: 'fallback' as const,
+      warning,
+      danger: Math.max(warning, baselineMean * (1 + config.dangerRelativePercent / 100)),
+      source:
+        config.mode === 'relative'
+          ? ('baseline-relative' as const)
+          : ('baseline-relative-fallback' as const),
     };
   }
 
   return {
-    warning: baselineMean * (1 + DISTANCE_WARNING_ABOVE_BASELINE),
-    danger: baselineMean * (1 + DISTANCE_DANGER_ABOVE_BASELINE),
-    source: 'baseline-relative' as const,
+    warning: DISTANCE_WARNING_FALLBACK,
+    danger: DISTANCE_DANGER_FALLBACK,
+    source: 'fallback' as const,
   };
 };
 
@@ -185,6 +292,9 @@ export default function HealthInsightsPage() {
   const [showDistanceGuide, setShowDistanceGuide] = useState(false);
   const [showTransitionGuide, setShowTransitionGuide] = useState(false);
   const [activePlotTab, setActivePlotTab] = useState<'distance' | 'transitions'>('distance');
+  const [distanceThresholdConfig, setDistanceThresholdConfig] = useState<DistanceThresholdConfig>(
+    () => sanitizeDistanceThresholdConfig()
+  );
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const [intervalPage, setIntervalPage] = useState(1);
   const [transitionPage, setTransitionPage] = useState(1);
@@ -196,6 +306,7 @@ export default function HealthInsightsPage() {
   const [appliedIncludeMonitoring, setAppliedIncludeMonitoring] = useState(true);
   const [hasAppliedWearTrendRun, setHasAppliedWearTrendRun] = useState(false);
   const [lastWearTrendRunAt, setLastWearTrendRunAt] = useState<string | null>(null);
+  const hasHydratedUiPrefsRef = useRef(false);
   const hasHydratedPersistedConfigRef = useRef(false);
   const skipNextDatasetMetadataResetRef = useRef(false);
   const hasPinnedDatasetRef = useRef(false);
@@ -266,6 +377,7 @@ export default function HealthInsightsPage() {
     if (typeof window === 'undefined') {
       return;
     }
+    hasHydratedUiPrefsRef.current = false;
 
     try {
       const raw = readScoped(INSIGHTS_UI_PREFS_KEY, userId);
@@ -273,6 +385,7 @@ export default function HealthInsightsPage() {
         if (window.matchMedia('(max-width: 1279px)').matches) {
           setIsControlsCollapsed(true);
         }
+        hasHydratedUiPrefsRef.current = true;
         return;
       }
 
@@ -280,6 +393,7 @@ export default function HealthInsightsPage() {
         includeMonitoring: boolean;
         showWearSummaryMetrics: boolean;
         activePlotTab: 'distance' | 'transitions';
+        distanceThresholdConfig: Partial<DistanceThresholdConfig>;
         isControlsCollapsed: boolean;
       }>;
 
@@ -292,18 +406,26 @@ export default function HealthInsightsPage() {
       if (parsed.activePlotTab === 'distance' || parsed.activePlotTab === 'transitions') {
         setActivePlotTab(parsed.activePlotTab);
       }
+      if (parsed.distanceThresholdConfig) {
+        setDistanceThresholdConfig(sanitizeDistanceThresholdConfig(parsed.distanceThresholdConfig));
+      }
       if (typeof parsed.isControlsCollapsed === 'boolean') {
         setIsControlsCollapsed(parsed.isControlsCollapsed);
       }
+      hasHydratedUiPrefsRef.current = true;
     } catch {
       if (window.matchMedia('(max-width: 1279px)').matches) {
         setIsControlsCollapsed(true);
       }
+      hasHydratedUiPrefsRef.current = true;
     }
   }, [userId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
+      return;
+    }
+    if (!hasHydratedUiPrefsRef.current) {
       return;
     }
 
@@ -314,10 +436,18 @@ export default function HealthInsightsPage() {
         includeMonitoring,
         showWearSummaryMetrics,
         activePlotTab,
+        distanceThresholdConfig,
         isControlsCollapsed,
       })
     );
-  }, [activePlotTab, includeMonitoring, isControlsCollapsed, showWearSummaryMetrics, userId]);
+  }, [
+    activePlotTab,
+    distanceThresholdConfig,
+    includeMonitoring,
+    isControlsCollapsed,
+    showWearSummaryMetrics,
+    userId,
+  ]);
 
   const metadataColumnsQuery = useQuery<string[]>({
     queryKey: ['deterioration-metadata-columns', datasetId],
@@ -871,6 +1001,16 @@ export default function HealthInsightsPage() {
     setLastWearTrendRunAt(null);
   };
 
+  const updateDistanceThresholdConfig = (updates: Partial<DistanceThresholdConfig>) => {
+    setDistanceThresholdConfig((current) =>
+      sanitizeDistanceThresholdConfig({ ...current, ...updates })
+    );
+  };
+
+  const resetDistanceThresholdConfig = () => {
+    setDistanceThresholdConfig(sanitizeDistanceThresholdConfig());
+  };
+
   const exportCSV = useCallback(
     (rows: Array<Record<string, string | number>>, filename: string) => {
       if (rows.length === 0) {
@@ -920,7 +1060,7 @@ export default function HealthInsightsPage() {
 
   const distanceSummary = useMemo(() => {
     if (!wearResult?.intervals?.length) {
-      const thresholds = deriveDistanceThresholds(null);
+      const thresholds = deriveDistanceThresholds([], null, distanceThresholdConfig);
       return {
         baseline: null as number | null,
         monitoring: null as number | null,
@@ -950,21 +1090,26 @@ export default function HealthInsightsPage() {
     );
     const monitoring = mean(monitoringDistances);
     const delta = baseline != null && monitoring != null ? monitoring - baseline : null;
-    const thresholds = deriveDistanceThresholds(baseline);
+    const thresholdBaselineDistances = selectedBaselineDistances.length
+      ? selectedBaselineDistances
+      : allBaselineDistances;
+    const thresholds = deriveDistanceThresholds(
+      thresholdBaselineDistances,
+      baseline,
+      distanceThresholdConfig
+    );
 
     return {
       baseline,
       monitoring,
       delta,
       warningDelta:
-        baseline != null && thresholds.source === 'baseline-relative'
-          ? baseline * DISTANCE_WARNING_ABOVE_BASELINE
-          : null,
+        baseline != null && thresholds.warning >= baseline ? thresholds.warning - baseline : null,
       warningThreshold: thresholds.warning,
       dangerThreshold: thresholds.danger,
       thresholdSource: thresholds.source,
     };
-  }, [wearResult?.intervals]);
+  }, [distanceThresholdConfig, wearResult?.intervals]);
 
   const distancePlot = useMemo(() => {
     if (!shouldRenderWearPlots || !wearResult?.intervals?.length) {
@@ -1614,6 +1759,30 @@ export default function HealthInsightsPage() {
         : latestMonitoringInterval.distance_from_g0 >= distanceSummary.warningThreshold
           ? 'warning'
           : 'success';
+  const distanceThresholdMethodLabel =
+    distanceSummary.thresholdSource === 'baseline-statistical'
+      ? `Baseline p${distanceThresholdConfig.warningPercentile}/p${distanceThresholdConfig.dangerPercentile}`
+      : distanceSummary.thresholdSource === 'baseline-relative'
+        ? `Baseline mean +${distanceThresholdConfig.warningRelativePercent}%/+${distanceThresholdConfig.dangerRelativePercent}%`
+        : distanceSummary.thresholdSource === 'baseline-relative-fallback'
+          ? 'Baseline-relative fallback'
+          : 'Fixed fallback';
+  const warningThresholdDescription =
+    distanceSummary.thresholdSource === 'baseline-statistical'
+      ? `Baseline statistical threshold: ${distanceThresholdConfig.warningPercentile}th percentile of selected healthy baseline distances.`
+      : distanceSummary.thresholdSource === 'baseline-relative'
+        ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
+        : distanceSummary.thresholdSource === 'baseline-relative-fallback'
+          ? `Fallback threshold: statistical distribution was unavailable, so warning uses selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
+          : 'Fixed fallback warning threshold used because a valid selected baseline distribution is unavailable.';
+  const dangerThresholdDescription =
+    distanceSummary.thresholdSource === 'baseline-statistical'
+      ? `Baseline statistical threshold: ${distanceThresholdConfig.dangerPercentile}th percentile of selected healthy baseline distances.`
+      : distanceSummary.thresholdSource === 'baseline-relative'
+        ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
+        : distanceSummary.thresholdSource === 'baseline-relative-fallback'
+          ? `Fallback threshold: statistical distribution was unavailable, so danger uses selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
+          : 'Fixed fallback danger threshold used because a valid selected baseline distribution is unavailable.';
 
   const g0ToGiMeans = useMemo(() => {
     if (!wearResult) {
@@ -1940,7 +2109,120 @@ export default function HealthInsightsPage() {
                 )}
               </div>
 
-              <div className="sticky bottom-0 space-y-2 rounded-lg border border-border bg-surface p-3">
+              <div className="space-y-3 rounded-lg border border-input p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">Threshold model</p>
+                    <p className="text-xs text-muted-foreground">
+                      Controls when monitoring distance becomes warning or danger.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={resetDistanceThresholdConfig}>
+                    Reset
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">Method</label>
+                  <select
+                    value={distanceThresholdConfig.mode}
+                    onChange={(event) =>
+                      updateDistanceThresholdConfig({
+                        mode:
+                          event.target.value === 'relative'
+                            ? 'relative'
+                            : DEFAULT_DISTANCE_THRESHOLD_CONFIG.mode,
+                      })
+                    }
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="statistical">Baseline statistical percentile</option>
+                    <option value="relative">Relative % above baseline mean</option>
+                  </select>
+                </div>
+
+                {distanceThresholdConfig.mode === 'statistical' ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                        Warning percentile
+                        <Input
+                          type="number"
+                          min={50}
+                          max={99.8}
+                          step={0.1}
+                          value={distanceThresholdConfig.warningPercentile}
+                          onChange={(event) =>
+                            updateDistanceThresholdConfig({
+                              warningPercentile: Number(event.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                        Danger percentile
+                        <Input
+                          type="number"
+                          min={50.1}
+                          max={99.9}
+                          step={0.1}
+                          value={distanceThresholdConfig.dangerPercentile}
+                          onChange={(event) =>
+                            updateDistanceThresholdConfig({
+                              dangerPercentile: Number(event.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Default p95/p99: warning starts near the upper edge of selected healthy
+                      baseline behavior; danger starts at the extreme healthy tail.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                        Warning above mean (%)
+                        <Input
+                          type="number"
+                          min={1}
+                          max={300}
+                          step={1}
+                          value={distanceThresholdConfig.warningRelativePercent}
+                          onChange={(event) =>
+                            updateDistanceThresholdConfig({
+                              warningRelativePercent: Number(event.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="space-y-1 text-xs font-medium text-muted-foreground">
+                        Danger above mean (%)
+                        <Input
+                          type="number"
+                          min={2}
+                          max={400}
+                          step={1}
+                          value={distanceThresholdConfig.dangerRelativePercent}
+                          onChange={(event) =>
+                            updateDistanceThresholdConfig({
+                              dangerRelativePercent: Number(event.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Default +30%/+60% is earlier than the previous +80%/+120% rule and can be
+                      tuned per dataset.
+                    </p>
+                  </>
+                )}
+              </div>
+
+              <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
                 <p className="text-sm font-medium">Apply analysis</p>
                 <div className="grid gap-2">
                   <Button onClick={applyWearTrendSelection} disabled={!canRunWearTrend}>
@@ -2120,9 +2402,9 @@ export default function HealthInsightsPage() {
                             X-axis = interval order ({wearResult.metadata_column}). Y-axis =
                             distance to baseline centroid (G0). Blue = baseline intervals. Red =
                             monitoring intervals. Green and violet solid lines show baseline and
-                            monitoring rolling means. Warning and danger thresholds are calculated
-                            from the selected healthy baseline mean. The vertical dashed guide marks
-                            the first warning or danger crossing.
+                            monitoring rolling means. Warning and danger thresholds use{' '}
+                            {distanceThresholdMethodLabel}. The vertical dashed guide marks the
+                            first warning or danger crossing.
                           </p>
                         )}
                       </div>
@@ -2130,7 +2412,7 @@ export default function HealthInsightsPage() {
                       {distancePlot ? (
                         <ChartFrame
                           title="Distance from baseline"
-                          description="Monitoring movement from selected healthy baseline cluster with warning and danger thresholds."
+                          description={`Monitoring movement from selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
                           stats={
                             <>
                               <ChartStat
@@ -2183,21 +2465,13 @@ export default function HealthInsightsPage() {
                               <ChartStat
                                 label="Warning"
                                 value={distanceSummary.warningThreshold.toFixed(3)}
-                                description={
-                                  distanceSummary.thresholdSource === 'baseline-relative'
-                                    ? 'Baseline-relative threshold: selected baseline mean plus 80%.'
-                                    : 'Fallback warning threshold used because a valid selected baseline mean is unavailable.'
-                                }
+                                description={warningThresholdDescription}
                                 tone="warning"
                               />
                               <ChartStat
                                 label="Danger"
                                 value={distanceSummary.dangerThreshold.toFixed(3)}
-                                description={
-                                  distanceSummary.thresholdSource === 'baseline-relative'
-                                    ? 'Baseline-relative threshold: selected baseline mean plus 120%.'
-                                    : 'Fallback danger threshold used because a valid selected baseline mean is unavailable.'
-                                }
+                                description={dangerThresholdDescription}
                                 tone="danger"
                               />
                             </>
