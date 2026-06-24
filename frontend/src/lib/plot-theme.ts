@@ -22,6 +22,8 @@ export interface PlotTheme {
   baselineSoft: string;
   monitoring: string;
   monitoringSoft: string;
+  baselineRolling: string;
+  monitoringRolling: string;
   latest: string;
   latestLine: string;
   trailOld: string;
@@ -53,6 +55,8 @@ export const DEFAULT_PLOT_THEME: PlotTheme = {
   baselineSoft: 'rgba(37, 99, 235, 0.16)',
   monitoring: '#dc2626',
   monitoringSoft: 'rgba(220, 38, 38, 0.24)',
+  baselineRolling: '#0f766e',
+  monitoringRolling: '#7c3aed',
   latest: '#facc15',
   latestLine: '#111827',
   trailOld: '#991b1b',
@@ -133,6 +137,8 @@ function readPlotThemeFromDom(): PlotTheme {
     baselineSoft: alphaColor(accent, 0.16),
     monitoring: danger,
     monitoringSoft: alphaColor(danger, 0.24),
+    baselineRolling: cssVar(styles, '--color-chart-baseline-rolling', '#0f766e'),
+    monitoringRolling: cssVar(styles, '--color-chart-monitoring-rolling', '#7c3aed'),
     latest: '#facc15',
     latestLine: cssVar(styles, '--color-text', DEFAULT_PLOT_THEME.text),
     trailOld: alphaColor(danger, 0.72),

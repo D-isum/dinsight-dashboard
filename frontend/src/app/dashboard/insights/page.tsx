@@ -969,6 +969,7 @@ export default function HealthInsightsPage() {
       .map((interval) => interval.distance_from_g0);
     const baselineSelectedMean = mean(baselineSelectedDistances);
     const monitoringMean = mean(monitoringDistances);
+    const baselineRollingSeries = rollingMean(baselineSeries, 12);
     const monitoringRollingSeries = rollingMean(monitoringSeries, 12);
     const latestMonitoringIndex = monitoringIndices.at(-1);
     const firstWarningIndex = sorted.findIndex(
@@ -981,6 +982,10 @@ export default function HealthInsightsPage() {
         interval.dataset_type === 'monitoring' &&
         interval.distance_from_g0 >= DISTANCE_DANGER_THRESHOLD
     );
+    const crossingIndex = firstDangerIndex >= 0 ? firstDangerIndex : firstWarningIndex;
+    const crossingInterval = crossingIndex >= 0 ? sorted[crossingIndex] : null;
+    const crossingTone = firstDangerIndex >= 0 ? 'danger' : 'warning';
+    const crossingColor = crossingTone === 'danger' ? plotTheme.danger : plotTheme.warning;
     const thresholdShapes = [
       {
         type: 'rect' as const,
@@ -1027,6 +1032,26 @@ export default function HealthInsightsPage() {
         line: { color: plotTheme.danger, dash: 'dot', width: 1.5 },
       },
     ];
+    const crossingGuideShapes =
+      crossingInterval != null
+        ? [
+            {
+              type: 'line' as const,
+              xref: 'x' as const,
+              yref: 'paper' as const,
+              x0: crossingInterval.sort_index,
+              x1: crossingInterval.sort_index,
+              y0: 0,
+              y1: 1,
+              line: {
+                color: crossingColor,
+                dash: crossingTone === 'danger' ? 'dashdot' : 'dash',
+                width: 2,
+              },
+              layer: 'below' as const,
+            },
+          ]
+        : [];
     const meanLines = [
       ...(baselineSelectedMean != null
         ? [
@@ -1111,6 +1136,17 @@ export default function HealthInsightsPage() {
           'Interval %{customdata[0]}<br>%{customdata[2]} pts · %{customdata[1]}<br>Distance: %{y:.4f}<extra></extra>',
         connectgaps: false,
       },
+      {
+        x,
+        y: baselineRollingSeries,
+        text: fullLabels,
+        mode: 'lines',
+        type: 'scatter',
+        name: 'Baseline rolling mean',
+        line: { color: plotTheme.baselineRolling, width: 3, dash: 'dot' },
+        hovertemplate: 'Baseline rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
+        connectgaps: false,
+      },
     ];
 
     if (hasMonitoringSeries) {
@@ -1159,9 +1195,9 @@ export default function HealthInsightsPage() {
         text: fullLabels,
         mode: 'lines',
         type: 'scatter',
-        name: 'Rolling mean',
-        line: { color: plotTheme.warning, width: 2.5, dash: 'solid' },
-        hovertemplate: 'Rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
+        name: 'Monitoring rolling mean',
+        line: { color: plotTheme.monitoringRolling, width: 3, dash: 'solid' },
+        hovertemplate: 'Monitoring rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
         connectgaps: false,
       });
 
@@ -1183,19 +1219,17 @@ export default function HealthInsightsPage() {
         });
       }
 
-      const crossingIndex = firstDangerIndex >= 0 ? firstDangerIndex : firstWarningIndex;
-      if (crossingIndex >= 0) {
-        const crossing = sorted[crossingIndex];
+      if (crossingInterval != null) {
         traces.push({
-          x: [crossing.sort_index],
-          y: [crossing.distance_from_g0],
-          text: [crossing.metadata_value],
+          x: [crossingInterval.sort_index],
+          y: [crossingInterval.distance_from_g0],
+          text: [crossingInterval.metadata_value],
           mode: 'markers',
           type: 'scatter',
-          name: firstDangerIndex >= 0 ? 'Danger crossing' : 'Warning crossing',
+          name: crossingTone === 'danger' ? 'Danger crossing' : 'Warning crossing',
           marker: {
             symbol: 'diamond',
-            color: firstDangerIndex >= 0 ? plotTheme.danger : plotTheme.warning,
+            color: crossingColor,
             size: 12,
             line: { color: plotTheme.surface, width: 1.5 },
           },
@@ -1236,7 +1270,12 @@ export default function HealthInsightsPage() {
           xanchor: 'center',
           x: 0.5,
         },
-        shapes: [...thresholdShapes, ...baselineClusterShapes, ...meanLines],
+        shapes: [
+          ...thresholdShapes,
+          ...baselineClusterShapes,
+          ...meanLines,
+          ...crossingGuideShapes,
+        ],
         annotations: meanAnnotations,
       }) as any,
       config: {
@@ -2040,8 +2079,9 @@ export default function HealthInsightsPage() {
                           <p className="mt-2">
                             X-axis = interval order ({wearResult.metadata_column}). Y-axis =
                             distance to baseline centroid (G0). Blue = baseline intervals. Red =
-                            monitoring intervals. Shaded bands mark intervals included in your
-                            baseline cluster.
+                            monitoring intervals. Teal and violet lines show baseline and monitoring
+                            rolling means. The vertical dashed guide marks the first warning or
+                            danger crossing.
                           </p>
                         )}
                       </div>
@@ -2094,7 +2134,14 @@ export default function HealthInsightsPage() {
                             <>
                               <ChartSwatch color={plotTheme.baseline} label="Baseline" />
                               <ChartSwatch color={plotTheme.monitoring} label="Monitoring" />
-                              <ChartSwatch color={plotTheme.warning} label="Rolling mean" />
+                              <ChartSwatch
+                                color={plotTheme.baselineRolling}
+                                label="Baseline rolling"
+                              />
+                              <ChartSwatch
+                                color={plotTheme.monitoringRolling}
+                                label="Monitoring rolling"
+                              />
                             </>
                           }
                           bodyClassName="p-2"
