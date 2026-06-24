@@ -1105,8 +1105,8 @@ export default function HealthInsightsPage() {
         mode: 'lines+markers',
         type: 'scatter',
         name: 'Baseline',
-        line: { color: plotTheme.baseline, width: 2 },
-        marker: { color: plotTheme.baseline, size: 7 },
+        line: { color: alphaColor(plotTheme.baseline, 0.82), width: 1.7 },
+        marker: { color: alphaColor(plotTheme.baseline, 0.82), size: 5.5 },
         customdata: sorted.map((interval) => [
           interval.metadata_value,
           interval.dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
@@ -1123,7 +1123,7 @@ export default function HealthInsightsPage() {
         mode: 'lines',
         type: 'scatter',
         name: 'Baseline rolling mean',
-        line: { color: plotTheme.baselineRolling, width: 3, dash: 'dot' },
+        line: { color: plotTheme.baselineRolling, width: 4, dash: 'dashdot' },
         hovertemplate: 'Baseline rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
         connectgaps: false,
       },
@@ -1138,8 +1138,8 @@ export default function HealthInsightsPage() {
           mode: 'lines+markers',
           type: 'scatter',
           name: 'Monitoring history',
-          line: { color: alphaColor(plotTheme.monitoring, 0.28), width: 1.5 },
-          marker: { color: alphaColor(plotTheme.monitoring, 0.36), size: 5 },
+          line: { color: alphaColor(plotTheme.monitoring, 0.18), width: 1.2 },
+          marker: { color: alphaColor(plotTheme.monitoring, 0.26), size: 4.5 },
           customdata: sorted.map((interval) => [
             interval.metadata_value,
             interval.dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
@@ -1156,8 +1156,8 @@ export default function HealthInsightsPage() {
           mode: 'lines+markers',
           type: 'scatter',
           name: 'Monitoring recent',
-          line: { color: plotTheme.monitoring, width: 3 },
-          marker: { color: plotTheme.monitoring, size: 8 },
+          line: { color: alphaColor(plotTheme.monitoring, 0.9), width: 2.2 },
+          marker: { color: alphaColor(plotTheme.monitoring, 0.88), size: 5.5 },
           customdata: sorted.map((interval) => [
             interval.metadata_value,
             interval.dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
@@ -1176,7 +1176,7 @@ export default function HealthInsightsPage() {
         mode: 'lines',
         type: 'scatter',
         name: 'Monitoring rolling mean',
-        line: { color: plotTheme.monitoringRolling, width: 3, dash: 'solid' },
+        line: { color: plotTheme.monitoringRolling, width: 4, dash: 'solid' },
         hovertemplate: 'Monitoring rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
         connectgaps: false,
       });
@@ -2041,6 +2041,7 @@ export default function HealthInsightsPage() {
                                     ? latestMonitoringInterval.distance_from_g0.toFixed(3)
                                     : '—'
                                 }
+                                description="Distance from G0 for the latest monitoring interval. Higher values are farther from the selected healthy baseline center."
                                 tone={latestMonitoringTone}
                               />
                               <ChartStat
@@ -2050,7 +2051,8 @@ export default function HealthInsightsPage() {
                                     ? g0ToGiMeans.baseline.toFixed(3)
                                     : '—'
                                 }
-                                tone="neutral"
+                                description="Average G0 to interval distance across baseline intervals. This is the reference level for healthy behavior."
+                                tone="baseline"
                               />
                               <ChartStat
                                 label="Monitoring mean"
@@ -2059,13 +2061,15 @@ export default function HealthInsightsPage() {
                                     ? g0ToGiMeans.monitoring.toFixed(3)
                                     : '—'
                                 }
-                                tone="info"
+                                description="Average G0 to interval distance across monitoring intervals. Compare this with the baseline mean."
+                                tone="monitoring"
                               />
                               <ChartStat
                                 label="Delta"
                                 value={
                                   g0ToGiMeans.delta != null ? g0ToGiMeans.delta.toFixed(3) : '—'
                                 }
+                                description="Monitoring mean minus baseline mean. Positive values indicate monitoring intervals are farther from the healthy baseline."
                                 tone={
                                   g0ToGiMeans.delta == null
                                     ? 'neutral'
@@ -2077,6 +2081,7 @@ export default function HealthInsightsPage() {
                               <ChartStat
                                 label="Danger"
                                 value={DISTANCE_DANGER_THRESHOLD.toFixed(1)}
+                                description="Fixed distance threshold used to mark the danger band and the first danger crossing."
                                 tone="danger"
                               />
                             </>
