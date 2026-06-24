@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ConfigDialog } from '@/components/ui/config-dialog';
 import { ProcessingDialog } from '@/components/ui/processing-dialog';
 import { DeploymentStatusCard } from '@/components/deployment/deployment-status-card';
+import { ChartFrame, ChartStat } from '@/components/charts/chart-frame';
 import { DatasetCatalog } from '@/components/datasets/dataset-catalog';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { usePermission } from '@/components/auth/require-permission';
@@ -39,8 +40,10 @@ import {
   previewCombinedCsvSplitFile,
   splitCombinedCsvFile,
 } from '@/lib/combined-csv-split';
+import { createDinsightPreviewPlot } from '@/lib/dinsight-preview-plot';
 import { formatDatasetOptionLabel, getDatasetSourceGroupKey } from '@/lib/dataset-source-groups';
 import { Actions } from '@/lib/permissions';
+import { usePlotTheme } from '@/lib/plot-theme';
 
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 
@@ -91,62 +94,8 @@ function sortByCreatedAtDesc(
   return b.dinsight_id - a.dinsight_id;
 }
 
-function createDinsightPreviewPlot(
-  baselineData: { dinsight_x: number[]; dinsight_y: number[] } | null | undefined,
-  monitoringData: { dinsight_x: number[]; dinsight_y: number[] } | null | undefined,
-  compact = false
-) {
-  if (!baselineData || baselineData.dinsight_x.length === 0) {
-    return null;
-  }
-
-  const traces: any[] = [
-    {
-      x: baselineData.dinsight_x,
-      y: baselineData.dinsight_y,
-      type: 'scattergl',
-      mode: 'markers',
-      name: 'Baseline',
-      marker: { color: '#2563EB', size: compact ? 4 : 6, opacity: 0.45 },
-      hovertemplate: 'Baseline<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
-    },
-  ];
-
-  if (monitoringData && monitoringData.dinsight_x.length > 0) {
-    traces.push({
-      x: monitoringData.dinsight_x,
-      y: monitoringData.dinsight_y,
-      type: 'scattergl',
-      mode: 'markers',
-      name: 'Monitoring',
-      marker: { color: '#DC2626', size: compact ? 4 : 6, opacity: 0.65 },
-      hovertemplate: 'Monitoring<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
-    });
-  }
-
-  return {
-    data: traces,
-    layout: {
-      template: 'plotly_white',
-      autosize: true,
-      margin: compact ? { t: 8, r: 8, b: 28, l: 36 } : { t: 18, r: 20, b: 50, l: 55 },
-      xaxis: { title: compact ? '' : 'DInsight X' },
-      yaxis: { title: compact ? '' : 'DInsight Y' },
-      legend: compact
-        ? { orientation: 'h', yanchor: 'bottom', y: 1.02, xanchor: 'right', x: 1 }
-        : {
-            orientation: 'h',
-            yanchor: 'bottom',
-            y: 1.02,
-            xanchor: 'right',
-            x: 1,
-          },
-    } as any,
-    config: { responsive: true, displayModeBar: false },
-  };
-}
-
 export default function DataIngestionPage() {
+  const plotTheme = usePlotTheme();
   const queryClient = useQueryClient();
   const canCreateDatasetMetadata = usePermission(Actions.DatasetCreate);
   const { state, uploadBaseline, uploadMonitoring, uploadCombinedSplit, resetWorkflow } =
@@ -875,12 +824,22 @@ export default function DataIngestionPage() {
         ? 'Review the error details below and retry when ready.'
         : 'Please wait while we process your files. This can take a few minutes for large datasets.';
   const previewPlot = useMemo(
-    () => createDinsightPreviewPlot(previewBaselineData, previewMonitoringData),
-    [previewBaselineData, previewMonitoringData]
+    () =>
+      createDinsightPreviewPlot(previewBaselineData, previewMonitoringData, plotTheme, {
+        datasetId: previewDatasetId,
+        modeBar: true,
+        title: previewDatasetId ? `Dataset #${previewDatasetId}` : undefined,
+      }),
+    [plotTheme, previewBaselineData, previewDatasetId, previewMonitoringData]
   );
   const inlinePreviewPlot = useMemo(
-    () => createDinsightPreviewPlot(inlineBaselineData, inlineMonitoringData, true),
-    [inlineBaselineData, inlineMonitoringData]
+    () =>
+      createDinsightPreviewPlot(inlineBaselineData, inlineMonitoringData, plotTheme, {
+        compact: true,
+        datasetId: inlinePreviewDatasetId,
+        modeBar: false,
+      }),
+    [inlineBaselineData, inlineMonitoringData, inlinePreviewDatasetId, plotTheme]
   );
 
   return (
@@ -1120,12 +1079,47 @@ export default function DataIngestionPage() {
           ) : previewBaselineError ? (
             <p className="text-sm text-danger-text">{previewBaselineError}</p>
           ) : previewPlot ? (
-            <>
+            <ChartFrame
+              title="Coordinate map"
+              description="Baseline and monitoring coordinates rendered with the same chart behavior used across the dashboard."
+              stats={
+                <>
+                  <ChartStat
+                    label="Dataset"
+                    value={previewDatasetId ? `#${previewDatasetId}` : '—'}
+                  />
+                  <ChartStat
+                    label="Baseline"
+                    value={(previewBaselineData?.dinsight_x.length ?? 0).toLocaleString()}
+                    tone="info"
+                  />
+                  <ChartStat
+                    label="Monitoring"
+                    value={(previewMonitoringData?.dinsight_x.length ?? 0).toLocaleString()}
+                    tone={previewMonitoringData?.dinsight_x.length ? 'danger' : 'neutral'}
+                  />
+                </>
+              }
+              actions={
+                <>
+                  <Button asChild size="sm">
+                    <Link href="/dashboard/live">
+                      Open in Live
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" size="sm">
+                    <Link href="/dashboard/insights">Open in Insights</Link>
+                  </Button>
+                </>
+              }
+            >
               <div className="mx-auto aspect-square w-full max-w-[820px] max-h-[75vh]">
                 <Plot
                   data={previewPlot.data as any}
                   layout={previewPlot.layout as any}
                   config={previewPlot.config as any}
+                  revision={previewPlot.revision}
                   useResizeHandler
                   style={{ width: '100%', height: '100%' }}
                 />
@@ -1133,18 +1127,7 @@ export default function DataIngestionPage() {
               {previewMonitoringError && (
                 <p className="text-xs text-muted-foreground">{previewMonitoringError}</p>
               )}
-              <div className="flex flex-wrap gap-2">
-                <Button asChild size="sm">
-                  <Link href="/dashboard/live">
-                    Open in Live
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" size="sm">
-                  <Link href="/dashboard/insights">Open in Insights</Link>
-                </Button>
-              </div>
-            </>
+            </ChartFrame>
           ) : (
             <p className="text-sm text-muted-foreground">
               No baseline visualization available for this dataset yet.
@@ -1766,7 +1749,29 @@ export default function DataIngestionPage() {
                   </div>
                 </div>
 
-                <div className="min-h-[260px] rounded-lg border border-border bg-background p-2">
+                <ChartFrame
+                  title="Coordinate preview"
+                  description="Sampled result map for quick validation before opening the full viewer."
+                  stats={
+                    <>
+                      <ChartStat
+                        label="Dataset"
+                        value={inlinePreviewDatasetId ? `#${inlinePreviewDatasetId}` : '—'}
+                      />
+                      <ChartStat
+                        label="Baseline"
+                        value={(inlineBaselineData?.dinsight_x.length ?? 0).toLocaleString()}
+                        tone="info"
+                      />
+                      <ChartStat
+                        label="Monitoring"
+                        value={(inlineMonitoringData?.dinsight_x.length ?? 0).toLocaleString()}
+                        tone={inlineMonitoringData?.dinsight_x.length ? 'danger' : 'neutral'}
+                      />
+                    </>
+                  }
+                  bodyClassName="p-2"
+                >
                   {!inlinePreviewDatasetId ? (
                     <EmptyState
                       title="No processed result yet"
@@ -1785,6 +1790,7 @@ export default function DataIngestionPage() {
                         data={inlinePreviewPlot.data as any}
                         layout={inlinePreviewPlot.layout as any}
                         config={inlinePreviewPlot.config as any}
+                        revision={inlinePreviewPlot.revision}
                         useResizeHandler
                         style={{ width: '100%', height: '100%' }}
                       />
@@ -1800,7 +1806,7 @@ export default function DataIngestionPage() {
                       {inlineMonitoringError}
                     </p>
                   )}
-                </div>
+                </ChartFrame>
               </CardContent>
             </Card>
 

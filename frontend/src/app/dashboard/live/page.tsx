@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { ChartFrame, ChartStat, ChartSwatch } from '@/components/charts/chart-frame';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { MetadataHoverControls } from '@/components/metadata-hover-controls';
 import { useMetadataHover } from '@/hooks/useMetadataHover';
@@ -35,6 +36,12 @@ import {
   buildPaddedAxisRange,
   plotRevisionFromParts,
 } from '@/lib/plot-autoscale';
+import {
+  alphaColor,
+  createThemedPlotConfig,
+  createThemedPlotLayout,
+  usePlotTheme,
+} from '@/lib/plot-theme';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/utils/cn';
@@ -93,6 +100,7 @@ const stateTone: Record<'OK' | 'Deteriorating' | 'Failing', string> = {
 // the browser/device for multi-device sync, not the user, so it stays flat.
 const LIVE_MONITOR_PREFS_KEY = 'live-monitor:prefs:v1';
 const LIVE_MONITOR_DEVICE_ID_KEY = 'dinsight:live-monitor:device-id:v1';
+const LIVE_RECENT_WINDOW_POINTS = 500;
 
 type PersistedLiveMonitorPreferences = {
   selectedId?: number;
@@ -102,6 +110,9 @@ type PersistedLiveMonitorPreferences = {
   showAdvanced?: boolean;
   pointSize?: number;
   showContours?: boolean;
+  followLatest?: boolean;
+  showTrajectoryLine?: boolean;
+  monitorView?: 'all' | 'recent';
   manualSelectionEnabled?: boolean;
   selectionMode?: SelectionMode;
   enableMultipleSelections?: boolean;
@@ -274,7 +285,7 @@ const createBoundary = (selection: any, selectionMode: SelectionMode): Boundary 
   };
 };
 
-const buildBoundaryShape = (boundary: Boundary) => {
+const buildBoundaryShape = (boundary: Boundary, boundaryColor: string) => {
   if (boundary.type === 'rectangle' && boundary.coordinates.length >= 2) {
     const [first, second] = boundary.coordinates;
     return {
@@ -283,7 +294,7 @@ const buildBoundaryShape = (boundary: Boundary) => {
       x1: Math.max(first[0], second[0]),
       y0: Math.min(first[1], second[1]),
       y1: Math.max(first[1], second[1]),
-      line: { color: '#8b5cf6', width: 2 },
+      line: { color: boundaryColor, width: 2 },
       fillcolor: 'rgba(0,0,0,0)',
       layer: 'above' as const,
     };
@@ -296,7 +307,7 @@ const buildBoundaryShape = (boundary: Boundary) => {
       x1: boundary.center.x + boundary.radius,
       y0: boundary.center.y - boundary.radius,
       y1: boundary.center.y + boundary.radius,
-      line: { color: '#8b5cf6', width: 2 },
+      line: { color: boundaryColor, width: 2 },
       fillcolor: 'rgba(0,0,0,0)',
       layer: 'above' as const,
     };
@@ -310,7 +321,7 @@ const buildBoundaryShape = (boundary: Boundary) => {
     return {
       type: 'path' as const,
       path: `${path} Z`,
-      line: { color: '#8b5cf6', width: 2 },
+      line: { color: boundaryColor, width: 2 },
       fillcolor: 'rgba(0,0,0,0)',
       layer: 'above' as const,
     };
@@ -323,7 +334,7 @@ const buildBoundaryShape = (boundary: Boundary) => {
       x1: boundary.center.x + boundary.radiusX,
       y0: boundary.center.y - boundary.radiusY,
       y1: boundary.center.y + boundary.radiusY,
-      line: { color: '#8b5cf6', width: 2 },
+      line: { color: boundaryColor, width: 2 },
       fillcolor: 'rgba(0,0,0,0)',
       layer: 'above' as const,
     };
@@ -334,6 +345,7 @@ const buildBoundaryShape = (boundary: Boundary) => {
 
 export default function LiveMonitorPage() {
   const { user } = useAuth();
+  const plotTheme = usePlotTheme();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [manualDatasetId, setManualDatasetId] = useState('');
   const [datasetError, setDatasetError] = useState<string | null>(null);
@@ -343,6 +355,9 @@ export default function LiveMonitorPage() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [pointSize, setPointSize] = useState(8);
   const [showContours, setShowContours] = useState(false);
+  const [followLatest, setFollowLatest] = useState(false);
+  const [showTrajectoryLine, setShowTrajectoryLine] = useState(false);
+  const [monitorView, setMonitorView] = useState<'all' | 'recent'>('all');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [anomalyResult, setAnomalyResult] = useState<AnomalyDetectionResult | null>(null);
   const [latestGlowCount, setLatestGlowCount] = useState(5);
@@ -564,6 +579,13 @@ export default function LiveMonitorPage() {
         setPointSize(parsed.pointSize);
       }
       if (typeof parsed.showContours === 'boolean') setShowContours(parsed.showContours);
+      if (typeof parsed.followLatest === 'boolean') setFollowLatest(parsed.followLatest);
+      if (typeof parsed.showTrajectoryLine === 'boolean') {
+        setShowTrajectoryLine(parsed.showTrajectoryLine);
+      }
+      if (parsed.monitorView === 'all' || parsed.monitorView === 'recent') {
+        setMonitorView(parsed.monitorView);
+      }
       if (typeof parsed.manualSelectionEnabled === 'boolean') {
         setManualSelectionEnabled(parsed.manualSelectionEnabled);
       }
@@ -704,6 +726,9 @@ export default function LiveMonitorPage() {
       showAdvanced,
       pointSize,
       showContours,
+      followLatest,
+      showTrajectoryLine,
+      monitorView,
       manualSelectionEnabled,
       selectionMode,
       enableMultipleSelections,
@@ -765,14 +790,17 @@ export default function LiveMonitorPage() {
     autoRefresh,
     boundaries,
     enableMultipleSelections,
+    followLatest,
     isPrefsHydrated,
     manualDatasetId,
     manualSelectionEnabled,
     metadataEnabled,
+    monitorView,
     pointSize,
     selectedId,
     selectedMetadataKeys,
     selectionMode,
+    showTrajectoryLine,
     showAdvanced,
     showContours,
     streamSpeed,
@@ -1070,8 +1098,9 @@ export default function LiveMonitorPage() {
     setBoundaries((current) => current.filter((boundary) => boundary.id !== id));
 
   const plotShapes = useMemo(
-    () => boundaries.map(buildBoundaryShape).filter(Boolean),
-    [boundaries]
+    () =>
+      boundaries.map((boundary) => buildBoundaryShape(boundary, plotTheme.accent)).filter(Boolean),
+    [boundaries, plotTheme.accent]
   );
 
   const plotData = useMemo(() => {
@@ -1123,7 +1152,7 @@ export default function LiveMonitorPage() {
           type: 'scattergl',
           mode: 'markers',
           name: 'Baseline',
-          marker: { color: '#1A73E8', size: pointSize, opacity: 0.35 },
+          marker: { color: plotTheme.baseline, size: pointSize, opacity: 0.38 },
         },
         buildHoverText(baselineData.metadata)
       ),
@@ -1137,12 +1166,17 @@ export default function LiveMonitorPage() {
         name: 'Baseline density',
         showscale: false,
         contours: { coloring: 'none' },
-        line: { color: 'rgba(26,115,232,0.35)' },
+        line: { color: alphaColor(plotTheme.baseline, 0.35) },
         hoverinfo: 'skip',
       });
     }
 
     if (effectiveMonitoringData && effectiveMonitoringData.dinsight_x.length > 0) {
+      const visibleStartIndex =
+        monitorView === 'recent'
+          ? Math.max(0, effectiveMonitoringData.dinsight_x.length - LIVE_RECENT_WINDOW_POINTS)
+          : 0;
+      const isVisibleMonitoringIndex = (index: number) => index >= visibleStartIndex;
       const hoverForIndices = (indices: number[]) =>
         buildHoverText(
           effectiveMonitoringData.metadata,
@@ -1150,25 +1184,26 @@ export default function LiveMonitorPage() {
         );
 
       if (manualClassification) {
-        if (manualClassification.normalIndices.length > 0) {
+        const visibleNormalIndices =
+          manualClassification.normalIndices.filter(isVisibleMonitoringIndex);
+        const visibleAnomalyIndices =
+          manualClassification.anomalyIndices.filter(isVisibleMonitoringIndex);
+
+        if (visibleNormalIndices.length > 0) {
           traces.push(
             withMetadata(
               {
-                x: manualClassification.normalIndices.map(
-                  (index) => effectiveMonitoringData.dinsight_x[index]
-                ),
-                y: manualClassification.normalIndices.map(
-                  (index) => effectiveMonitoringData.dinsight_y[index]
-                ),
+                x: visibleNormalIndices.map((index) => effectiveMonitoringData.dinsight_x[index]),
+                y: visibleNormalIndices.map((index) => effectiveMonitoringData.dinsight_y[index]),
                 type: 'scattergl',
                 mode: 'markers',
-                name: `Normal (${manualClassification.normalIndices.length})`,
+                name: `Normal (${visibleNormalIndices.length.toLocaleString()})`,
                 marker: {
-                  color: manualClassification.normalIndices,
+                  color: visibleNormalIndices,
                   colorscale: [
-                    [0, '#166534'],
-                    [0.75, '#22C55E'],
-                    [1, '#FACC15'],
+                    [0, alphaColor(plotTheme.normal, 0.65)],
+                    [0.75, plotTheme.normal],
+                    [1, plotTheme.latest],
                   ],
                   cmin: 0,
                   cmax: Math.max(effectiveMonitoringData.dinsight_x.length - 1, 1),
@@ -1177,7 +1212,7 @@ export default function LiveMonitorPage() {
                   showscale: false,
                 },
               },
-              hoverForIndices(manualClassification.normalIndices)
+              hoverForIndices(visibleNormalIndices)
             )
           );
         }
@@ -1195,10 +1230,10 @@ export default function LiveMonitorPage() {
                 mode: 'markers',
                 name: `Normal (latest ${normalLatest.length})`,
                 marker: {
-                  color: '#22C55E',
+                  color: plotTheme.normal,
                   size: pointSize + 4,
                   opacity: 1,
-                  line: { color: '#FACC15', width: 2 },
+                  line: { color: plotTheme.latest, width: 2 },
                 },
               },
               hoverForIndices(normalLatest)
@@ -1206,25 +1241,21 @@ export default function LiveMonitorPage() {
           );
         }
 
-        if (manualClassification.anomalyIndices.length > 0) {
+        if (visibleAnomalyIndices.length > 0) {
           traces.push(
             withMetadata(
               {
-                x: manualClassification.anomalyIndices.map(
-                  (index) => effectiveMonitoringData.dinsight_x[index]
-                ),
-                y: manualClassification.anomalyIndices.map(
-                  (index) => effectiveMonitoringData.dinsight_y[index]
-                ),
+                x: visibleAnomalyIndices.map((index) => effectiveMonitoringData.dinsight_x[index]),
+                y: visibleAnomalyIndices.map((index) => effectiveMonitoringData.dinsight_y[index]),
                 type: 'scattergl',
                 mode: 'markers',
-                name: `Anomaly (${manualClassification.anomalyIndices.length})`,
+                name: `Anomaly (${visibleAnomalyIndices.length.toLocaleString()})`,
                 marker: {
-                  color: manualClassification.anomalyIndices,
+                  color: visibleAnomalyIndices,
                   colorscale: [
-                    [0, '#991B1B'],
-                    [0.75, '#EF4444'],
-                    [1, '#FACC15'],
+                    [0, alphaColor(plotTheme.anomaly, 0.72)],
+                    [0.75, plotTheme.anomaly],
+                    [1, plotTheme.latest],
                   ],
                   cmin: 0,
                   cmax: Math.max(effectiveMonitoringData.dinsight_x.length - 1, 1),
@@ -1233,7 +1264,7 @@ export default function LiveMonitorPage() {
                   showscale: false,
                 },
               },
-              hoverForIndices(manualClassification.anomalyIndices)
+              hoverForIndices(visibleAnomalyIndices)
             )
           );
         }
@@ -1251,10 +1282,10 @@ export default function LiveMonitorPage() {
                 mode: 'markers',
                 name: `Anomaly (latest ${anomalyLatest.length})`,
                 marker: {
-                  color: '#EF4444',
+                  color: plotTheme.anomaly,
                   size: pointSize + 5,
                   opacity: 1,
-                  line: { color: '#FACC15', width: 2 },
+                  line: { color: plotTheme.latest, width: 2 },
                 },
               },
               hoverForIndices(anomalyLatest)
@@ -1262,8 +1293,12 @@ export default function LiveMonitorPage() {
           );
         }
       } else if (anomalyResult?.anomalous_points?.length) {
-        const normal = anomalyResult.anomalous_points.filter((point) => !point.is_anomaly);
-        const anomalies = anomalyResult.anomalous_points.filter((point) => point.is_anomaly);
+        const normal = anomalyResult.anomalous_points.filter(
+          (point) => !point.is_anomaly && isVisibleMonitoringIndex(point.index)
+        );
+        const anomalies = anomalyResult.anomalous_points.filter(
+          (point) => point.is_anomaly && isVisibleMonitoringIndex(point.index)
+        );
 
         if (normal.length > 0) {
           traces.push(
@@ -1274,7 +1309,7 @@ export default function LiveMonitorPage() {
                 type: 'scattergl',
                 mode: 'markers',
                 name: 'Monitoring (normal)',
-                marker: { color: '#34A853', size: pointSize, opacity: 0.75 },
+                marker: { color: plotTheme.normal, size: pointSize, opacity: 0.75 },
               },
               hoverForIndices(normal.map((point) => point.index))
             )
@@ -1290,7 +1325,7 @@ export default function LiveMonitorPage() {
                 type: 'scattergl',
                 mode: 'markers',
                 name: 'Monitoring (anomaly)',
-                marker: { color: '#EA4335', size: pointSize + 1, opacity: 0.95 },
+                marker: { color: plotTheme.anomaly, size: pointSize + 1, opacity: 0.95 },
               },
               hoverForIndices(anomalies.map((point) => point.index))
             )
@@ -1299,7 +1334,12 @@ export default function LiveMonitorPage() {
       } else {
         const regularIndices = effectiveMonitoringData.dinsight_x
           .map((_, index) => index)
-          .filter((index) => !latestIndices.has(index) && !trailIndices.has(index));
+          .filter(
+            (index) =>
+              isVisibleMonitoringIndex(index) &&
+              !latestIndices.has(index) &&
+              !trailIndices.has(index)
+          );
         const trailOnly = effectiveMonitoringData.dinsight_x
           .map((_, index) => index)
           .filter((index) => trailIndices.has(index));
@@ -1318,9 +1358,9 @@ export default function LiveMonitorPage() {
                 mode: 'markers',
                 name: 'Monitoring',
                 marker: {
-                  color: '#EF4444',
+                  color: plotTheme.monitoring,
                   size: pointSize,
-                  opacity: 0.82,
+                  opacity: monitorView === 'recent' ? 0.82 : 0.7,
                 },
               },
               hoverForIndices(regularIndices)
@@ -1334,7 +1374,7 @@ export default function LiveMonitorPage() {
             return 0.32 + (index / (trailOnly.length - 1)) * 0.48;
           });
 
-          if (trajectoryLine.length > 1) {
+          if (showTrajectoryLine && trajectoryLine.length > 1) {
             traces.push({
               x: trajectoryLine.map((index) => effectiveMonitoringData.dinsight_x[index]),
               y: trajectoryLine.map((index) => effectiveMonitoringData.dinsight_y[index]),
@@ -1342,7 +1382,7 @@ export default function LiveMonitorPage() {
               mode: 'lines',
               name: 'Trajectory',
               hoverinfo: 'skip',
-              line: { color: 'rgba(249, 115, 22, 0.18)', width: 2 },
+              line: { color: alphaColor(plotTheme.trailMid, 0.22), width: 2 },
               showlegend: false,
             });
           }
@@ -1357,15 +1397,15 @@ export default function LiveMonitorPage() {
             marker: {
               color: trailOnly.map((_, index) => index),
               colorscale: [
-                [0, '#991B1B'],
-                [0.5, '#F97316'],
-                [1, '#FACC15'],
+                [0, plotTheme.trailOld],
+                [0.5, plotTheme.trailMid],
+                [1, plotTheme.trailLatest],
               ],
               cmin: 0,
               cmax: Math.max(trailOnly.length - 1, 1),
               size: pointSize + 2,
               opacity: trailOpacity,
-              line: { color: 'rgba(124, 45, 18, 0.35)', width: 0.5 },
+              line: { color: alphaColor(plotTheme.trailMid, 0.35), width: 0.5 },
               showscale: false,
             },
           });
@@ -1381,10 +1421,10 @@ export default function LiveMonitorPage() {
                 mode: 'markers',
                 name: `Latest (${latestOnly.length})`,
                 marker: {
-                  color: '#FACC15',
+                  color: plotTheme.latest,
                   size: pointSize + 5,
                   opacity: 1,
-                  line: { color: '#111827', width: 2 },
+                  line: { color: plotTheme.latestLine, width: 2 },
                 },
               },
               hoverForIndices(latestOnly)
@@ -1408,35 +1448,57 @@ export default function LiveMonitorPage() {
           marker: {
             size: pointSize + 8,
             color: 'rgba(0,0,0,0)',
-            line: { color: '#FACC15', width: 2.5 },
+            line: { color: plotTheme.latest, width: 2.5 },
             opacity: 1,
           },
         });
       }
     }
 
+    const monitoringRangeStart = (() => {
+      if (!effectiveMonitoringData) {
+        return 0;
+      }
+      const count = effectiveMonitoringData.dinsight_x.length;
+      if (followLatest) {
+        return Math.max(0, count - Math.max(50, latestGlowCount + trailPoints + 25));
+      }
+      if (monitorView === 'recent') {
+        return Math.max(0, count - LIVE_RECENT_WINDOW_POINTS);
+      }
+      return 0;
+    })();
+    const monitoringRangeX = effectiveMonitoringData?.dinsight_x.slice(monitoringRangeStart) ?? [];
+    const monitoringRangeY = effectiveMonitoringData?.dinsight_y.slice(monitoringRangeStart) ?? [];
+
     const xAxisRange = buildPaddedAxisRange([
       ...(baselineData?.dinsight_x ?? []),
-      ...(effectiveMonitoringData?.dinsight_x ?? []),
+      ...monitoringRangeX,
       ...(anomalyResult?.anomalous_points?.map((point) => point.x) ?? []),
     ]);
     const yAxisRange = buildPaddedAxisRange([
       ...(baselineData?.dinsight_y ?? []),
-      ...(effectiveMonitoringData?.dinsight_y ?? []),
+      ...monitoringRangeY,
       ...(anomalyResult?.anomalous_points?.map((point) => point.y) ?? []),
     ]);
     const autoscaleRevision = plotRevisionFromParts([
       selectedId ?? 'live-monitor',
+      followLatest ? 'follow-latest' : monitorView,
       axisRangeRevisionPart(xAxisRange),
       axisRangeRevisionPart(yAxisRange),
     ]);
+    const baseConfig = createThemedPlotConfig({ modeBar: true });
+    const selectionModeButtonsToRemove = manualSelectionEnabled
+      ? selectionMode === 'lasso'
+        ? ['select2d']
+        : ['lasso2d']
+      : [];
 
     return {
       data: traces,
       revision: autoscaleRevision,
-      layout: {
+      layout: createThemedPlotLayout(plotTheme, {
         height: 560,
-        template: 'plotly_white',
         title: '',
         xaxis: {
           title: "D'insight X Coordinate",
@@ -1457,33 +1519,36 @@ export default function LiveMonitorPage() {
             : 'select'
           : 'zoom',
         shapes: plotShapes,
-      } as any,
+      }) as any,
       config: {
-        displayModeBar: true,
-        displaylogo: false,
-        responsive: true,
-        modeBarButtonsToRemove: manualSelectionEnabled
-          ? selectionMode === 'lasso'
-            ? ['select2d']
-            : ['lasso2d']
-          : [],
+        ...baseConfig,
+        modeBarButtonsToRemove: [
+          ...baseConfig.modeBarButtonsToRemove,
+          ...selectionModeButtonsToRemove,
+        ],
       },
     };
   }, [
     anomalyResult,
     baselineData,
     buildHoverText,
+    followLatest,
     hasActiveMetadata,
     latestIndices,
+    latestGlowCount,
     trailIndices,
     manualClassification,
     manualSelectionEnabled,
     effectiveMonitoringData,
+    monitorView,
     plotShapes,
+    plotTheme,
     pointSize,
     selectedId,
     selectionMode,
     showContours,
+    showTrajectoryLine,
+    trailPoints,
   ]);
 
   const applyManualDataset = () => {
@@ -1747,6 +1812,47 @@ export default function LiveMonitorPage() {
               </button>
             </div>
 
+            <div className="space-y-3 rounded-md border border-input p-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">Plot focus</p>
+                <Badge variant={monitorView === 'recent' ? 'info' : 'outline'}>
+                  {monitorView === 'recent' ? `Recent ${LIVE_RECENT_WINDOW_POINTS}` : 'All points'}
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  size="sm"
+                  variant={monitorView === 'all' ? 'default' : 'outline'}
+                  onClick={() => setMonitorView('all')}
+                >
+                  All points
+                </Button>
+                <Button
+                  size="sm"
+                  variant={monitorView === 'recent' ? 'default' : 'outline'}
+                  onClick={() => setMonitorView('recent')}
+                >
+                  Recent
+                </Button>
+              </div>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={followLatest}
+                  onChange={(event) => setFollowLatest(event.target.checked)}
+                />
+                Follow latest range
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={showTrajectoryLine}
+                  onChange={(event) => setShowTrajectoryLine(event.target.checked)}
+                />
+                Show faint trajectory line
+              </label>
+            </div>
+
             <Button variant="outline" onClick={refreshNow} className="w-full">
               <RefreshCw className="mr-2 h-4 w-4" />
               Refresh now
@@ -1960,36 +2066,79 @@ export default function LiveMonitorPage() {
               </div>
             )}
 
-            {isLoadingBaseline || (selectedId && isLoadingMonitoring) ? (
-              <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
-                Loading monitor view...
-              </div>
-            ) : plotData ? (
-              <Plot
-                data={plotData.data}
-                layout={plotData.layout as any}
-                config={plotData.config as any}
-                revision={plotData.revision}
-                useResizeHandler
-                style={{ width: '100%', height: 'min(62vh, 560px)', minHeight: '420px' }}
-                onSelecting={() => {
-                  if (manualSelectionEnabled) {
-                    setIsSelecting(true);
-                  }
-                }}
-                onSelected={(selection: any) => {
-                  setIsSelecting(false);
-                  handleSelection(selection);
-                }}
-                onDeselect={() => {
-                  setIsSelecting(false);
-                }}
-              />
-            ) : (
-              <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
-                Select a dataset with baseline coordinates to start live monitoring.
-              </div>
-            )}
+            <ChartFrame
+              title="Coordinate map"
+              description={
+                followLatest
+                  ? 'Range follows the latest monitoring segment; the page and plot stay mounted.'
+                  : 'Baseline, monitoring, recent trail, and latest stream points in one view.'
+              }
+              stats={
+                <>
+                  <ChartStat label="Dataset" value={selectedId ? `#${selectedId}` : '—'} />
+                  <ChartStat label="View" value={monitorView === 'recent' ? 'Recent' : 'All'} />
+                  <ChartStat
+                    label="Streamed"
+                    value={`${monitoringCount.toLocaleString()} / ${
+                      streamingStatus?.total_points?.toLocaleString() ?? '—'
+                    }`}
+                    tone="info"
+                  />
+                  <ChartStat
+                    label="Abnormal"
+                    value={anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : '—'}
+                    tone={
+                      anomalyPercentage == null
+                        ? 'neutral'
+                        : anomalyPercentage >= 25
+                          ? 'danger'
+                          : anomalyPercentage >= 10
+                            ? 'warning'
+                            : 'success'
+                    }
+                  />
+                </>
+              }
+              actions={
+                <>
+                  <ChartSwatch color={plotTheme.baseline} label="Baseline" />
+                  <ChartSwatch color={plotTheme.monitoring} label="Monitoring" />
+                  <ChartSwatch color={plotTheme.latest} label="Latest" />
+                </>
+              }
+              bodyClassName="p-2"
+            >
+              {isLoadingBaseline || (selectedId && isLoadingMonitoring) ? (
+                <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
+                  Loading monitor view...
+                </div>
+              ) : plotData ? (
+                <Plot
+                  data={plotData.data}
+                  layout={plotData.layout as any}
+                  config={plotData.config as any}
+                  revision={plotData.revision}
+                  useResizeHandler
+                  style={{ width: '100%', height: 'min(62vh, 560px)', minHeight: '420px' }}
+                  onSelecting={() => {
+                    if (manualSelectionEnabled) {
+                      setIsSelecting(true);
+                    }
+                  }}
+                  onSelected={(selection: any) => {
+                    setIsSelecting(false);
+                    handleSelection(selection);
+                  }}
+                  onDeselect={() => {
+                    setIsSelecting(false);
+                  }}
+                />
+              ) : (
+                <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
+                  Select a dataset with baseline coordinates to start live monitoring.
+                </div>
+              )}
+            </ChartFrame>
           </CardContent>
         </Card>
       </div>

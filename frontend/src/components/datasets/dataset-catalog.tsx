@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   ArrowLeft,
+  BarChart3,
   Calendar,
   Database,
   Download,
@@ -49,12 +50,17 @@ import { EditMetadataDialog } from '@/components/datasets/edit-metadata-dialog';
 import { RegisterMetadataDialog } from '@/components/datasets/register-metadata-dialog';
 import { ValidationRulesPanel } from '@/components/datasets/validation-rules-panel';
 import { usePermission } from '@/components/auth/require-permission';
+import { ChartEmptyState, ChartFrame, ChartStat } from '@/components/charts/chart-frame';
+import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 import { Actions } from '@/lib/permissions';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api-client';
+import { createDinsightPreviewPlot } from '@/lib/dinsight-preview-plot';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
+import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import type { DinsightDatasetSource } from '@/lib/dataset-normalizers';
+import { usePlotTheme } from '@/lib/plot-theme';
 
 // Catalog browses the dataset metadata + lineage + validation that
 // upload + processing pipelines record server-side.
@@ -88,9 +94,12 @@ export interface DatasetCatalogProps {
 
 export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
   const { currentOrg } = useAuth();
+  const plotTheme = usePlotTheme();
+  const isModal = variant === 'modal';
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [selectedDatasetId, setSelectedDatasetId] = useState<number | null>(null);
+  const [previewDatasetId, setPreviewDatasetId] = useState<number | null>(null);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [registerInitialDatasetId, setRegisterInitialDatasetId] = useState<number | null>(null);
   const [deleteDatasetId, setDeleteDatasetId] = useState('');
@@ -317,7 +326,47 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
     return items;
   }, [catalogItems, filteredDatasetIds, search, sourceByDinsightId]);
 
-  const isModal = variant === 'modal';
+  useEffect(() => {
+    if (!isModal) {
+      return;
+    }
+    if (filtered.length === 0) {
+      setPreviewDatasetId(null);
+      return;
+    }
+    if (
+      previewDatasetId == null ||
+      !filtered.some((item) => item.dataset_id === previewDatasetId)
+    ) {
+      setPreviewDatasetId(filtered[0].dataset_id);
+    }
+  }, [filtered, isModal, previewDatasetId]);
+
+  const {
+    baselineData: previewBaselineData,
+    monitoringData: previewMonitoringData,
+    isLoadingBaseline: isLoadingPreviewBaseline,
+    isLoadingMonitoring: isLoadingPreviewMonitoring,
+    baselineError: previewBaselineError,
+    monitoringError: previewMonitoringError,
+  } = useBaselineMonitoringData({
+    dinsightId: isModal ? previewDatasetId : null,
+    includeMetadata: false,
+    monitoringMode: 'coordinates',
+    maxPoints: 20_000,
+  });
+
+  const previewPlot = useMemo(
+    () =>
+      createDinsightPreviewPlot(previewBaselineData, previewMonitoringData, plotTheme, {
+        compact: true,
+        datasetId: previewDatasetId,
+        modeBar: false,
+      }),
+    [plotTheme, previewBaselineData, previewDatasetId, previewMonitoringData]
+  );
+  const previewItem = filtered.find((item) => item.dataset_id === previewDatasetId) ?? null;
+  const catalogColumnCount = isModal ? (canDelete ? 6 : 5) : canDelete ? 9 : 8;
 
   return (
     <div className={isModal ? 'space-y-4' : 'space-y-6'}>
@@ -442,136 +491,273 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
         </CardContent>
       </Card>
 
-      <Card className="border-border/60">
-        <CardContent className="p-0">
-          <Table className="table-fixed">
-            <colgroup>
-              <col className="w-[28%]" />
-              <col className="w-[23%]" />
-              <col className="w-[12%]" />
-              <col className="w-[9%]" />
-              <col className="w-[10%]" />
-              <col className="w-[8%]" />
-              <col className="w-[10%]" />
-              <col className="w-14" />
-              {canDelete && <col className="w-14" />}
-            </colgroup>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Source</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Quality</TableHead>
-                <TableHead>Validation</TableHead>
-                <TableHead>Records</TableHead>
-                <TableHead>Registered</TableHead>
-                <TableHead className="w-16 text-right">Export</TableHead>
-                {canDelete && <TableHead className="w-16 text-right">Delete</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {listQuery.isLoading || isLoadingDinsightSummaries ? (
-                <TableLoading message="Loading dataset catalog" rowSpan={canDelete ? 9 : 8} />
-              ) : filtered.length === 0 ? (
-                <TableEmpty
-                  rowSpan={canDelete ? 9 : 8}
-                  message={
-                    search || typeFilter
-                      ? 'No datasets match the current filters.'
-                      : 'No datasets registered yet. Upload one from the Data Ingestion page.'
-                  }
-                />
+      <div className={isModal ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]' : 'space-y-4'}>
+        <Card className="min-w-0 border-border/60">
+          <CardContent className="p-0">
+            <Table className={isModal ? 'min-w-[740px] table-fixed' : 'min-w-[980px] table-fixed'}>
+              {isModal ? (
+                <colgroup>
+                  <col className="w-[230px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[112px]" />
+                  <col className="w-[64px]" />
+                  {canDelete && <col className="w-[64px]" />}
+                </colgroup>
               ) : (
-                filtered.map((item) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer hover:bg-surface-muted"
-                    onClick={() => setSelectedDatasetId(item.dataset_id)}
-                  >
-                    <TableCell className="min-w-0">
-                      <div className="truncate font-medium text-fg" title={item.name}>
-                        {item.name}
-                      </div>
-                      {item.description && (
-                        <div className="truncate text-xs text-fg-muted" title={item.description}>
-                          {item.description}
+                <colgroup>
+                  <col className="w-[220px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[96px]" />
+                  <col className="w-[120px]" />
+                  <col className="w-[96px]" />
+                  <col className="w-[112px]" />
+                  <col className="w-[64px]" />
+                  {canDelete && <col className="w-[64px]" />}
+                </colgroup>
+              )}
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead>Type</TableHead>
+                  {!isModal && <TableHead>Quality</TableHead>}
+                  <TableHead>Validation</TableHead>
+                  {!isModal && <TableHead>Records</TableHead>}
+                  {!isModal && <TableHead>Registered</TableHead>}
+                  <TableHead className="w-16 text-right">Export</TableHead>
+                  {canDelete && <TableHead className="w-16 text-right">Delete</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {listQuery.isLoading || isLoadingDinsightSummaries ? (
+                  <TableLoading message="Loading dataset catalog" rowSpan={catalogColumnCount} />
+                ) : filtered.length === 0 ? (
+                  <TableEmpty
+                    rowSpan={catalogColumnCount}
+                    message={
+                      search || typeFilter
+                        ? 'No datasets match the current filters.'
+                        : 'No datasets registered yet. Upload one from the Data Ingestion page.'
+                    }
+                  />
+                ) : (
+                  filtered.map((item) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover:bg-surface-muted"
+                      onClick={() => {
+                        setPreviewDatasetId(item.dataset_id);
+                        setSelectedDatasetId(item.dataset_id);
+                      }}
+                    >
+                      <TableCell className="min-w-0">
+                        <div className="truncate font-medium text-fg" title={item.name}>
+                          {item.name}
                         </div>
-                      )}
-                      {!item.has_metadata && (
-                        <div className="mt-1 line-clamp-2 text-xs text-warning-text">
-                          Register metadata to unlock curation, validation, and compatibility
-                          workflows.
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <CatalogSourceCell source={sourceByDinsightId.get(item.dataset_id)} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={item.has_metadata ? 'secondary' : 'warning'}>
-                        {item.has_metadata ? item.dataset_type : 'No metadata'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <QualityBadge score={item.data_quality_score} />
-                    </TableCell>
-                    <TableCell className="text-sm">
-                      <ValidationBadge status={item.validation_status} />
-                    </TableCell>
-                    <TableCell className="text-sm text-fg-muted">
-                      {item.total_records?.toLocaleString() ?? '—'}
-                    </TableCell>
-                    <TableCell className="text-sm text-fg-muted">
-                      {item.created_at
-                        ? new Date(item.created_at).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })
-                        : '—'}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={`Export dataset ${item.dataset_id}`}
-                        disabled={exportingDatasetId === item.dataset_id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void requestExport(item.dataset_id);
-                        }}
-                      >
-                        {exportingDatasetId === item.dataset_id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4" />
+                        {item.description && (
+                          <div className="truncate text-xs text-fg-muted" title={item.description}>
+                            {item.description}
+                          </div>
                         )}
-                      </Button>
-                    </TableCell>
-                    {canDelete && (
+                        {!item.has_metadata && (
+                          <div className="mt-1 line-clamp-2 text-xs text-warning-text">
+                            Register metadata to unlock curation, validation, and compatibility
+                            workflows.
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <CatalogSourceCell source={sourceByDinsightId.get(item.dataset_id)} />
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={item.has_metadata ? 'secondary' : 'warning'}>
+                          {item.has_metadata ? item.dataset_type : 'No metadata'}
+                        </Badge>
+                      </TableCell>
+                      {!isModal && (
+                        <TableCell className="text-sm">
+                          <QualityBadge score={item.data_quality_score} />
+                        </TableCell>
+                      )}
+                      <TableCell className="text-sm">
+                        <ValidationBadge status={item.validation_status} />
+                      </TableCell>
+                      {!isModal && (
+                        <TableCell className="text-sm text-fg-muted">
+                          {item.total_records?.toLocaleString() ?? '—'}
+                        </TableCell>
+                      )}
+                      {!isModal && (
+                        <TableCell className="text-sm text-fg-muted">
+                          {item.created_at
+                            ? new Date(item.created_at).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })
+                            : '—'}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
-                          aria-label={`Delete dataset ${item.dataset_id}`}
-                          disabled={deleteMutation.isPending}
+                          aria-label={`Export dataset ${item.dataset_id}`}
+                          disabled={exportingDatasetId === item.dataset_id}
                           onClick={(event) => {
                             event.stopPropagation();
-                            requestDelete(item.dataset_id);
+                            void requestExport(item.dataset_id);
                           }}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {exportingDatasetId === item.dataset_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
                         </Button>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))
+                      {canDelete && (
+                        <TableCell className="text-right">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
+                            aria-label={`Delete dataset ${item.dataset_id}`}
+                            disabled={deleteMutation.isPending}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              requestDelete(item.dataset_id);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {isModal && (
+          <ChartFrame
+            title="Dataset preview"
+            description="Sampled baseline and monitoring coordinates for the catalog selection."
+            className="self-start"
+            stats={
+              <>
+                <ChartStat
+                  label="Dataset"
+                  value={previewDatasetId ? `#${previewDatasetId}` : '—'}
+                />
+                <ChartStat
+                  label="Baseline"
+                  value={(previewBaselineData?.dinsight_x.length ?? 0).toLocaleString()}
+                  tone="info"
+                />
+                <ChartStat
+                  label="Monitoring"
+                  value={(previewMonitoringData?.dinsight_x.length ?? 0).toLocaleString()}
+                  tone={previewMonitoringData?.dinsight_x.length ? 'danger' : 'neutral'}
+                />
+              </>
+            }
+            actions={
+              <select
+                value={previewDatasetId != null ? String(previewDatasetId) : ''}
+                onChange={(event) =>
+                  setPreviewDatasetId(event.target.value ? Number(event.target.value) : null)
+                }
+                className="max-w-[220px] rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+              >
+                <option value="">Select dataset</option>
+                {filtered.map((item) => (
+                  <option key={item.dataset_id} value={item.dataset_id}>
+                    #{item.dataset_id} - {item.name}
+                  </option>
+                ))}
+              </select>
+            }
+            bodyClassName="p-2"
+          >
+            <div className="space-y-3">
+              {previewItem && (
+                <div className="rounded-md border border-border bg-surface-muted/50 px-3 py-2 text-xs">
+                  <div className="truncate font-semibold text-fg" title={previewItem.name}>
+                    {previewItem.name}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-2 text-fg-muted">
+                    <span>
+                      {previewItem.has_metadata ? previewItem.dataset_type : 'No metadata'}
+                    </span>
+                    <span>•</span>
+                    <span>
+                      {sourceByDinsightId.get(previewItem.dataset_id)?.source ?? 'Manual upload'}
+                    </span>
+                  </div>
+                </div>
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+
+              {!previewDatasetId ? (
+                <ChartEmptyState
+                  title="No dataset selected"
+                  description="Choose a catalog row or use the selector above to preview coordinates."
+                />
+              ) : isLoadingPreviewBaseline || isLoadingPreviewMonitoring ? (
+                <ChartEmptyState
+                  title="Loading preview"
+                  description="Fetching sampled baseline and monitoring coordinates."
+                />
+              ) : previewBaselineError ? (
+                <ChartEmptyState title="Preview unavailable" description={previewBaselineError} />
+              ) : previewPlot ? (
+                <div className="h-[280px]">
+                  <Plot
+                    data={previewPlot.data as any}
+                    layout={previewPlot.layout as any}
+                    config={previewPlot.config as any}
+                    revision={previewPlot.revision}
+                    useResizeHandler
+                    style={{ width: '100%', height: '100%' }}
+                  />
+                </div>
+              ) : (
+                <ChartEmptyState
+                  title="No coordinates available"
+                  description="This dataset has no processed baseline coordinates yet."
+                />
+              )}
+              {previewMonitoringError && (
+                <p className="px-1 text-xs text-fg-muted">{previewMonitoringError}</p>
+              )}
+              {previewDatasetId && (
+                <div className="flex flex-wrap gap-2 px-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void requestExport(previewDatasetId)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedDatasetId(previewDatasetId)}
+                  >
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Details
+                  </Button>
+                </div>
+              )}
+            </div>
+          </ChartFrame>
+        )}
+      </div>
 
       {selectedDatasetId !== null && (
         <DetailDrawer
