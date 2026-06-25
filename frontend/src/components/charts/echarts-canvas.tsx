@@ -37,8 +37,11 @@ function EChartsSurface({
 }: EChartsCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ECharts | null>(null);
+  const optionRef = useRef(option);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [chartReadyRevision, setChartReadyRevision] = useState(0);
+
+  optionRef.current = option;
 
   useEffect(() => {
     let cancelled = false;
@@ -50,7 +53,7 @@ function EChartsSurface({
         }
 
         chartRef.current = echarts.init(containerRef.current, undefined, { renderer });
-        chartRef.current.setOption(option, { notMerge, lazyUpdate });
+        chartRef.current.setOption(optionRef.current, { notMerge, lazyUpdate });
         setChartReadyRevision((revision) => revision + 1);
       })
       .catch((error: unknown) => {
@@ -70,7 +73,7 @@ function EChartsSurface({
 
   useEffect(() => {
     chartRef.current?.setOption(option, { notMerge, lazyUpdate });
-  }, [lazyUpdate, notMerge, option]);
+  }, [chartReadyRevision, lazyUpdate, notMerge, option]);
 
   useEffect(() => {
     const chart = chartRef.current;

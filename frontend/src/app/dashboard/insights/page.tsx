@@ -1807,16 +1807,17 @@ export default function HealthInsightsPage() {
       },
       series: [
         {
-          type: 'line',
+          type: 'scatter',
           name: 'Baseline',
           data: sorted
             .filter((interval) => interval.dataset_type === 'baseline')
             .map((interval) => toPoint(interval, 'Baseline')),
-          showSymbol: true,
+          symbol: 'circle',
           symbolSize: 5.5,
-          lineStyle: { width: 1.7, color: alphaColor(plotTheme.baseline, 0.82) },
-          itemStyle: { color: alphaColor(plotTheme.baseline, 0.82) },
-          connectNulls: false,
+          itemStyle: { color: alphaColor(plotTheme.baseline, 0.82), borderWidth: 0 },
+          emphasis: { focus: 'series', scale: 1.4 },
+          large: true,
+          largeThreshold: 2000,
           progressive: 800,
           markArea: { silent: true, data: markAreaData },
         },
@@ -1851,7 +1852,7 @@ export default function HealthInsightsPage() {
           lineStyle: { color: plotTheme.danger, width: 2, type: 'dotted' },
         },
         {
-          type: 'line',
+          type: 'scatter',
           name: 'Monitoring history',
           data: sorted
             .filter(
@@ -1859,14 +1860,16 @@ export default function HealthInsightsPage() {
                 interval.dataset_type === 'monitoring' && !recentMonitoringIndexSet.has(index)
             )
             .map((interval) => toPoint(interval, 'Monitoring')),
-          showSymbol: true,
+          symbol: 'circle',
           symbolSize: 4.5,
-          lineStyle: { color: alphaColor(plotTheme.monitoring, 0.18), width: 1.2 },
-          itemStyle: { color: alphaColor(plotTheme.monitoring, 0.26) },
+          itemStyle: { color: alphaColor(plotTheme.monitoring, 0.28), borderWidth: 0 },
+          emphasis: { focus: 'series', scale: 1.35 },
+          large: true,
+          largeThreshold: 2000,
           progressive: 800,
         },
         {
-          type: 'line',
+          type: 'scatter',
           name: 'Monitoring recent',
           data: sorted
             .filter(
@@ -1874,10 +1877,12 @@ export default function HealthInsightsPage() {
                 interval.dataset_type === 'monitoring' && recentMonitoringIndexSet.has(index)
             )
             .map((interval) => toPoint(interval, 'Monitoring')),
-          showSymbol: true,
+          symbol: 'circle',
           symbolSize: 5.5,
-          lineStyle: { color: alphaColor(plotTheme.monitoring, 0.9), width: 2.2 },
-          itemStyle: { color: alphaColor(plotTheme.monitoring, 0.88) },
+          itemStyle: { color: alphaColor(plotTheme.monitoring, 0.9), borderWidth: 0 },
+          emphasis: { focus: 'series', scale: 1.4 },
+          large: true,
+          largeThreshold: 2000,
           progressive: 800,
         },
         {
