@@ -45,7 +45,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <ShieldAlert className="h-4 w-4 text-amber-700 dark:text-amber-400" />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold text-fg">Dinsight Admin</span>
+              <span className="text-sm font-semibold text-fg">D'Insight Admin</span>
               <span className="text-xs text-fg-muted">
                 Vendor-staff surface — managing customers, fleet, and support sessions
               </span>
@@ -72,7 +72,7 @@ function NotAuthorized() {
       <ShieldAlert className="h-10 w-10 text-muted-foreground" />
       <h1 className="text-xl font-semibold">Not authorized</h1>
       <p className="text-sm text-muted-foreground max-w-md">
-        This area is reserved for Dinsight platform administrators. If you reached this page by
+        This area is reserved for D'Insight platform administrators. If you reached this page by
         mistake, return to your dashboard.
       </p>
       <Link

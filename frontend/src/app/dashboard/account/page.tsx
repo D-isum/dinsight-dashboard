@@ -38,7 +38,7 @@ import { AuditLogSection } from '@/components/audit/audit-log-section';
 import { usePermission } from '@/components/auth/require-permission';
 import { Actions } from '@/lib/permissions';
 
-// Account & Security is the consolidated settings surface. Sub-sections
+// Settings is the consolidated settings surface. Sub-sections
 // are tabs so the page stays a single route (deep-linkable via
 // ?section=...) and the tab strip is the user's primary scan target.
 //
@@ -273,11 +273,11 @@ function AccountSecurityView() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl">
             <UserCog className="h-6 w-6" />
-            Account &amp; Security
+            Settings
           </CardTitle>
           <CardDescription>
-            Manage your profile, security credentials, organization memberships, alert and
-            validation rules, license, and notification preferences. Pick a section below.
+            Manage your account, organization, devices, alerts, validation rules, license, and audit
+            settings.
           </CardDescription>
         </CardHeader>
       </Card>
@@ -815,7 +815,7 @@ function AccountSecurityView() {
                 Org-wide rules that can be run against any dataset to check data quality. To run a
                 rule against a specific dataset, open the dataset in the{' '}
                 <a
-                  href="/dashboard/data/catalog"
+                  href="/dashboard/data?catalog=open"
                   className="font-medium text-accent hover:underline"
                 >
                   catalog
@@ -838,8 +838,8 @@ function AccountSecurityView() {
                   Audit log
                 </CardTitle>
                 <CardDescription>
-                  Every mutating action in this organization, ordered by recency. Read traffic is
-                  intentionally omitted. Admin-only.
+                  Every change made in this organization, ordered by newest first. Read-only page
+                  views are not listed. Admin-only.
                 </CardDescription>
               </CardHeader>
               <CardContent>

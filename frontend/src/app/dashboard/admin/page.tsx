@@ -62,8 +62,7 @@ function AdminContent() {
         <h1 className="text-2xl font-semibold">Platform administration</h1>
         <p className="text-sm text-muted-foreground">
           Manage customer organizations, view fleet-wide ingestion metrics, and open audited support
-          sessions. All actions taken here are scoped to the platform tier — they affect customers
-          other than your own org.
+          sessions. These tools affect customer organizations outside the current organization.
         </p>
       </header>
 

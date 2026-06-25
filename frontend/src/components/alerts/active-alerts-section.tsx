@@ -34,7 +34,7 @@ import { useAuth } from '@/context/auth-context';
 
 // ActiveAlertsSection is the operational feed of alerts that fired
 // against this org's stored anomaly classifications. Was its own page
-// at /dashboard/alerts; now embedded as a tab under Account & Security
+// at /dashboard/alerts; now embedded as a tab under Settings
 // so the top-level sidebar can stay short.
 
 interface AlertItem {

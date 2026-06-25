@@ -80,14 +80,11 @@ export function DevicesSection() {
       <header className="space-y-2">
         <h2 className="text-2xl font-semibold">Devices</h2>
         <p className="text-sm text-muted-foreground">
-          Each device is one physical machine being monitored. Devices are registered by your
-          Dinsight provider — the mobile app on each device authenticates to Azure IoT Hub with a
-          device-scoped credential that arrives pre-loaded. From this page you can monitor
+          Each device is one physical machine being monitored. From this page you can monitor
           ingestion, pause a device for planned downtime, or trigger a manual sync.
         </p>
         <p className="text-xs text-muted-foreground">
-          Need to add a new device or rotate a credential? Contact support — it&apos;s a
-          vendor-managed action.
+          Need to add a new device or rotate credentials? Contact support.
         </p>
       </header>
 
@@ -178,7 +175,7 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
-            <TableHead>IoT Hub identity</TableHead>
+            <TableHead>Device identity</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last ingested</TableHead>
             {(canUpdate || canDelete) && <TableHead aria-label="Actions" />}
@@ -188,10 +185,7 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
           {query.isLoading && <TableLoading message="Loading devices…" rowSpan={5} />}
           {query.isError && <TableError message="Failed to load devices." rowSpan={5} />}
           {query.isSuccess && query.data.length === 0 && (
-            <TableEmpty
-              message="No devices yet. Devices are registered by your Dinsight provider — contact support to provision one."
-              rowSpan={5}
-            />
+            <TableEmpty message="No devices yet. Contact support to provision one." rowSpan={5} />
           )}
           {query.isSuccess &&
             query.data.map((d) => {

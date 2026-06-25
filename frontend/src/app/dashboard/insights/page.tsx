@@ -1365,7 +1365,7 @@ export default function HealthInsightsPage() {
       },
       yAxis: {
         type: 'value',
-        name: 'Distance from baseline reference G0',
+        name: 'Distance from healthy baseline',
         nameLocation: 'middle',
         nameGap: 56,
         min: yAxisRange?.[0],
@@ -1757,8 +1757,8 @@ export default function HealthInsightsPage() {
         type: 'value',
         name:
           wearResult?.metadata_column != null
-            ? `${wearResult.metadata_column} Transition # (Gi -> Gi+1)`
-            : 'Transition # (Gi -> Gi+1)',
+            ? `${wearResult.metadata_column} interval transition`
+            : 'Interval transition',
         nameLocation: 'middle',
         nameGap: 52,
         min: xAxisRange?.[0],
@@ -1768,7 +1768,7 @@ export default function HealthInsightsPage() {
       },
       yAxis: {
         type: 'value',
-        name: 'Centroid movement distance (Gi->Gi+1)',
+        name: 'Step-to-step movement distance',
         nameLocation: 'middle',
         nameGap: 58,
         min: yAxisRange?.[0],
@@ -1960,15 +1960,15 @@ export default function HealthInsightsPage() {
       <div
         className={cn(
           'grid grid-cols-1 gap-5',
-          !isControlsCollapsed && 'xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'
+          !isControlsCollapsed && 'lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'
         )}
       >
         {!isControlsCollapsed && (
-          <Card className="min-w-0 border-border/60 xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
+          <Card className="min-w-0 border-border/60 lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden">
             <CardHeader className="border-b border-border/70 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <CardTitle className="text-base">Controls</CardTitle>
+                  <CardTitle className="text-base">Analysis controls</CardTitle>
                   <CardDescription className="mt-1">
                     Baseline selection, thresholds, and analysis actions.
                   </CardDescription>
@@ -1985,7 +1985,7 @@ export default function HealthInsightsPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-5 py-4 xl:max-h-[calc(100vh-13rem)] xl:overflow-y-auto">
+            <CardContent className="space-y-5 py-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto">
               <div className="space-y-3 rounded-lg border border-input bg-muted/20 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
@@ -2016,7 +2016,7 @@ export default function HealthInsightsPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Source set</p>
+                    <p className="text-muted-foreground">Matching datasets</p>
                     <p className="font-semibold">
                       {isLoadingDatasets ? 'Loading' : filteredDatasets.length.toLocaleString()}
                     </p>
@@ -2182,8 +2182,12 @@ export default function HealthInsightsPage() {
                 </div>
 
                 <p className="text-xs text-muted-foreground">
-                  {selectedClusterValues.length} of {baselineIntervalValues.length} baseline
-                  intervals selected.
+                  {isFetchingWearTrend && baselineIntervalValues.length === 0
+                    ? 'Loading baseline intervals...'
+                    : `${Math.min(
+                        selectedClusterValues.length,
+                        baselineIntervalValues.length
+                      )} of ${baselineIntervalValues.length} baseline intervals selected.`}
                 </p>
                 {hasPartialClusterRange && (
                   <p className="text-xs text-warning-text">
@@ -2455,13 +2459,17 @@ export default function HealthInsightsPage() {
                       <div className="mt-3 space-y-3">
                         <div className="grid gap-4 sm:grid-cols-4">
                           <div className="rounded-lg border border-input p-3">
-                            <p className="text-xs text-muted-foreground">Mean g0-&gt;gi</p>
+                            <p className="text-xs text-muted-foreground">
+                              Average distance from baseline
+                            </p>
                             <p className="text-xl font-semibold">
                               {wearResult.distances.g0_to_gi_mean.toFixed(3)}
                             </p>
                           </div>
                           <div className="rounded-lg border border-input p-3">
-                            <p className="text-xs text-muted-foreground">Mean gi-&gt;gi+1</p>
+                            <p className="text-xs text-muted-foreground">
+                              Average interval movement
+                            </p>
                             <p className="text-xl font-semibold">
                               {wearResult.distances.gi_to_gi_plus_1_mean.toFixed(3)}
                             </p>
@@ -2482,14 +2490,16 @@ export default function HealthInsightsPage() {
 
                         <div className="grid gap-4 sm:grid-cols-3">
                           <div className="rounded-lg border border-input p-3">
-                            <p className="text-xs text-muted-foreground">Mean G0-&gt;Gi baseline</p>
+                            <p className="text-xs text-muted-foreground">
+                              Baseline average distance
+                            </p>
                             <p className="text-xl font-semibold">
                               {g0ToGiMeans.baseline != null ? g0ToGiMeans.baseline.toFixed(3) : '—'}
                             </p>
                           </div>
                           <div className="rounded-lg border border-input p-3">
                             <p className="text-xs text-muted-foreground">
-                              Mean G0-&gt;Gi monitoring
+                              Monitoring average distance
                             </p>
                             <p className="text-xl font-semibold">
                               {g0ToGiMeans.monitoring != null
@@ -2518,8 +2528,8 @@ export default function HealthInsightsPage() {
                     className="space-y-4"
                   >
                     <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="distance">Distance from Baseline (G0→Gi)</TabsTrigger>
-                      <TabsTrigger value="transitions">Interval Transitions (Gi→Gi+1)</TabsTrigger>
+                      <TabsTrigger value="distance">Distance from baseline</TabsTrigger>
+                      <TabsTrigger value="transitions">Interval movement</TabsTrigger>
                     </TabsList>
                     <p className="text-xs text-muted-foreground">
                       Use mouse wheel or trackpad to zoom, drag to pan, and click autoscale/home in
@@ -2545,9 +2555,9 @@ export default function HealthInsightsPage() {
                         {showDistanceGuide && (
                           <p className="mt-2">
                             X-axis = interval order ({wearResult.metadata_column}). Y-axis =
-                            distance to baseline centroid (G0). Blue = baseline intervals. Red =
-                            monitoring intervals. Green and violet solid lines show baseline and
-                            monitoring rolling means. Warning and danger thresholds use{' '}
+                            distance from the selected healthy baseline center. Blue = baseline
+                            intervals. Red = monitoring intervals. Green and violet solid lines show
+                            baseline and monitoring rolling means. Warning and danger thresholds use{' '}
                             {distanceThresholdMethodLabel}. The vertical dashed guide marks the
                             first warning or danger crossing.
                           </p>
@@ -2557,7 +2567,7 @@ export default function HealthInsightsPage() {
                       {distanceEChart ? (
                         <ChartFrame
                           title="Distance from baseline"
-                          description={`Apache ECharts. Monitoring movement from selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
+                          description={`Monitoring movement from the selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
                           stats={
                             <>
                               <ChartStat
@@ -2567,7 +2577,7 @@ export default function HealthInsightsPage() {
                                     ? latestMonitoringInterval.distance_from_g0.toFixed(3)
                                     : '—'
                                 }
-                                description="Distance from G0 for the latest monitoring interval. Higher values are farther from the selected healthy baseline center."
+                                description="Distance for the latest monitoring interval. Higher values are farther from the selected healthy baseline center."
                                 tone={latestMonitoringTone}
                               />
                               <ChartStat
@@ -2577,7 +2587,7 @@ export default function HealthInsightsPage() {
                                     ? distanceSummary.baseline.toFixed(3)
                                     : '—'
                                 }
-                                description="Average G0 to interval distance across the selected healthy baseline intervals. Thresholds are derived from this value."
+                                description="Average distance across the selected healthy baseline intervals. Thresholds are derived from this value."
                                 tone="baseline"
                               />
                               <ChartStat
@@ -2587,7 +2597,7 @@ export default function HealthInsightsPage() {
                                     ? distanceSummary.monitoring.toFixed(3)
                                     : '—'
                                 }
-                                description="Average G0 to interval distance across monitoring intervals. Compare this with the baseline mean."
+                                description="Average distance across monitoring intervals. Compare this with the baseline mean."
                                 tone="monitoring"
                               />
                               <ChartStat
@@ -2725,7 +2735,7 @@ export default function HealthInsightsPage() {
                                     <th className="pb-2 pr-4">Interval</th>
                                     <th className="pb-2 pr-4">Type</th>
                                     <th className="pb-2 pr-4">Points</th>
-                                    <th className="pb-2 pr-4">Distance to G0</th>
+                                    <th className="pb-2 pr-4">Distance from baseline</th>
                                     <th className="pb-2 pr-4">In baseline cluster</th>
                                   </tr>
                                 </thead>
@@ -2800,8 +2810,8 @@ export default function HealthInsightsPage() {
                         {showTransitionGuide && (
                           <p className="mt-2">
                             X-axis = consecutive transition order. Y-axis = centroid movement
-                            between one interval and the next (Gi→Gi+1). Spikes indicate abrupt
-                            behavior changes.
+                            between one interval and the next. Spikes indicate abrupt behavior
+                            changes.
                           </p>
                         )}
                       </div>
@@ -2809,7 +2819,7 @@ export default function HealthInsightsPage() {
                       {transitionPlot ? (
                         <ChartFrame
                           title="Transition movement"
-                          description="Consecutive Gi→Gi+1 movement split by baseline, handoff, and monitoring transition types."
+                          description="Step-to-step movement split by baseline, handoff, and monitoring transition types."
                           stats={
                             <>
                               <ChartStat
@@ -2822,7 +2832,7 @@ export default function HealthInsightsPage() {
                                 tone={transitionPlot.spikeCount ? 'warning' : 'success'}
                               />
                               <ChartStat
-                                label="Mean Gi→Gi+1"
+                                label="Mean movement"
                                 value={wearResult.distances.gi_to_gi_plus_1_mean.toFixed(3)}
                                 tone="info"
                               />
@@ -2849,7 +2859,7 @@ export default function HealthInsightsPage() {
                         <WorkflowState
                           icon={<Activity className="h-5 w-5" aria-hidden="true" />}
                           title="Transition plot is not ready"
-                          description="Enable monitoring intervals or choose a dataset with enough ordered baseline and monitoring intervals to calculate Gi to Gi+1 movement."
+                          description="Enable monitoring intervals or choose a dataset with enough ordered baseline and monitoring intervals to calculate step-to-step movement."
                         />
                       )}
 

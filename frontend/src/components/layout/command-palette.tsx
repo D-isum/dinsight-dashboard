@@ -354,7 +354,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 command={{
                   id: `source:${group.key}`,
                   title: group.label,
-                  description: `${group.datasets.length.toLocaleString()} dataset(s) in this source`,
+                  description:
+                    group.datasets.length === 1
+                      ? '1 dataset in this source'
+                      : `${group.datasets.length.toLocaleString()} datasets in this source`,
                   badge: selectedSourceKey === group.key ? 'Active' : undefined,
                   icon: <Database className="h-4 w-4" aria-hidden="true" />,
                   action: () => runAndClose(() => selectSource(group.key)),

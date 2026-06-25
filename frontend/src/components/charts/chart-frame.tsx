@@ -45,8 +45,8 @@ export function ChartFrame({
   }, [isFullscreen]);
 
   const header = (
-    <div className="flex flex-col gap-3 border-b border-border px-4 py-3">
-      <div className="grid min-w-0 flex-1 gap-3">
+    <div className="grid gap-3 border-b border-border px-4 py-3">
+      <div className="grid min-w-0 gap-3">
         <div className="flex min-w-0 items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="text-sm font-semibold text-fg">{title}</h3>
@@ -65,8 +65,16 @@ export function ChartFrame({
             </Button>
           )}
         </div>
-        {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
-        {stats && <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{stats}</div>}
+        {actions && (
+          <div className="-mx-1 flex min-w-0 overflow-x-auto px-1 pb-1">
+            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          </div>
+        )}
+        {stats && (
+          <div className="-mx-1 flex min-w-0 overflow-x-auto px-1 pb-1">
+            <div className="flex shrink-0 items-stretch gap-2">{stats}</div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -109,10 +117,14 @@ export function ChartFrame({
             {(actions || stats) && (
               <div className="grid gap-2 border-b border-border px-4 py-3">
                 {actions && (
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>
+                  <div className="-mx-1 flex min-w-0 overflow-x-auto px-1 pb-1">
+                    <div className="flex shrink-0 items-center gap-2">{actions}</div>
+                  </div>
                 )}
                 {stats && (
-                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">{stats}</div>
+                  <div className="-mx-1 flex min-w-0 overflow-x-auto px-1 pb-1">
+                    <div className="flex shrink-0 items-stretch gap-2">{stats}</div>
+                  </div>
                 )}
               </div>
             )}
@@ -141,7 +153,7 @@ export function ChartStat({
       tabIndex={description ? 0 : undefined}
       aria-label={description ? `${label}: ${description}` : undefined}
       className={cn(
-        'min-h-[3.25rem] min-w-0 rounded-md border px-2.5 py-1.5 text-xs sm:min-w-[7.25rem]',
+        'min-h-[3.25rem] min-w-[6.75rem] rounded-md border px-2.5 py-1.5 text-xs sm:min-w-[7.25rem]',
         description && 'cursor-help',
         tone === 'neutral' && 'border-border bg-surface-muted/60 text-fg',
         tone === 'info' && 'border-info-border bg-info-bg text-info-text',
@@ -170,7 +182,7 @@ export function ChartSwatch({
   value?: ReactNode;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface-muted/60 px-2 py-1 text-xs text-fg-muted">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-surface-muted/60 px-2 py-1 text-xs text-fg-muted">
       <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
       <span className="font-medium text-fg">{label}</span>
       {value != null && <span>{value}</span>}

@@ -10,7 +10,7 @@ import {
 
 const dataset = (id: number, source: DinsightDatasetSummary['source']): DinsightDatasetSummary => ({
   dinsight_id: id,
-  name: `DInsight ID ${id}`,
+  name: `Dataset #${id}`,
   type: 'dinsight',
   source,
 });

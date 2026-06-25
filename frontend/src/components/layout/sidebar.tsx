@@ -54,7 +54,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-scrim transition-opacity md:hidden"
+          className="fixed inset-0 z-40 bg-scrim transition-opacity xl:hidden"
           onClick={onClose}
         />
       )}
@@ -62,7 +62,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-in-out xl:relative xl:translate-x-0',
           'bg-canvas border-r border-border',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
@@ -84,7 +84,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden hover:bg-surface-hover rounded-lg transition-colors"
+              className="xl:hidden hover:bg-surface-hover rounded-lg transition-colors"
               onClick={onClose}
             >
               <X className="h-5 w-5" />

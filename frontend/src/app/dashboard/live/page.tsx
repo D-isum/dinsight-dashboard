@@ -1769,11 +1769,11 @@ export default function LiveMonitorPage() {
       <div
         className={cn(
           'grid grid-cols-1 gap-5',
-          !isControlsCollapsed && 'xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'
+          !isControlsCollapsed && 'lg:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'
         )}
       >
         {!isControlsCollapsed && (
-          <Card className="min-w-0 border-border/60 xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
+          <Card className="min-w-0 border-border/60 lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden">
             <CardHeader className="border-b border-border/70 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1797,7 +1797,7 @@ export default function LiveMonitorPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4 py-4 xl:max-h-[calc(100vh-13rem)] xl:overflow-y-auto">
+            <CardContent className="space-y-4 py-4 lg:max-h-[calc(100vh-13rem)] lg:overflow-y-auto">
               <div className={cn('rounded-lg border p-3 text-sm', stateTone[machineStatus.state])}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -1844,7 +1844,7 @@ export default function LiveMonitorPage() {
                 </p>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                 <Button onClick={startStreaming} disabled={!selectedId || isStreaming}>
                   <Play className="mr-2 h-4 w-4" />
                   Start stream
@@ -2207,8 +2207,8 @@ export default function LiveMonitorPage() {
                 title="Coordinate map"
                 description={
                   followLatest
-                    ? 'Apache ECharts. Range follows the latest monitoring segment; the page and plot stay mounted.'
-                    : 'Apache ECharts. Baseline, monitoring, recent trail, and latest stream points in one view.'
+                    ? 'Range follows the latest monitoring segment while the page and plot stay mounted.'
+                    : 'Baseline, monitoring, recent trail, and latest stream points in one view.'
                 }
                 stats={
                   <>

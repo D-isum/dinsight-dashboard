@@ -13,19 +13,19 @@ vi.mock('@/context/auth-context', () => ({
 const datasets: DinsightDatasetSummary[] = [
   {
     dinsight_id: 10,
-    name: 'DInsight ID 10',
+    name: 'Dataset #10',
     type: 'dinsight',
     source: { source: 'auto', deviceId: 1, deviceName: 'Press A' },
   },
   {
     dinsight_id: 11,
-    name: 'DInsight ID 11',
+    name: 'Dataset #11',
     type: 'dinsight',
     source: { source: 'auto', deviceId: 1, deviceName: 'Press A' },
   },
   {
     dinsight_id: 20,
-    name: 'DInsight ID 20',
+    name: 'Dataset #20',
     type: 'dinsight',
     source: { source: 'auto', deviceId: 2, deviceName: 'Press B' },
   },

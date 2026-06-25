@@ -36,7 +36,7 @@ import { useAuth } from '@/context/auth-context';
 
 // AlertRulesSection is the self-contained CRUD surface for alert rules.
 // Originally lived inline in /dashboard/alerts; extracted so it can be
-// embedded in the Account & Security settings page too. The active-
+// embedded in the Settings page too. The active-
 // alerts feed is a separate concern (see /dashboard/alerts).
 
 interface AlertRuleItem {

@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuditLogSection } from '@/components/audit/audit-log-section';
 
 // AuditLogSection is the extracted body of the former /dashboard/audit
-// page. It's embedded as an admin-only tab under Account & Security.
+// page. It's embedded as an admin-only tab under Settings.
 // These tests pin: the role gate, the table render, and the empty
 // state. The page-level redirect stub at /dashboard/audit isn't
 // covered here (it's a 5-line useEffect).

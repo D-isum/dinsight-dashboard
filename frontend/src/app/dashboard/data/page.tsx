@@ -1001,7 +1001,7 @@ export default function DataIngestionPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Gamma0</label>
+              <label className="text-sm font-medium">Initial gamma</label>
               <Input
                 type="number"
                 step="0.0000001"
@@ -1250,7 +1250,7 @@ export default function DataIngestionPage() {
               </Badge>
             </div>
             <p className="max-w-3xl text-sm text-fg-muted">
-              Configure processing, upload combined or split CSV files, and review saved DInsight
+              Configure processing, upload combined or split CSV files, and review saved D'Insight
               results.
             </p>
           </div>
@@ -1278,19 +1278,19 @@ export default function DataIngestionPage() {
           />
           <MetricTile
             icon={<Upload className="h-4 w-4" />}
-            label="Workflow"
+            label="Upload mode"
             value={state.step}
             detail={state.statusMessage || state.status}
           />
           <MetricTile
             icon={<Database className="h-4 w-4" />}
-            label="Baseline target"
+            label="Selected baseline"
             value={suggestedBaselineId ? `#${suggestedBaselineId}` : 'Not selected'}
             detail={`${filteredDatasets.length.toLocaleString()} matching datasets`}
           />
           <MetricTile
             icon={<BarChart3 className="h-4 w-4" />}
-            label="Preview dataset"
+            label="Preview result"
             value={previewDatasetId ? `#${previewDatasetId}` : 'None'}
             detail={`${sourceFilteredDatasets.length.toLocaleString()} saved results`}
           />
@@ -1342,7 +1342,10 @@ export default function DataIngestionPage() {
                       value={config?.optimizer ?? DEFAULT_CONFIG.optimizer}
                     />
                     <ConfigValue label="Alpha" value={config?.alpha ?? DEFAULT_CONFIG.alpha} />
-                    <ConfigValue label="Gamma0" value={config?.gamma0 ?? DEFAULT_CONFIG.gamma0} />
+                    <ConfigValue
+                      label="Initial gamma"
+                      value={config?.gamma0 ?? DEFAULT_CONFIG.gamma0}
+                    />
                     <ConfigValue
                       label="End metadata"
                       value={config?.end_meta ?? DEFAULT_CONFIG.end_meta}
@@ -1645,7 +1648,7 @@ export default function DataIngestionPage() {
 
                         <div className="space-y-3 rounded-md border border-input bg-background/60 p-3">
                           <div className="flex items-center justify-between gap-3">
-                            <label className="text-sm font-medium">Baseline target</label>
+                            <label className="text-sm font-medium">Baseline dataset</label>
                             <Button
                               variant="outline"
                               size="sm"
@@ -1891,7 +1894,7 @@ export default function DataIngestionPage() {
               <Card className="border-success-border bg-success-bg/40">
                 <CardHeader>
                   <CardTitle className="text-lg text-success-text">
-                    Ready for Live Operation
+                    Ready for live monitoring
                   </CardTitle>
                   <CardDescription>
                     Baseline and monitoring uploads are complete and validated.
@@ -1931,7 +1934,7 @@ export default function DataIngestionPage() {
                   label="Effective baseline"
                   value={suggestedBaselineId ?? 'Not selected'}
                 />
-                <SideFact label="Workflow ID" value={state.dinsightId ?? 'None'} />
+                <SideFact label="Generated dataset ID" value={state.dinsightId ?? 'None'} />
                 <SideFact label="Saved results" value={sourceFilteredDatasets.length} />
                 <SideFact label="Matching targets" value={filteredDatasets.length} />
                 {selectedDatasetMeta && <DatasetSourceCard dataset={selectedDatasetMeta} />}
@@ -1959,7 +1962,7 @@ export default function DataIngestionPage() {
                   Dataset Catalog
                 </CardTitle>
                 <CardDescription>
-                  Export, delete, validate, register metadata, and inspect lineage from one modal.
+                  Export, delete, validate, register metadata, and inspect lineage from the catalog.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
@@ -1970,43 +1973,6 @@ export default function DataIngestionPage() {
                 <Button className="w-full justify-start" onClick={() => setIsCatalogOpen(true)}>
                   <Database className="mr-2 h-4 w-4" />
                   Open catalog
-                </Button>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/60">
-              <CardHeader>
-                <CardTitle className="text-base">Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="grid gap-2">
-                <Button
-                  variant="outline"
-                  className="justify-start"
-                  onClick={() => setIsCatalogOpen(true)}
-                >
-                  <Database className="mr-2 h-4 w-4" />
-                  Open catalog
-                </Button>
-                <Button variant="outline" asChild className="justify-start">
-                  <Link href="/dashboard/live">
-                    <ArrowRight className="mr-2 h-4 w-4" />
-                    Open live monitor
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild className="justify-start">
-                  <Link href="/dashboard/insights">
-                    <BarChart3 className="mr-2 h-4 w-4" />
-                    Open insights
-                  </Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="justify-start"
-                  onClick={resetWorkflow}
-                  disabled={isActiveProcessing}
-                >
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Reset flow
                 </Button>
               </CardContent>
             </Card>

@@ -56,7 +56,7 @@ export function CustomersSection() {
       <header className="space-y-1">
         <h2 className="text-lg font-semibold">Customer organizations</h2>
         <p className="text-sm text-muted-foreground">
-          Onboard a new customer and view the current customers on this Dinsight deployment.
+          Onboard a new customer and view the current customers on this D'Insight deployment.
         </p>
       </header>
 

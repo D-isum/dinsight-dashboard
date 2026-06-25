@@ -47,16 +47,9 @@ export function PlatformAnalyticsSection() {
     refetchInterval: 60_000,
   });
 
-  // The `default` org doubles as the vendor's dogfood customer in
-  // the current MVP — Pattern B in the architecture doc. It counts
-  // as a customer because it IS one (the vendor uses it to test
-  // every feature a real customer would). The `platform` badge on
-  // its row marks it as vendor-internal for clarity; nothing about
-  // the counts excludes it.
-  //
-  // Phase 7 (post-GA) will split vendor staff identity from customer
-  // tenancy, at which point default becomes a plain customer org
-  // and a separate /admin app holds the platform-admin surface.
+  // The seeded default org is included in fleet analytics and marked
+  // with a platform badge so staff can distinguish internal activity
+  // from customer activity.
   const rows = query.data ?? [];
   const totals = aggregate(rows);
 
@@ -66,8 +59,8 @@ export function PlatformAnalyticsSection() {
         <h3 className="text-sm font-semibold">Fleet analytics</h3>
         <p className="text-xs text-muted-foreground">
           Per-customer counts across devices, members, file uploads, and ingestion. Recomputed every
-          60 seconds. The vendor&apos;s own org (<code>default</code>) doubles as the dogfood
-          customer and is included in the counts.
+          60 seconds. The vendor&apos;s own org (<code>default</code>) is included and marked
+          platform.
         </p>
       </header>
 
@@ -121,8 +114,8 @@ export function PlatformAnalyticsSection() {
                   <TableCell>
                     <span className="font-medium">{row.device_count_total}</span>
                     <div className="text-xs text-muted-foreground">
-                      {row.device_count_active}a / {row.device_count_paused}p /{' '}
-                      {row.device_count_retired}r
+                      {row.device_count_active} active · {row.device_count_paused} paused ·{' '}
+                      {row.device_count_retired} retired
                     </div>
                   </TableCell>
                   <TableCell>{row.member_count}</TableCell>

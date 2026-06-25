@@ -53,7 +53,7 @@ vi.mock('@/hooks/useDashboardOverview', () => ({
     datasets: [
       {
         dinsight_id: 14,
-        name: 'DInsight ID 14',
+        name: 'Dataset #14',
         type: 'dinsight',
         records: 240,
         source: {

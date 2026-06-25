@@ -153,7 +153,7 @@ export function ActivityTimeline() {
 
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          onClick={() => router.push('/dashboard/data')}
+          onClick={() => router.push('/dashboard/data?catalog=open')}
           className="cursor-pointer px-4 py-3"
         >
           Open dataset catalog

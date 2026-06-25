@@ -403,7 +403,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 </CardTitle>
                 <CardDescription>
                   Browse datasets registered for this organization with their lineage and validation
-                  status. Mutations happen in the ingestion + processing pipelines.
+                  status. Uploads and processing runs add entries automatically.
                 </CardDescription>
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -538,17 +538,17 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       <div className="space-y-4">
         <Card className="min-w-0 border-border/60">
           <CardContent className="p-0">
-            <Table className="min-w-[980px] table-fixed">
+            <Table className="min-w-[1080px] table-fixed">
               <colgroup>
-                <col className="w-[220px]" />
-                <col className="w-[150px]" />
+                <col className="w-[280px]" />
+                <col className="w-[180px]" />
                 <col className="w-[120px]" />
                 <col className="w-[96px]" />
                 <col className="w-[120px]" />
                 <col className="w-[96px]" />
                 <col className="w-[112px]" />
-                <col className="w-[64px]" />
-                {canDelete && <col className="w-[64px]" />}
+                <col className="w-[84px]" />
+                {canDelete && <col className="w-[84px]" />}
               </colgroup>
               <TableHeader>
                 <TableRow>
@@ -559,8 +559,8 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   <TableHead>Validation</TableHead>
                   <TableHead>Records</TableHead>
                   <TableHead>Registered</TableHead>
-                  <TableHead className="w-16 text-right">Export</TableHead>
-                  {canDelete && <TableHead className="w-16 text-right">Delete</TableHead>}
+                  <TableHead className="w-20 text-right">Export</TableHead>
+                  {canDelete && <TableHead className="w-20 text-right">Delete</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -634,6 +634,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                           size="sm"
                           aria-label={`Export dataset ${item.dataset_id}`}
                           disabled={exportingDatasetId === item.dataset_id}
+                          className="gap-1.5"
                           onClick={(event) => {
                             event.stopPropagation();
                             void requestExport(item.dataset_id);
@@ -644,6 +645,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                           ) : (
                             <Download className="h-4 w-4" />
                           )}
+                          <span className="text-xs">Export</span>
                         </Button>
                       </TableCell>
                       {canDelete && (
@@ -651,7 +653,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="text-danger-text hover:bg-danger-bg hover:text-danger-text"
+                            className="gap-1.5 text-danger-text hover:bg-danger-bg hover:text-danger-text"
                             aria-label={`Delete dataset ${item.dataset_id}`}
                             disabled={deleteMutation.isPending}
                             onClick={(event) => {
@@ -660,6 +662,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
+                            <span className="text-xs">Delete</span>
                           </Button>
                         </TableCell>
                       )}
@@ -867,7 +870,7 @@ function DeleteImpactDialog({
         <div className="rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger-text">
           <div className="font-semibold">Deletion impact</div>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Baseline DInsight coordinates and metadata</li>
+            <li>Baseline D'Insight coordinates and metadata</li>
             <li>Monitoring rows and generated monitoring coordinates</li>
             <li>Generated visualization/export records tied to the dataset</li>
             <li>Dataset metadata, lineage, validation results, and analysis comparisons</li>

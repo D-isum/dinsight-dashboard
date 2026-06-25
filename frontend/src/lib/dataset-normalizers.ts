@@ -114,7 +114,7 @@ export const normalizeDinsightDatasetSummary = (
 
   return {
     dinsight_id: resolvedId,
-    name: `DInsight ID ${resolvedId}`,
+    name: `Dataset #${resolvedId}`,
     type: 'dinsight',
     records: Math.min(x.length, y.length),
     source: extractDatasetSource(data),

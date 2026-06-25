@@ -87,7 +87,7 @@ export function useDatasetDiscovery(options?: DatasetDiscoveryOptions): DatasetD
               if (!Number.isInteger(id) || id <= 0) continue;
               summaries.push({
                 dinsight_id: id,
-                name: `DInsight ID ${id}`,
+                name: `Dataset #${id}`,
                 type: 'dinsight',
                 records:
                   typeof data.records === 'number'

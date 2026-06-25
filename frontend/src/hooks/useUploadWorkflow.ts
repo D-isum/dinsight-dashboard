@@ -325,7 +325,7 @@ export function useUploadWorkflow(options?: UploadWorkflowOptions) {
 
         const baselineResult = await waitForProcessing(baselineUploadId, 'baseline');
         if (!baselineResult.dinsightId) {
-          throw new Error('Baseline processing completed without a DInsight ID.');
+          throw new Error('Baseline processing completed without a dataset ID.');
         }
 
         setState((prev) => ({

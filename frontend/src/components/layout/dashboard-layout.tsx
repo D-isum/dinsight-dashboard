@@ -96,7 +96,7 @@ function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
   // Handle responsive sidebar behavior
   useEffect(() => {
     const handleResize = () => {
-      if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      if (typeof window !== 'undefined' && window.innerWidth >= 1280) {
         setSidebarOpen(false);
       }
     };

@@ -19,8 +19,8 @@ export interface NavItem {
   description?: string;
 }
 
-// Top-level sidebar IA. Five entries only — every settings-y surface
-// (alerts, audit log, license, etc.) lives under Account & Security
+// Top-level sidebar IA. Five entries only. Account, security,
+// alerts, audit log, license, and related controls live under Settings
 // as tabs. Per-tab routing inside that page uses ?section=...
 //
 // Anything that USED to be top-level (alerts, audit) now redirects to
@@ -56,18 +56,17 @@ export const mainNavItems: NavItem[] = [
     description: 'Anomaly and wear trend interpretation',
   },
   {
-    label: 'Account & Security',
+    label: 'Settings',
     href: '/dashboard/account',
     icon: UserCog,
     requiresAuth: true,
-    description:
-      'Profile, security, organizations, license, notifications, active alerts, alert rules, validation rules, audit log.',
+    description: 'Account, security, teams, devices, alerts, validation, license, and audit log.',
   },
 ];
 
 export const bottomNavItems: NavItem[] = [];
 
-export const userMenuItems = [{ label: 'Account & Security', href: '/dashboard/account' }];
+export const userMenuItems = [{ label: 'Settings', href: '/dashboard/account' }];
 
 export const quickActions = [
   { label: 'Upload Data', href: '/dashboard/data', icon: Database },

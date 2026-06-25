@@ -35,7 +35,7 @@ interface HeaderProps {
   isSidebarOpen: boolean;
 }
 
-export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
+export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
   const isPlatformAdmin = usePlatformAdmin();
   const [isCommandOpen, setIsCommandOpen] = useState(false);
@@ -57,15 +57,15 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="mr-2 md:hidden hover:bg-surface-hover rounded-lg transition-colors"
+          className="mr-2 xl:hidden hover:bg-surface-hover rounded-lg transition-colors"
           onClick={onMenuClick}
         >
           <Menu className="h-5 w-5" />
           <span className="sr-only">Toggle menu</span>
         </Button>
 
-        {/* Mobile brand anchor — sidebar is the canonical product mark on md+ */}
-        <div className="flex items-center md:hidden">
+        {/* Compact brand anchor — sidebar is the canonical product mark on xl+ */}
+        <div className="flex items-center xl:hidden">
           <Link href="/dashboard" aria-label="D'Insight" className="flex items-center">
             <div className="h-9 w-9 bg-accent rounded-lg flex items-center justify-center shadow-sm">
               <Sparkles className="h-5 w-5 text-accent-contrast" />
@@ -74,7 +74,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
         </div>
 
         {/* Search / command bar */}
-        <div className="mx-4 hidden max-w-sm flex-1 md:flex 2xl:max-w-xl">
+        <div className="mx-3 hidden max-w-[16rem] flex-1 md:flex lg:max-w-xs 2xl:max-w-xl">
           <button
             type="button"
             onClick={() => setIsCommandOpen(true)}
@@ -93,6 +93,26 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
           </button>
         </div>
 
+        <div className="hidden min-w-0 items-center gap-2 md:flex xl:hidden">
+          <select
+            value={selectedDatasetId != null ? String(selectedDatasetId) : ''}
+            onChange={(event) =>
+              selectDataset(event.target.value ? Number(event.target.value) : null)
+            }
+            disabled={isLoadingDatasets || filteredDatasets.length === 0}
+            className="h-10 w-[10.5rem] rounded-lg border border-border bg-background px-2 text-xs text-fg disabled:opacity-60 lg:w-[12rem]"
+            title="Global dataset context"
+            aria-label="Global dataset context"
+          >
+            <option value="">{isLoadingDatasets ? 'Loading...' : 'Select dataset'}</option>
+            {filteredDatasets.map((dataset) => (
+              <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
+                {formatDatasetOptionLabel(dataset)}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="hidden min-w-0 items-center gap-2 xl:flex 2xl:gap-3">
           <DatasetSourceSelect
             groups={groups}
@@ -109,6 +129,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
             disabled={isLoadingDatasets || filteredDatasets.length === 0}
             className="h-10 w-[11.5rem] rounded-lg border border-border bg-background px-2 text-xs text-fg disabled:opacity-60 2xl:w-[14rem]"
             title="Global dataset context"
+            aria-label="Global dataset context"
           >
             <option value="">{isLoadingDatasets ? 'Loading datasets...' : 'Select dataset'}</option>
             {filteredDatasets.map((dataset) => (
@@ -182,7 +203,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
                     <span>Account</span>
                   </DropdownMenuItem>
                 </Link>
-                <Link href="/dashboard/account">
+                <Link href="/dashboard/account?section=security">
                   <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Security</span>
@@ -194,7 +215,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
                   <Link href="/dashboard/admin">
                     <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
                       <ShieldAlert className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      <span>Dinsight Admin</span>
+                      <span>D'Insight Admin</span>
                       <span className="ml-auto text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
                         staff
                       </span>

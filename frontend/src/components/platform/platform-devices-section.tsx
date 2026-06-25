@@ -57,7 +57,7 @@ export function PlatformDevicesSection() {
           <TableRow>
             <TableHead>Org</TableHead>
             <TableHead>Device</TableHead>
-            <TableHead>IoT Hub identity</TableHead>
+            <TableHead>Device identity</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Last ingested</TableHead>
             <TableHead>Created</TableHead>
