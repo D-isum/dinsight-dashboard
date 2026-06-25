@@ -1743,56 +1743,7 @@ export default function LiveMonitorPage() {
   const statusLabel = streamingStatus?.status ?? 'not_started';
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold text-fg">Live Monitor</h1>
-            <Badge variant={statusLabel === 'streaming' ? 'success' : 'outline'}>
-              {statusLabel === 'not_started' ? 'Not started' : statusLabel}
-            </Badge>
-          </div>
-          <p className="max-w-3xl text-sm text-fg-muted">
-            Watch baseline and monitoring coordinates, streaming progress, latest points, and
-            boundary-based abnormal behavior in one live workspace.
-          </p>
-        </div>
-      </div>
-
-      <Card className={cn('border', stateTone[machineStatus.state])}>
-        <CardContent className="grid gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:items-start">
-          <div>
-            <p className="text-sm font-medium">Current machine state</p>
-            <p className="text-2xl font-bold">{machineStatus.state}</p>
-            <p className="text-sm">{machineStatus.recommendation}</p>
-          </div>
-          <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
-            <div>
-              <p>
-                Abnormal behavior:{' '}
-                <span className="font-semibold">
-                  {anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : 'Not checked'}
-                </span>
-              </p>
-              <p>
-                Monitoring points: <span className="font-semibold">{monitoringCount}</span>
-              </p>
-              <p>
-                Baseline points: <span className="font-semibold">{baselineCount}</span>
-              </p>
-            </div>
-            <div className="rounded-md border border-current/20 bg-white/25 p-3 dark:bg-black/10">
-              <p className="text-xs font-semibold uppercase">Why this state</p>
-              <ul className="mt-2 space-y-1 text-xs">
-                {machineStatus.reasons.map((reason) => (
-                  <li key={reason}>{reason}</li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="space-y-5">
       {prefsConflict && (
         <Card className="border-warning-border bg-warning-bg ">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
@@ -1822,7 +1773,7 @@ export default function LiveMonitorPage() {
         )}
       >
         {!isControlsCollapsed && (
-          <Card className="min-w-0 border-border/60 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
+          <Card className="min-w-0 border-border/60 xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
             <CardHeader className="border-b border-border/70 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -1847,6 +1798,43 @@ export default function LiveMonitorPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4 py-4 xl:max-h-[calc(100vh-13rem)] xl:overflow-y-auto">
+              <div className={cn('rounded-lg border p-3 text-sm', stateTone[machineStatus.state])}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold uppercase">Machine state</p>
+                    <p className="mt-1 text-2xl font-bold leading-none">{machineStatus.state}</p>
+                    <p className="mt-2 text-xs">{machineStatus.recommendation}</p>
+                  </div>
+                  <Badge variant={statusLabel === 'streaming' ? 'success' : 'outline'}>
+                    {statusLabel === 'not_started' ? 'Not started' : statusLabel}
+                  </Badge>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="opacity-75">Abnormal</p>
+                    <p className="font-semibold">
+                      {anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="opacity-75">Monitor</p>
+                    <p className="font-semibold">{monitoringCount.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="opacity-75">Baseline</p>
+                    <p className="font-semibold">{baselineCount.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="mt-3 rounded-md border border-current/20 bg-white/25 p-2 dark:bg-black/10">
+                  <p className="text-xs font-semibold uppercase">Why</p>
+                  <ul className="mt-1 space-y-1 text-xs">
+                    {machineStatus.reasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
               <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
                 <p className="text-xs font-semibold uppercase text-muted-foreground">
                   Active dataset

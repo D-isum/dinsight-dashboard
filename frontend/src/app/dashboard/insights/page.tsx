@@ -1956,70 +1956,7 @@ export default function HealthInsightsPage() {
   }, [applyWearTrendSelection, canRunWearTrend, datasetId, logActivity]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-2xl font-semibold text-fg">Health Insights</h1>
-            <Badge variant={canRunWearTrend ? 'secondary' : 'outline'}>
-              {canRunWearTrend ? 'Ready to run' : 'Configure baseline selection'}
-            </Badge>
-            {streamingStatus?.is_active && hasAppliedWearTrendRun && appliedIncludeMonitoring && (
-              <Badge variant="outline">Live updating</Badge>
-            )}
-          </div>
-          <p className="max-w-3xl text-sm text-fg-muted">
-            Configure baseline behavior, review deterioration distance, and inspect interval
-            transitions with interactive ECharts plots.
-          </p>
-        </div>
-      </div>
-
-      <Card className="border-border/60">
-        <CardContent className="space-y-4 py-4">
-          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
-            <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-lg border border-input bg-muted/20 p-3">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">Dataset</p>
-                <p className="mt-1 text-lg font-semibold text-fg">
-                  {datasetId ? `#${datasetId}` : 'None'}
-                </p>
-              </div>
-              <div className="rounded-lg border border-input bg-muted/20 p-3">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">Source set</p>
-                <p className="mt-1 text-lg font-semibold text-fg">
-                  {isLoadingDatasets ? 'Loading' : filteredDatasets.length.toLocaleString()}
-                </p>
-              </div>
-              <div className="rounded-lg border border-input bg-muted/20 p-3">
-                <p className="text-xs font-semibold uppercase text-muted-foreground">Stream</p>
-                <p className="mt-1 text-lg font-semibold text-fg">
-                  {activeStreamingDatasetId === datasetId ? 'Active' : 'Idle'}
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-input bg-muted/20 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium">Workflow status</p>
-                {hasPendingChanges && <Badge variant="outline">Selection changed</Badge>}
-                {lastWearTrendRunAt && (
-                  <Badge variant="outline">
-                    Last run {new Date(lastWearTrendRunAt).toLocaleTimeString()}
-                  </Badge>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {selectedDataset?.source.originalFileName ??
-                  selectedDataset?.source.deviceName ??
-                  selectedDataset?.source.deviceSlug ??
-                  'No dataset source selected'}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
+    <div className="space-y-5">
       <div
         className={cn(
           'grid grid-cols-1 gap-5',
@@ -2027,7 +1964,7 @@ export default function HealthInsightsPage() {
         )}
       >
         {!isControlsCollapsed && (
-          <Card className="min-w-0 border-border/60 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
+          <Card className="min-w-0 border-border/60 xl:sticky xl:top-6 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
             <CardHeader className="border-b border-border/70 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -2049,6 +1986,67 @@ export default function HealthInsightsPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-5 py-4 xl:max-h-[calc(100vh-13rem)] xl:overflow-y-auto">
+              <div className="space-y-3 rounded-lg border border-input bg-muted/20 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-xs font-semibold uppercase text-muted-foreground">
+                      Active dataset
+                    </p>
+                    <p className="mt-1 text-xl font-semibold text-fg">
+                      {datasetId ? `#${datasetId}` : 'None'}
+                    </p>
+                  </div>
+                  <Badge variant={canRunWearTrend ? 'secondary' : 'outline'}>
+                    {canRunWearTrend ? 'Ready' : 'Configure'}
+                  </Badge>
+                </div>
+                <p
+                  className="truncate text-xs text-muted-foreground"
+                  title={
+                    selectedDataset?.source.originalFileName ??
+                    selectedDataset?.source.deviceName ??
+                    selectedDataset?.source.deviceSlug ??
+                    undefined
+                  }
+                >
+                  {selectedDataset?.source.originalFileName ??
+                    selectedDataset?.source.deviceName ??
+                    selectedDataset?.source.deviceSlug ??
+                    'No dataset source selected'}
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Source set</p>
+                    <p className="font-semibold">
+                      {isLoadingDatasets ? 'Loading' : filteredDatasets.length.toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Stream</p>
+                    <p className="font-semibold">
+                      {activeStreamingDatasetId === datasetId ? 'Active' : 'Idle'}
+                    </p>
+                  </div>
+                </div>
+                {(hasPendingChanges ||
+                  lastWearTrendRunAt ||
+                  (streamingStatus?.is_active &&
+                    hasAppliedWearTrendRun &&
+                    appliedIncludeMonitoring)) && (
+                  <div className="flex flex-wrap gap-2">
+                    {hasPendingChanges && <Badge variant="outline">Selection changed</Badge>}
+                    {streamingStatus?.is_active &&
+                      hasAppliedWearTrendRun &&
+                      appliedIncludeMonitoring && <Badge variant="outline">Live updating</Badge>}
+                    {lastWearTrendRunAt && (
+                      <Badge variant="outline">
+                        Last run {new Date(lastWearTrendRunAt).toLocaleTimeString()}
+                      </Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Wear trend column</label>
                 <select
