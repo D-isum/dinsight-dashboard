@@ -7,18 +7,22 @@ import { useDeploymentStatus } from '@/hooks/useDeploymentStatus';
 
 export function DeploymentStatusCard({ compact = false }: { compact?: boolean }) {
   const { runtime, license, isLoadingLicense, licenseError } = useDeploymentStatus();
+  const effectiveExpiresAt = license?.effectiveExpiresAt ?? license?.expiresAt ?? null;
   const expired =
-    license?.expiresAt != null && Number.isFinite(Date.parse(license.expiresAt))
-      ? Date.parse(license.expiresAt) <= Date.now()
+    effectiveExpiresAt != null && Number.isFinite(Date.parse(effectiveExpiresAt))
+      ? Date.parse(effectiveExpiresAt) <= Date.now()
       : false;
   const licenseValid = license?.isValid === true && !expired;
+  const devExtensionActive = license?.devExtensionActive === true;
   const statusLabel = isLoadingLicense
     ? 'Checking license'
     : licenseError
       ? 'License unavailable'
-      : licenseValid
-        ? 'License valid'
-        : 'License attention';
+      : devExtensionActive && licenseValid
+        ? 'Dev extension active'
+        : licenseValid
+          ? 'License valid'
+          : 'License attention';
 
   return (
     <Card className="border-border/60">
@@ -55,7 +59,7 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
             <div>
               Expires:{' '}
               <span className="font-medium text-fg">
-                {license?.expiresAt ? new Date(license.expiresAt).toLocaleDateString() : 'Unknown'}
+                {effectiveExpiresAt ? new Date(effectiveExpiresAt).toLocaleDateString() : 'Unknown'}
               </span>
             </div>
             <div>
@@ -72,12 +76,25 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
           </div>
         )}
 
-        {runtime.devLicenseExtensionDays != null && (
+        {devExtensionActive ? (
           <div className="mt-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning-text">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Dev license extension advertised for {runtime.devLicenseExtensionDays} day(s). Keep this
-            disabled in production builds.
+            Development extension is active. Original expiry:{' '}
+            {license?.originalExpiresAt
+              ? new Date(license.originalExpiresAt).toLocaleDateString()
+              : 'unknown'}
+            ; effective access until{' '}
+            {effectiveExpiresAt ? new Date(effectiveExpiresAt).toLocaleDateString() : 'unknown'}.
+            Disable before production.
           </div>
+        ) : (
+          runtime.devLicenseExtensionDays != null && (
+            <div className="mt-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning-text">
+              <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Dev license extension advertised for {runtime.devLicenseExtensionDays} day(s), but the
+              API has not reported an active extension. Keep this disabled in production builds.
+            </div>
+          )
         )}
       </CardContent>
     </Card>

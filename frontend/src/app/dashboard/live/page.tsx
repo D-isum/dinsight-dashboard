@@ -98,12 +98,24 @@ const LIVE_MONITOR_PREFS_KEY = 'live-monitor:prefs:v1';
 const LIVE_MONITOR_DEVICE_ID_KEY = 'dinsight:live-monitor:device-id:v1';
 const LIVE_RECENT_WINDOW_POINTS = 500;
 
+type RenderDensity = 'fast' | 'balanced' | 'detailed';
+
+const LIVE_RENDER_DENSITY: Record<
+  RenderDensity,
+  { label: string; maxPoints: number; description: string }
+> = {
+  fast: { label: 'Fast', maxPoints: 20_000, description: '20k points per series' },
+  balanced: { label: 'Balanced', maxPoints: 50_000, description: '50k points per series' },
+  detailed: { label: 'Detailed', maxPoints: 100_000, description: '100k points per series' },
+};
+
 type PersistedLiveMonitorPreferences = {
   selectedId?: number;
   manualDatasetId?: string;
   autoRefresh?: boolean;
   isControlsCollapsed?: boolean;
   streamSpeed?: '0.5x' | '1x' | '2x';
+  renderDensity?: RenderDensity;
   showAdvanced?: boolean;
   pointSize?: number;
   showContours?: boolean;
@@ -492,6 +504,7 @@ export default function LiveMonitorPage() {
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamSpeed, setStreamSpeed] = useState<'0.5x' | '1x' | '2x'>('1x');
+  const [renderDensity, setRenderDensity] = useState<RenderDensity>('balanced');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [pointSize, setPointSize] = useState(8);
   const [showContours, setShowContours] = useState(false);
@@ -509,6 +522,7 @@ export default function LiveMonitorPage() {
   const [boundaries, setBoundaries] = useState<Boundary[]>([]);
   const [isSelecting, setIsSelecting] = useState(false);
   const [liveMonitoringData, setLiveMonitoringData] = useState<CoordinateSeries | null>(null);
+  const [lastStatusAt, setLastStatusAt] = useState<string | null>(null);
   const [isPrefsHydrated, setIsPrefsHydrated] = useState(false);
   const [isServerPrefsLoaded, setIsServerPrefsLoaded] = useState(false);
   const [prefsConflict, setPrefsConflict] = useState<{
@@ -531,6 +545,7 @@ export default function LiveMonitorPage() {
     if (streamSpeed === '0.5x') return 4000;
     return 2000;
   }, [streamSpeed]);
+  const renderMaxPoints = LIVE_RENDER_DENSITY[renderDensity].maxPoints;
 
   const {
     baselineData,
@@ -545,22 +560,24 @@ export default function LiveMonitorPage() {
     dinsightId: selectedId,
     includeMetadata: true,
     monitoringMode: 'coordinates',
-    maxPoints: 100_000,
+    maxPoints: renderMaxPoints,
   });
 
-  const { data: streamingStatus, refetch: refetchStatus } = useQuery<StreamingStatus | null>({
+  const {
+    data: streamingStatus,
+    refetch: refetchStatus,
+    isFetching: isFetchingStatus,
+    error: streamingStatusError,
+  } = useQuery<StreamingStatus | null, Error>({
     queryKey: ['streaming-status', selectedId],
     enabled: !!selectedId,
     queryFn: async () => {
       if (!selectedId) return null;
-      try {
-        const response = await api.streaming.getStatus(selectedId);
-        return response?.data?.success ? (response.data.data as StreamingStatus) : null;
-      } catch {
-        return null;
-      }
+      const response = await api.streaming.getStatus(selectedId);
+      return response?.data?.success ? (response.data.data as StreamingStatus) : null;
     },
     refetchInterval: autoRefresh && !isSelecting ? refreshIntervalMs : false,
+    retry: 1,
   });
 
   const effectiveMonitoringData = liveMonitoringData ?? monitoringData;
@@ -684,6 +701,13 @@ export default function LiveMonitorPage() {
         parsed.streamSpeed === '2x'
       ) {
         setStreamSpeed(parsed.streamSpeed);
+      }
+      if (
+        parsed.renderDensity === 'fast' ||
+        parsed.renderDensity === 'balanced' ||
+        parsed.renderDensity === 'detailed'
+      ) {
+        setRenderDensity(parsed.renderDensity);
       }
       if (typeof parsed.showAdvanced === 'boolean') setShowAdvanced(parsed.showAdvanced);
       if (
@@ -839,6 +863,7 @@ export default function LiveMonitorPage() {
       autoRefresh,
       isControlsCollapsed,
       streamSpeed,
+      renderDensity,
       showAdvanced,
       pointSize,
       showContours,
@@ -913,6 +938,7 @@ export default function LiveMonitorPage() {
     metadataEnabled,
     monitorView,
     pointSize,
+    renderDensity,
     selectedId,
     selectedMetadataKeys,
     selectionMode,
@@ -989,6 +1015,7 @@ export default function LiveMonitorPage() {
       return;
     }
 
+    setLastStatusAt(new Date().toISOString());
     setIsStreaming(streamingStatus.is_active);
     if (
       typeof streamingStatus.latest_glow_count === 'number' &&
@@ -1047,7 +1074,6 @@ export default function LiveMonitorPage() {
 
     const smartInterval = isStreaming ? refreshIntervalMs : 10_000;
     const timer = window.setInterval(() => {
-      void refetchStatus();
       void refetchDatasets();
       void refetchBaseline();
       void refetchMonitoring();
@@ -1062,7 +1088,6 @@ export default function LiveMonitorPage() {
     refetchBaseline,
     refetchDatasets,
     refetchMonitoring,
-    refetchStatus,
     selectedId,
   ]);
 
@@ -1964,6 +1989,29 @@ export default function LiveMonitorPage() {
                 </label>
               </div>
 
+              <div className="space-y-2 rounded-md border border-input p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Render density</p>
+                  <Badge variant="outline">{LIVE_RENDER_DENSITY[renderDensity].description}</Badge>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(LIVE_RENDER_DENSITY) as RenderDensity[]).map((density) => (
+                    <Button
+                      key={density}
+                      size="sm"
+                      variant={renderDensity === density ? 'default' : 'outline'}
+                      onClick={() => setRenderDensity(density)}
+                    >
+                      {LIVE_RENDER_DENSITY[density].label}
+                    </Button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Lower density keeps zooming smooth on large streamed datasets; detailed keeps the
+                  largest sample in memory.
+                </p>
+              </div>
+
               <Button variant="outline" onClick={refreshNow} className="w-full">
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Refresh now
@@ -2020,6 +2068,43 @@ export default function LiveMonitorPage() {
                     <p className="font-semibold">{trailPoints}</p>
                   </div>
                 </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Connection</p>
+                    <p className="font-semibold">
+                      {streamingStatusError
+                        ? 'Retrying'
+                        : isFetchingStatus
+                          ? 'Refreshing'
+                          : autoRefresh
+                            ? 'Live'
+                            : 'Manual'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Last update</p>
+                    <p className="font-semibold">
+                      {lastStatusAt ? new Date(lastStatusAt).toLocaleTimeString() : '-'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Sample cap</p>
+                    <p className="font-semibold">{renderMaxPoints.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Status refresh</p>
+                    <p className="font-semibold">
+                      {autoRefresh ? `${refreshIntervalMs / 1000}s` : 'Paused'}
+                    </p>
+                  </div>
+                </div>
+                {streamingStatusError && (
+                  <p className="rounded-md border border-warning-border bg-warning-bg px-2 py-1 text-xs text-warning-text">
+                    Streaming status is retrying: {streamingStatusError.message}
+                  </p>
+                )}
               </div>
 
               <Button
@@ -2221,6 +2306,7 @@ export default function LiveMonitorPage() {
                       }`}
                       tone="info"
                     />
+                    <ChartStat label="Sample cap" value={renderMaxPoints.toLocaleString()} />
                     <ChartStat
                       label="Abnormal"
                       value={anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : '—'}

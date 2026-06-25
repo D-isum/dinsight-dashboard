@@ -181,14 +181,19 @@ apiClient.interceptors.request.use(
 
 // Response interceptor
 let isRefreshing = false;
-let refreshSubscribers: Array<(token: string) => void> = [];
+let refreshSubscribers: Array<(token: string | null) => void> = [];
 
-const subscribeTokenRefresh = (cb: (token: string) => void) => {
+const subscribeTokenRefresh = (cb: (token: string | null) => void) => {
   refreshSubscribers.push(cb);
 };
 
 const onTokenRefreshed = (token: string) => {
   refreshSubscribers.forEach((cb) => cb(token));
+  refreshSubscribers = [];
+};
+
+const onTokenRefreshFailed = () => {
+  refreshSubscribers.forEach((cb) => cb(null));
   refreshSubscribers = [];
 };
 
@@ -205,8 +210,12 @@ apiClient.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       if (isRefreshing) {
-        return new Promise((resolve) => {
-          subscribeTokenRefresh((token: string) => {
+        return new Promise((resolve, reject) => {
+          subscribeTokenRefresh((token) => {
+            if (!token) {
+              reject(error);
+              return;
+            }
             if (originalRequest.headers) {
               originalRequest.headers.Authorization = `Bearer ${token}`;
             }
@@ -237,19 +246,22 @@ apiClient.interceptors.response.use(
         const { access_token, expires_in } = refreshPayload;
         const currentRefreshToken = tokenManager.getRefreshToken();
 
-        if (currentRefreshToken) {
-          tokenManager.setTokens(access_token, currentRefreshToken, expires_in);
-          onTokenRefreshed(access_token);
-
-          if (originalRequest.headers) {
-            originalRequest.headers.Authorization = `Bearer ${access_token}`;
-          }
-
-          console.log('Token refreshed successfully, retrying original request');
-          return apiClient(originalRequest);
+        if (!currentRefreshToken) {
+          throw new Error('Refresh token disappeared during token refresh');
         }
+
+        tokenManager.setTokens(access_token, currentRefreshToken, expires_in);
+        onTokenRefreshed(access_token);
+
+        if (originalRequest.headers) {
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        }
+
+        console.log('Token refreshed successfully, retrying original request');
+        return apiClient(originalRequest);
       } catch (refreshError) {
         console.warn('Token refresh failed:', refreshError);
+        onTokenRefreshFailed();
         tokenManager.clearTokens();
 
         // Only redirect to login if we're not already there

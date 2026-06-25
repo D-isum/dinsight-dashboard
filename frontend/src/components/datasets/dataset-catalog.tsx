@@ -12,6 +12,7 @@ import {
   Download,
   GitBranch,
   Loader2,
+  Monitor,
   Pencil,
   Plus,
   ShieldCheck,
@@ -56,8 +57,6 @@ import { Actions } from '@/lib/permissions';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api-client';
 import { createDinsightPreviewPlot } from '@/lib/dinsight-preview-plot';
-import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
-import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import type { DinsightDatasetSource } from '@/lib/dataset-normalizers';
 import { usePlotTheme } from '@/lib/plot-theme';
@@ -100,7 +99,15 @@ export interface DatasetCatalogProps {
 export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
   const { currentOrg } = useAuth();
   const plotTheme = usePlotTheme();
-  const { selectDataset: selectWorkspaceDataset } = useDashboardWorkspace();
+  const {
+    datasets: dinsightSummaries,
+    groups: datasetSourceGroups,
+    selectedSourceKey,
+    selectSource: selectWorkspaceSource,
+    selectDataset: selectWorkspaceDataset,
+    filteredDatasetIds,
+    isLoadingDatasets,
+  } = useDashboardWorkspace();
   const isModal = variant === 'modal';
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -118,22 +125,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
   const canDelete = usePermission(Actions.DatasetDelete);
   const queryClient = useQueryClient();
 
-  // Pull source attribution (device / file / created_at) from the
-  // /dinsight list endpoint and key it by dinsight_id so we can show
-  // a Source column on the metadata table. Each metadata row's
-  // dataset_id corresponds to dinsight_data.id — that's the join key.
-  const { datasets: dinsightSummaries, isLoading: isLoadingDinsightSummaries } =
-    useDatasetDiscovery({
-      queryKey: ['catalog', 'dinsight-source-map'],
-      refetchInterval: 60_000,
-      staleTime: 30_000,
-    });
-  const {
-    groups: datasetSourceGroups,
-    selectedSourceKey,
-    setSelectedSourceKey,
-    filteredDatasetIds,
-  } = useDatasetSourceFilter(dinsightSummaries);
+  // Source attribution (device / file / created_at) is provided by the
+  // workspace context so the catalog, header picker, live monitor, and
+  // insights page all share one source selection state.
   const sourceByDinsightId = useMemo(() => {
     const map = new Map<number, DinsightDatasetSource>();
     for (const summary of dinsightSummaries) {
@@ -449,7 +443,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
             <DatasetSourceSelect
               groups={datasetSourceGroups}
               selectedSourceKey={selectedSourceKey}
-              onChange={setSelectedSourceKey}
+              onChange={selectWorkspaceSource}
               className="rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             />
             {catalogItems.length > 0 && (
@@ -564,7 +558,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {listQuery.isLoading || isLoadingDinsightSummaries ? (
+                {listQuery.isLoading || isLoadingDatasets ? (
                   <TableLoading message="Loading dataset catalog" rowSpan={catalogColumnCount} />
                 ) : filtered.length === 0 ? (
                   <TableEmpty
@@ -772,6 +766,24 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     <Download className="mr-2 h-4 w-4" />
                     Export
                   </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link
+                      href="/dashboard/live"
+                      onClick={() => selectWorkspaceDataset(previewDatasetId)}
+                    >
+                      <Monitor className="mr-2 h-4 w-4" />
+                      Open in Live
+                    </Link>
+                  </Button>
+                  <Button variant="outline" size="sm" asChild>
+                    <Link
+                      href="/dashboard/insights"
+                      onClick={() => selectWorkspaceDataset(previewDatasetId)}
+                    >
+                      <BarChart3 className="mr-2 h-4 w-4" />
+                      Open in Insights
+                    </Link>
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -804,6 +816,8 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 }
               : undefined
           }
+          onOpenLive={() => selectWorkspaceDataset(selectedDatasetId)}
+          onOpenInsights={() => selectWorkspaceDataset(selectedDatasetId)}
           isExporting={exportingDatasetId === selectedDatasetId}
           isDeleting={deleteMutation.isPending && pendingDeleteDatasetId === selectedDatasetId}
         />
@@ -918,6 +932,8 @@ interface DetailDrawerProps {
   onExport: () => void;
   onDelete?: () => void;
   onRegisterMetadata?: () => void;
+  onOpenLive: () => void;
+  onOpenInsights: () => void;
   isExporting: boolean;
   isDeleting: boolean;
 }
@@ -956,6 +972,8 @@ function DetailDrawer({
   onExport,
   onDelete,
   onRegisterMetadata,
+  onOpenLive,
+  onOpenInsights,
   isExporting,
   isDeleting,
 }: DetailDrawerProps) {
@@ -1003,6 +1021,18 @@ function DetailDrawer({
             <p className="text-xs text-fg-muted">Dataset #{datasetId}</p>
           </div>
           <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/live" onClick={onOpenLive}>
+                <Monitor className="mr-2 h-4 w-4" />
+                Live
+              </Link>
+            </Button>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/insights" onClick={onOpenInsights}>
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Insights
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" onClick={onExport} disabled={isExporting}>
               {isExporting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

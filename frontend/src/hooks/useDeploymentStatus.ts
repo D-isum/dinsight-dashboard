@@ -5,11 +5,17 @@ import { api, API_BASE_URL } from '@/lib/api-client';
 export interface LicenseStatusInfo {
   isValid: boolean | null;
   daysUntilExpiry: number | null;
+  effectiveDaysUntilExpiry: number | null;
   expiresAt: string | null;
+  originalExpiresAt: string | null;
+  effectiveExpiresAt: string | null;
   customerId: string | null;
   version: string | null;
   registeredDevices: number | null;
   maxDevices: number | null;
+  devExtensionActive: boolean;
+  devExtensionDays: number | null;
+  environment: string | null;
 }
 
 export function useDeploymentStatus() {
@@ -25,12 +31,25 @@ export function useDeploymentStatus() {
         isValid: typeof payload.is_valid === 'boolean' ? payload.is_valid : null,
         daysUntilExpiry:
           typeof payload.days_until_expiry === 'number' ? payload.days_until_expiry : null,
+        effectiveDaysUntilExpiry:
+          typeof payload.effective_days_until_expiry === 'number'
+            ? payload.effective_days_until_expiry
+            : null,
         expiresAt: typeof payload.expires_at === 'string' ? payload.expires_at : null,
+        originalExpiresAt:
+          typeof payload.original_expires_at === 'string' ? payload.original_expires_at : null,
+        effectiveExpiresAt:
+          typeof payload.effective_expires_at === 'string' ? payload.effective_expires_at : null,
         customerId: typeof payload.customer_id === 'string' ? payload.customer_id : null,
         version: typeof payload.version === 'string' ? payload.version : null,
         registeredDevices:
           typeof payload.registered_devices === 'number' ? payload.registered_devices : null,
         maxDevices: typeof payload.max_devices === 'number' ? payload.max_devices : null,
+        devExtensionActive:
+          typeof payload.dev_extension_active === 'boolean' ? payload.dev_extension_active : false,
+        devExtensionDays:
+          typeof payload.dev_extension_days === 'number' ? payload.dev_extension_days : null,
+        environment: typeof payload.environment === 'string' ? payload.environment : null,
       };
     },
     staleTime: 60_000,

@@ -23,7 +23,7 @@ export function useDatasetSourceFilter(datasets: DinsightDatasetSummary[]) {
   const syncFromStorage = useCallback(() => {
     const stored = readScoped(rawStorageKey, user?.id);
     const resolved = resolveDatasetSourceGroupKey(datasets, stored);
-    setSelectedSourceKeyState(resolved);
+    setSelectedSourceKeyState((current) => (current === resolved ? current : resolved));
     if (resolved && resolved !== stored) {
       writeScoped(rawStorageKey, user?.id, resolved);
     }
@@ -53,6 +53,7 @@ export function useDatasetSourceFilter(datasets: DinsightDatasetSummary[]) {
   const setSelectedSourceKey = useCallback(
     (key: string) => {
       if (!groups.some((group) => group.key === key)) return;
+      if (key === selectedSourceKey) return;
       setSelectedSourceKeyState(key);
       writeScoped(rawStorageKey, user?.id, key);
       window.dispatchEvent(
@@ -61,7 +62,7 @@ export function useDatasetSourceFilter(datasets: DinsightDatasetSummary[]) {
         })
       );
     },
-    [groups, rawStorageKey, scopedStorageKey, user?.id]
+    [groups, rawStorageKey, scopedStorageKey, selectedSourceKey, user?.id]
   );
 
   const filteredDatasets = useMemo(

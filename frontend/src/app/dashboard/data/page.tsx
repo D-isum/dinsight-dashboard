@@ -286,9 +286,31 @@ export default function DataIngestionPage() {
 
   useEffect(() => {
     if (savedPreviewId == null || !filteredDatasetIds.includes(savedPreviewId)) {
-      setSavedPreviewId(latestFilteredDatasetId);
+      const workspacePreviewId =
+        workspaceDatasetId && filteredDatasetIds.includes(workspaceDatasetId)
+          ? workspaceDatasetId
+          : null;
+      setSavedPreviewId(workspacePreviewId ?? latestFilteredDatasetId);
     }
-  }, [filteredDatasetIds, latestFilteredDatasetId, savedPreviewId]);
+  }, [filteredDatasetIds, latestFilteredDatasetId, savedPreviewId, workspaceDatasetId]);
+
+  useEffect(() => {
+    if (!workspaceDatasetId || !filteredDatasetIds.includes(workspaceDatasetId)) {
+      return;
+    }
+    if (savedPreviewId !== workspaceDatasetId) {
+      setSavedPreviewId(workspaceDatasetId);
+    }
+    if (workspaceDatasetId !== latestFilteredDatasetId && previewMode !== 'saved') {
+      setPreviewMode('saved');
+    }
+  }, [
+    filteredDatasetIds,
+    latestFilteredDatasetId,
+    previewMode,
+    savedPreviewId,
+    workspaceDatasetId,
+  ]);
 
   useEffect(() => {
     if (state.dinsightId && lastSourceSyncedWorkflowIdRef.current !== state.dinsightId) {
@@ -1134,9 +1156,13 @@ export default function DataIngestionPage() {
             {previewMode === 'saved' && (
               <select
                 value={savedPreviewId != null ? String(savedPreviewId) : ''}
-                onChange={(event) =>
-                  setSavedPreviewId(event.target.value ? Number(event.target.value) : null)
-                }
+                onChange={(event) => {
+                  const nextId = event.target.value ? Number(event.target.value) : null;
+                  setSavedPreviewId(nextId);
+                  if (nextId != null) {
+                    selectWorkspaceDataset(nextId);
+                  }
+                }}
                 className="rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Select saved dataset</option>

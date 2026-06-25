@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -77,10 +77,16 @@ interface LicenseInfo {
   version: string;
   features: string[];
   expires_at: string;
+  original_expires_at?: string;
+  effective_expires_at?: string;
   days_until_expiry: number;
+  effective_days_until_expiry?: number;
   max_devices: number;
   registered_devices: number;
   is_valid: boolean;
+  dev_extension_active?: boolean;
+  dev_extension_days?: number;
+  environment?: string;
   last_validated_at: string;
 }
 
@@ -109,6 +115,48 @@ function AccountSecurityView() {
   const { user, refreshUser } = useAuth();
   const queryClient = useQueryClient();
   const canReadAudit = usePermission(Actions.AuditRead);
+  const sectionGroups = useMemo(
+    () => [
+      {
+        label: 'Account',
+        description: 'Identity and sign-in',
+        sections: [
+          { value: 'profile' as const, label: 'Profile', icon: User },
+          { value: 'security' as const, label: 'Security', icon: Shield },
+          { value: 'notifications' as const, label: 'Notifications', icon: Bell },
+        ],
+      },
+      {
+        label: 'Organization',
+        description: 'People and devices',
+        sections: [
+          { value: 'organizations' as const, label: 'Organizations', icon: Building2 },
+          { value: 'members' as const, label: 'Members', icon: Users },
+          { value: 'devices' as const, label: 'Devices', icon: Monitor },
+        ],
+      },
+      {
+        label: 'Operations',
+        description: 'Alerts and validation',
+        sections: [
+          { value: 'active-alerts' as const, label: 'Active alerts', icon: AlertOctagon },
+          { value: 'alert-rules' as const, label: 'Alert rules', icon: ShieldAlert },
+          { value: 'validation' as const, label: 'Validation rules', icon: ShieldCheck },
+        ],
+      },
+      {
+        label: 'System',
+        description: 'License and audit',
+        sections: [
+          { value: 'license' as const, label: 'License', icon: ScrollText },
+          ...(canReadAudit
+            ? [{ value: 'audit-log' as const, label: 'Audit log', icon: ClipboardList }]
+            : []),
+        ],
+      },
+    ],
+    [canReadAudit]
+  );
 
   // Active section from URL — keeps the page deep-linkable and lets
   // other pages (e.g. /dashboard/alerts) point at a specific tab.
@@ -266,6 +314,11 @@ function AccountSecurityView() {
   // (User struct in backend). Falls back to "Password" for users
   // predating the OIDC column.
   const authProvider = (user as { auth_provider?: string } | null)?.auth_provider ?? 'password';
+  const licenseOriginalExpiresAt = licenseInfo?.original_expires_at ?? licenseInfo?.expires_at;
+  const licenseEffectiveExpiresAt = licenseInfo?.effective_expires_at ?? licenseInfo?.expires_at;
+  const licenseEffectiveDaysUntilExpiry =
+    licenseInfo?.effective_days_until_expiry ?? licenseInfo?.days_until_expiry;
+  const isDevLicenseExtensionActive = licenseInfo?.dev_extension_active === true;
 
   return (
     <div className="space-y-6">
@@ -283,53 +336,34 @@ function AccountSecurityView() {
       </Card>
 
       <Tabs value={section} onValueChange={handleSectionChange} className="space-y-4">
-        <TabsList className="h-auto flex-wrap justify-start gap-1">
-          <TabsTrigger value="profile" className="gap-2">
-            <User className="h-4 w-4" />
-            Profile
-          </TabsTrigger>
-          <TabsTrigger value="security" className="gap-2">
-            <Shield className="h-4 w-4" />
-            Security
-          </TabsTrigger>
-          <TabsTrigger value="organizations" className="gap-2">
-            <Building2 className="h-4 w-4" />
-            Organizations
-          </TabsTrigger>
-          <TabsTrigger value="members" className="gap-2">
-            <Users className="h-4 w-4" />
-            Members
-          </TabsTrigger>
-          <TabsTrigger value="devices" className="gap-2">
-            <Monitor className="h-4 w-4" />
-            Devices
-          </TabsTrigger>
-          <TabsTrigger value="license" className="gap-2">
-            <ScrollText className="h-4 w-4" />
-            License
-          </TabsTrigger>
-          <TabsTrigger value="notifications" className="gap-2">
-            <Bell className="h-4 w-4" />
-            Notifications
-          </TabsTrigger>
-          <TabsTrigger value="active-alerts" className="gap-2">
-            <AlertOctagon className="h-4 w-4" />
-            Active alerts
-          </TabsTrigger>
-          <TabsTrigger value="alert-rules" className="gap-2">
-            <ShieldAlert className="h-4 w-4" />
-            Alert rules
-          </TabsTrigger>
-          <TabsTrigger value="validation" className="gap-2">
-            <ShieldCheck className="h-4 w-4" />
-            Validation rules
-          </TabsTrigger>
-          {canReadAudit && (
-            <TabsTrigger value="audit-log" className="gap-2">
-              <ClipboardList className="h-4 w-4" />
-              Audit log
-            </TabsTrigger>
-          )}
+        <TabsList
+          aria-label="Settings sections"
+          className="grid h-auto w-full items-stretch justify-stretch gap-3 bg-transparent p-0 text-left md:grid-cols-2 xl:grid-cols-4"
+        >
+          {sectionGroups.map((group) => (
+            <div
+              key={group.label}
+              className="rounded-lg border border-border bg-surface p-3 shadow-sm"
+            >
+              <div className="mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-fg-muted">
+                  {group.label}
+                </p>
+                <p className="mt-0.5 text-xs text-fg-muted">{group.description}</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {group.sections.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <TabsTrigger key={item.value} value={item.value} className="gap-2">
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </TabsTrigger>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
@@ -612,7 +646,26 @@ function AccountSecurityView() {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {licenseInfo.days_until_expiry < 30 && (
+                  {isDevLicenseExtensionActive && (
+                    <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" aria-hidden="true" />
+                      <div>
+                        <p className="font-medium text-fg">Development license extension active</p>
+                        <p className="text-fg-muted">
+                          The signed license expired on{' '}
+                          {licenseOriginalExpiresAt
+                            ? new Date(licenseOriginalExpiresAt).toLocaleDateString()
+                            : 'an unknown date'}
+                          . Dev access is extended until{' '}
+                          {licenseEffectiveExpiresAt
+                            ? new Date(licenseEffectiveExpiresAt).toLocaleDateString()
+                            : 'an unknown date'}
+                          . Keep this flag disabled in production.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  {!isDevLicenseExtensionActive && licenseInfo.days_until_expiry < 30 && (
                     <div className="flex items-start gap-2 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm">
                       <AlertTriangle className="mt-0.5 h-4 w-4 text-danger" aria-hidden="true" />
                       <div>
@@ -628,17 +681,19 @@ function AccountSecurityView() {
                       </div>
                     </div>
                   )}
-                  {licenseInfo.days_until_expiry >= 30 && licenseInfo.days_until_expiry < 60 && (
-                    <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" aria-hidden="true" />
-                      <div>
-                        <p className="font-medium text-fg">License renewal coming up</p>
-                        <p className="text-fg-muted">
-                          Expires in {licenseInfo.days_until_expiry} days.
-                        </p>
+                  {!isDevLicenseExtensionActive &&
+                    licenseInfo.days_until_expiry >= 30 &&
+                    licenseInfo.days_until_expiry < 60 && (
+                      <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
+                        <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" aria-hidden="true" />
+                        <div>
+                          <p className="font-medium text-fg">License renewal coming up</p>
+                          <p className="text-fg-muted">
+                            Expires in {licenseInfo.days_until_expiry} days.
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                   <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
                     <div>
                       <Label className="text-xs uppercase tracking-wide text-fg-muted">
@@ -657,16 +712,28 @@ function AccountSecurityView() {
                         Expires
                       </Label>
                       <p className="mt-1 text-fg">
-                        {new Date(licenseInfo.expires_at).toLocaleDateString(undefined, {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}{' '}
+                        {licenseEffectiveExpiresAt
+                          ? new Date(licenseEffectiveExpiresAt).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : '—'}{' '}
                         <span className="text-fg-muted">
-                          ({licenseInfo.days_until_expiry} day
-                          {licenseInfo.days_until_expiry === 1 ? '' : 's'} from now)
+                          ({licenseEffectiveDaysUntilExpiry} day
+                          {licenseEffectiveDaysUntilExpiry === 1 ? '' : 's'} from now)
                         </span>
                       </p>
+                      {isDevLicenseExtensionActive && licenseOriginalExpiresAt && (
+                        <p className="mt-1 text-xs text-fg-muted">
+                          Original expiry:{' '}
+                          {new Date(licenseOriginalExpiresAt).toLocaleDateString(undefined, {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      )}
                     </div>
                     <div>
                       <Label className="text-xs uppercase tracking-wide text-fg-muted">
@@ -701,7 +768,13 @@ function AccountSecurityView() {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     })}{' '}
-                    · Status: {licenseInfo.is_valid ? 'Valid' : 'Invalid'}
+                    · Status:{' '}
+                    {isDevLicenseExtensionActive
+                      ? 'Dev extension active'
+                      : licenseInfo.is_valid
+                        ? 'Valid'
+                        : 'Invalid'}
+                    {licenseInfo.environment ? ` · Environment: ${licenseInfo.environment}` : ''}
                   </p>
                 </div>
               )}

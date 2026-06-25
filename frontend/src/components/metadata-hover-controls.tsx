@@ -33,6 +33,7 @@ export function MetadataHoverControls({
   const previewKeys = selectedKeys.slice(0, 3);
   const remainingCount = selectedKeys.length - previewKeys.length;
   const hasMetadataAvailable = availableKeys.length > 0;
+  const toggleId = 'metadata-hover-enabled';
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -43,13 +44,18 @@ export function MetadataHoverControls({
             Choose which metadata fields appear when hovering over chart points.
           </p>
         </div>
-        <input
-          type="checkbox"
-          className="mt-1 rounded border-strong"
-          checked={metadataEnabled && hasMetadataAvailable && !disabled}
-          onChange={(event) => onToggleEnabled(event.target.checked)}
-          disabled={!hasMetadataAvailable || disabled}
-        />
+        <label className="mt-1 inline-flex items-center gap-2 text-xs text-fg-muted">
+          <span className="sr-only">Enable hover metadata</span>
+          <input
+            id={toggleId}
+            type="checkbox"
+            className="rounded border-strong"
+            checked={metadataEnabled && hasMetadataAvailable && !disabled}
+            onChange={(event) => onToggleEnabled(event.target.checked)}
+            disabled={!hasMetadataAvailable || disabled}
+            aria-describedby={`${toggleId}-status`}
+          />
+        </label>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -65,7 +71,7 @@ export function MetadataHoverControls({
             )}
           </>
         ) : (
-          <span className="text-xs text-fg-muted">
+          <span id={`${toggleId}-status`} className="text-xs text-fg-muted">
             {hasMetadataAvailable
               ? 'No metadata fields selected yet.'
               : 'Metadata fields will appear once the dataset is loaded.'}
