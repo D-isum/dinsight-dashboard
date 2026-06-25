@@ -702,7 +702,7 @@ export default function DataIngestionPage() {
     monitoringError: inlineMonitoringError,
   } = useBaselineMonitoringData({
     dinsightId: inlinePreviewDatasetId ?? null,
-    includeMetadata: false,
+    includeMetadata: true,
     monitoringMode: 'coordinates',
     maxPoints: 20_000,
     refreshKey: previewRefreshKey,
@@ -717,7 +717,7 @@ export default function DataIngestionPage() {
     monitoringError: previewMonitoringError,
   } = useBaselineMonitoringData({
     dinsightId: isResultsModalOpen ? previewDatasetId : null,
-    includeMetadata: false,
+    includeMetadata: true,
     monitoringMode: 'coordinates',
     maxPoints: 75_000,
     refreshKey: previewRefreshKey,

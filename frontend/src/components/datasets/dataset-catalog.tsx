@@ -352,7 +352,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
     monitoringError: previewMonitoringError,
   } = useBaselineMonitoringData({
     dinsightId: isModal ? previewDatasetId : null,
-    includeMetadata: false,
+    includeMetadata: true,
     monitoringMode: 'coordinates',
     maxPoints: 20_000,
   });

@@ -4,12 +4,73 @@ import {
   plotRevisionFromParts,
 } from '@/lib/plot-autoscale';
 import { alphaColor, type PlotTheme } from '@/lib/plot-theme';
+import type { MetadataEntry } from '@/types';
 import type { EChartsOption } from 'echarts';
 
 interface CoordinateInput {
   dinsight_x: number[];
   dinsight_y: number[];
+  metadata?: MetadataEntry[];
 }
+
+const escapeHtml = (value: unknown): string =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const formatMetadataValue = (value: unknown): string => {
+  if (value === null || value === undefined) {
+    return '-';
+  }
+  if (typeof value === 'string') {
+    return value.length > 120 ? `${value.slice(0, 117)}...` : value;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized.length > 120 ? `${serialized.slice(0, 117)}...` : serialized;
+  } catch {
+    return '-';
+  }
+};
+
+const metadataTooltipHtml = (metadata?: MetadataEntry): string => {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
+    return '';
+  }
+
+  const entries = Object.entries(metadata).filter(([key]) => key.trim().length > 0);
+  if (entries.length === 0) {
+    return '';
+  }
+
+  const visibleEntries = entries.slice(0, 8);
+  const rows = visibleEntries
+    .map(([key, value]) => `${escapeHtml(key)}: ${escapeHtml(formatMetadataValue(value))}`)
+    .join('<br/>');
+  const remaining = entries.length - visibleEntries.length;
+
+  return `<br/><br/><b>Metadata</b><br/>${rows}${
+    remaining > 0 ? `<br/>+${remaining} more field${remaining === 1 ? '' : 's'}` : ''
+  }`;
+};
+
+const hasMetadataEntries = (metadata?: MetadataEntry[]): boolean =>
+  Boolean(
+    metadata?.some(
+      (entry) =>
+        entry &&
+        typeof entry === 'object' &&
+        !Array.isArray(entry) &&
+        Object.keys(entry).some((key) => key.trim().length > 0)
+    )
+  );
 
 export function createDinsightPreviewPlot(
   baselineData: CoordinateInput | null | undefined,
@@ -30,13 +91,18 @@ export function createDinsightPreviewPlot(
   const modeBar = options.modeBar ?? !compact;
   const baselineCount = baselineData.dinsight_x.length;
   const monitoringCount = monitoringData?.dinsight_x.length ?? 0;
+  const scatterPerformanceOptions =
+    hasMetadataEntries(baselineData.metadata) || hasMetadataEntries(monitoringData?.metadata)
+      ? {}
+      : { large: true, largeThreshold: 2000, progressive: 1000 };
   const pointSize = compact ? 4 : 6;
   const tooltipFormatter = (params: any) => {
     const value = params?.data?.value ?? params?.data;
     if (!Array.isArray(value)) {
       return `<b>${params?.seriesName ?? 'Point'}</b>`;
     }
-    return `<b>${params.seriesName}</b><br/>Point: ${Number(value[2]).toLocaleString()}<br/>X: ${Number(value[0]).toFixed(4)}<br/>Y: ${Number(value[1]).toFixed(4)}`;
+    const metadata = typeof value[3] === 'string' ? value[3] : '';
+    return `<b>${params.seriesName}</b><br/>Point: ${Number(value[2]).toLocaleString()}<br/>X: ${Number(value[0]).toFixed(4)}<br/>Y: ${Number(value[1]).toFixed(4)}${metadata}`;
   };
   const series: any[] = [
     {
@@ -46,11 +112,10 @@ export function createDinsightPreviewPlot(
         x,
         baselineData.dinsight_y[index],
         index + 1,
+        metadataTooltipHtml(baselineData.metadata?.[index]),
       ]),
       symbolSize: pointSize,
-      large: true,
-      largeThreshold: 2000,
-      progressive: 1000,
+      ...scatterPerformanceOptions,
       itemStyle: { color: alphaColor(theme.baseline, compact ? 0.5 : 0.58), borderWidth: 0 },
     },
   ];
@@ -63,11 +128,10 @@ export function createDinsightPreviewPlot(
         x,
         monitoringData.dinsight_y[index],
         index + 1,
+        metadataTooltipHtml(monitoringData.metadata?.[index]),
       ]),
       symbolSize: pointSize,
-      large: true,
-      largeThreshold: 2000,
-      progressive: 1000,
+      ...scatterPerformanceOptions,
       itemStyle: { color: alphaColor(theme.monitoring, compact ? 0.62 : 0.72), borderWidth: 0 },
     });
   }

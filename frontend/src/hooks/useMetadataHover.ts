@@ -24,13 +24,21 @@ export interface MetadataHoverState {
 
 const DEFAULT_SELECTION_COUNT = 3;
 
+const escapeHtml = (value: unknown): string =>
+  String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 const formatMetadataValue = (value: unknown): string => {
   if (value === null || value === undefined) {
-    return '—';
+    return '-';
   }
 
   if (typeof value === 'string') {
-    return value.length > 120 ? `${value.slice(0, 117)}…` : value;
+    return value.length > 120 ? `${value.slice(0, 117)}...` : value;
   }
 
   if (typeof value === 'number' || typeof value === 'boolean') {
@@ -42,14 +50,14 @@ const formatMetadataValue = (value: unknown): string => {
       typeof item === 'object' ? JSON.stringify(item) : String(item)
     );
     const result = joined.join(', ');
-    return result.length > 120 ? `${result.slice(0, 117)}…` : result;
+    return result.length > 120 ? `${result.slice(0, 117)}...` : result;
   }
 
   try {
     const json = JSON.stringify(value);
-    return json.length > 120 ? `${json.slice(0, 117)}…` : json;
+    return json.length > 120 ? `${json.slice(0, 117)}...` : json;
   } catch (error) {
-    return '—';
+    return '-';
   }
 };
 
@@ -123,11 +131,16 @@ export function useMetadataHover({
 
       return sourceEntries.map((entry) => {
         if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-          return selectedKeys.map((key) => `${key}: —`).join('<br>');
+          return selectedKeys.map((key) => `${escapeHtml(key)}: -`).join('<br>');
         }
 
         return selectedKeys
-          .map((key) => `${key}: ${formatMetadataValue((entry as Record<string, unknown>)[key])}`)
+          .map(
+            (key) =>
+              `${escapeHtml(key)}: ${escapeHtml(
+                formatMetadataValue((entry as Record<string, unknown>)[key])
+              )}`
+          )
           .join('<br>');
       });
     },

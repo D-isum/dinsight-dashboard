@@ -555,7 +555,7 @@ export default function LiveMonitorPage() {
     refetchMonitoring,
   } = useBaselineMonitoringData({
     dinsightId: selectedId,
-    includeMetadata: false,
+    includeMetadata: true,
     monitoringMode: 'coordinates',
     maxPoints: 100_000,
   });
@@ -1286,6 +1286,9 @@ export default function LiveMonitorPage() {
       Number(value).toLocaleString(undefined, {
         maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
       });
+    const scatterPerformanceOptions = hasActiveMetadata
+      ? {}
+      : { large: true, largeThreshold: 2000, progressive: 1000 };
     const series: any[] = [];
     let visualMap: EChartsOption['visualMap'] | undefined;
 
@@ -1328,9 +1331,7 @@ export default function LiveMonitorPage() {
         toSeriesPoint(x, baselineData.dinsight_y[index], index, baselineHover[index], 'Baseline')
       ),
       symbolSize: pointSize,
-      large: true,
-      largeThreshold: 2000,
-      progressive: 1000,
+      ...scatterPerformanceOptions,
       itemStyle: { color: alphaColor(plotTheme.baseline, 0.38) },
       z: 4,
     });
@@ -1365,9 +1366,7 @@ export default function LiveMonitorPage() {
             name: `Normal (${visibleNormalIndices.length.toLocaleString()})`,
             data: visibleNormalIndices.map((index) => pointForIndex(index, 'Normal')),
             symbolSize: pointSize + 1,
-            large: true,
-            largeThreshold: 2000,
-            progressive: 1000,
+            ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.normal, 0.86) },
           });
         }
@@ -1377,9 +1376,7 @@ export default function LiveMonitorPage() {
             name: `Anomaly (${visibleAnomalyIndices.length.toLocaleString()})`,
             data: visibleAnomalyIndices.map((index) => pointForIndex(index, 'Anomaly')),
             symbolSize: pointSize + 2,
-            large: true,
-            largeThreshold: 2000,
-            progressive: 1000,
+            ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.anomaly, 0.92) },
           });
         }
@@ -1425,9 +1422,7 @@ export default function LiveMonitorPage() {
             name: 'Monitoring (normal)',
             data: normal.map((point) => pointForIndex(point.index, 'Monitoring normal')),
             symbolSize: pointSize,
-            large: true,
-            largeThreshold: 2000,
-            progressive: 1000,
+            ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.normal, 0.78) },
           });
         }
@@ -1437,9 +1432,7 @@ export default function LiveMonitorPage() {
             name: 'Monitoring (anomaly)',
             data: anomalies.map((point) => pointForIndex(point.index, 'Monitoring anomaly')),
             symbolSize: pointSize + 2,
-            large: true,
-            largeThreshold: 2000,
-            progressive: 1000,
+            ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.anomaly, 0.95) },
           });
         }
@@ -1466,9 +1459,7 @@ export default function LiveMonitorPage() {
             name: 'Monitoring',
             data: regularIndices.map((index) => pointForIndex(index, 'Monitoring')),
             symbolSize: pointSize,
-            large: true,
-            largeThreshold: 2000,
-            progressive: 1000,
+            ...scatterPerformanceOptions,
             itemStyle: {
               color: alphaColor(plotTheme.monitoring, monitorView === 'recent' ? 0.82 : 0.7),
             },
@@ -1653,6 +1644,7 @@ export default function LiveMonitorPage() {
     effectiveMonitoringData,
     enableMultipleSelections,
     followLatest,
+    hasActiveMetadata,
     latestGlowCount,
     latestIndices,
     manualClassification,

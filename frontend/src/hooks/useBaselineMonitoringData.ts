@@ -77,7 +77,7 @@ export function useBaselineMonitoringData(
         return null;
       }
 
-      if (monitoringMode === 'coordinates') {
+      if (monitoringMode === 'coordinates' && !includeMetadata) {
         const response = await api.monitoring.getCoordinates(options.dinsightId, {
           max_points: maxPoints,
         });
