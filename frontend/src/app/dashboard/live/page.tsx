@@ -20,21 +20,16 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ChartFrame, ChartStat, ChartSwatch } from '@/components/charts/chart-frame';
 import { WorkflowState } from '@/components/ui/workflow-state';
-import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { MetadataHoverControls } from '@/components/metadata-hover-controls';
 import { useMetadataHover } from '@/hooks/useMetadataHover';
-import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
-import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useMachineHealthStatus } from '@/hooks/useMachineHealthStatus';
 import { api } from '@/lib/api-client';
 import type { CoordinateSeries } from '@/lib/dataset-normalizers';
-import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 import {
   axisRangeRevisionPart,
   buildPaddedAxisRange,
@@ -487,15 +482,12 @@ export default function LiveMonitorPage() {
   const { user } = useAuth();
   const {
     selectedDatasetId: workspaceDatasetId,
-    selectDataset: selectWorkspaceDataset,
-    selectSource: selectWorkspaceSource,
+    refetchDatasets,
     setMachineHealthSnapshot,
     logActivity,
   } = useDashboardWorkspace();
   const plotTheme = usePlotTheme();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [manualDatasetId, setManualDatasetId] = useState('');
-  const [datasetError, setDatasetError] = useState<string | null>(null);
+  const selectedId = workspaceDatasetId;
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -523,7 +515,6 @@ export default function LiveMonitorPage() {
     server: PersistedLiveMonitorPreferences;
     updatedAt: string;
   } | null>(null);
-  const isRestoringPrefsRef = useRef(false);
   const isApplyingPersistedPrefsRef = useRef(false);
   const boundariesByDatasetRef = useRef<Record<string, Boundary[]>>({});
   const serverSaveTimerRef = useRef<number | null>(null);
@@ -540,23 +531,6 @@ export default function LiveMonitorPage() {
     if (streamSpeed === '0.5x') return 4000;
     return 2000;
   }, [streamSpeed]);
-
-  const {
-    datasets,
-    isLoading: isLoadingDatasets,
-    refetch: refetchDatasets,
-  } = useDatasetDiscovery({
-    queryKey: ['available-dinsight-ids'],
-    refetchInterval: 30_000,
-    staleTime: 10_000,
-  });
-  const {
-    groups: datasetSourceGroups,
-    selectedSourceKey,
-    filteredDatasets,
-    filteredDatasetIds,
-    latestFilteredDatasetId,
-  } = useDatasetSourceFilter(datasets);
 
   const {
     baselineData,
@@ -700,15 +674,6 @@ export default function LiveMonitorPage() {
 
       isApplyingPersistedPrefsRef.current = true;
 
-      if (
-        typeof parsed.selectedId === 'number' &&
-        Number.isInteger(parsed.selectedId) &&
-        parsed.selectedId > 0
-      ) {
-        isRestoringPrefsRef.current = true;
-        setSelectedId(parsed.selectedId);
-      }
-      if (typeof parsed.manualDatasetId === 'string') setManualDatasetId(parsed.manualDatasetId);
       if (typeof parsed.autoRefresh === 'boolean') setAutoRefresh(parsed.autoRefresh);
       if (typeof parsed.isControlsCollapsed === 'boolean') {
         setIsControlsCollapsed(parsed.isControlsCollapsed);
@@ -871,7 +836,6 @@ export default function LiveMonitorPage() {
     const payload = {
       ...serverPrefsSnapshotRef.current,
       selectedId,
-      manualDatasetId,
       autoRefresh,
       isControlsCollapsed,
       streamSpeed,
@@ -945,7 +909,6 @@ export default function LiveMonitorPage() {
     followLatest,
     isControlsCollapsed,
     isPrefsHydrated,
-    manualDatasetId,
     manualSelectionEnabled,
     metadataEnabled,
     monitorView,
@@ -971,47 +934,6 @@ export default function LiveMonitorPage() {
   );
 
   useEffect(() => {
-    const selectedDatasetExists =
-      selectedId != null && datasets.some((dataset) => dataset.dinsight_id === selectedId);
-    if (selectedDatasetExists && workspaceDatasetId === selectedId) {
-      return;
-    }
-
-    if (selectedId === null || !filteredDatasetIds.includes(selectedId)) {
-      setSelectedId(latestFilteredDatasetId);
-      setDatasetError(null);
-    }
-  }, [datasets, filteredDatasetIds, latestFilteredDatasetId, selectedId, workspaceDatasetId]);
-
-  useEffect(() => {
-    if (
-      workspaceDatasetId &&
-      workspaceDatasetId !== selectedId &&
-      datasets.some((dataset) => dataset.dinsight_id === workspaceDatasetId)
-    ) {
-      setSelectedId(workspaceDatasetId);
-      setManualDatasetId(String(workspaceDatasetId));
-      setDatasetError(null);
-    }
-  }, [datasets, selectedId, workspaceDatasetId]);
-
-  useEffect(() => {
-    if (!selectedId || workspaceDatasetId === selectedId) {
-      return;
-    }
-    if (workspaceDatasetId && !filteredDatasetIds.includes(workspaceDatasetId)) {
-      return;
-    }
-    selectWorkspaceDataset(selectedId);
-  }, [filteredDatasetIds, selectWorkspaceDataset, selectedId, workspaceDatasetId]);
-
-  useEffect(() => {
-    if (selectedId) {
-      setManualDatasetId(String(selectedId));
-    }
-  }, [selectedId]);
-
-  useEffect(() => {
     setAnomalyResult(null);
     setLiveMonitoringData(null);
     if (!selectedId) {
@@ -1021,10 +943,6 @@ export default function LiveMonitorPage() {
 
     const restored = boundariesByDatasetRef.current[String(selectedId)] ?? [];
     setBoundaries(restored);
-
-    if (isRestoringPrefsRef.current) {
-      isRestoringPrefsRef.current = false;
-    }
   }, [selectedId]);
 
   useEffect(() => {
@@ -1763,22 +1681,6 @@ export default function LiveMonitorPage() {
     [handleEChartsBrushEnd, manualSelectionEnabled]
   );
 
-  const applyManualDataset = () => {
-    const parsed = Number(manualDatasetId.trim());
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setDatasetError('Enter a valid dataset ID.');
-      return;
-    }
-    if (!filteredDatasetIds.includes(parsed)) {
-      setDatasetError('Select the dataset device/source before applying this ID.');
-      return;
-    }
-
-    setDatasetError(null);
-    setSelectedId(parsed);
-    selectWorkspaceDataset(parsed);
-  };
-
   const refreshNow = useCallback(() => {
     void refetchDatasets();
     void refetchStatus();
@@ -1945,54 +1847,13 @@ export default function LiveMonitorPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4 py-4 xl:max-h-[calc(100vh-13rem)] xl:overflow-y-auto">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Device / source</label>
-                <DatasetSourceSelect
-                  groups={datasetSourceGroups}
-                  selectedSourceKey={selectedSourceKey}
-                  onChange={selectWorkspaceSource}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Dataset</label>
-                <select
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={selectedId != null ? String(selectedId) : ''}
-                  onChange={(event) => {
-                    const nextValue = event.target.value;
-                    const parsed = nextValue ? Number(nextValue) : null;
-                    setSelectedId(parsed);
-                    selectWorkspaceDataset(parsed);
-                  }}
-                >
-                  <option value="">Select dataset</option>
-                  {filteredDatasets.map((dataset) => (
-                    <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                      {formatDatasetOptionLabel(dataset)}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-muted-foreground">
-                  {isLoadingDatasets
-                    ? 'Loading datasets...'
-                    : `${filteredDatasets.length} dataset(s) available for this source`}
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">
+                  Active dataset
                 </p>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Manual dataset ID</label>
-                <div className="flex gap-2">
-                  <Input
-                    value={manualDatasetId}
-                    onChange={(event) => setManualDatasetId(event.target.value)}
-                    placeholder="e.g. 14"
-                  />
-                  <Button variant="outline" onClick={applyManualDataset}>
-                    Apply
-                  </Button>
-                </div>
-                {datasetError && <p className="text-xs text-danger-text">{datasetError}</p>}
+                <p className="mt-1 text-lg font-semibold text-fg">
+                  {selectedId ? `#${selectedId}` : 'None selected'}
+                </p>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">

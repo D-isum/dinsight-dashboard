@@ -23,12 +23,8 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartFrame, ChartStat, ChartSwatch } from '@/components/charts/chart-frame';
 import { WorkflowState } from '@/components/ui/workflow-state';
-import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
-import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
-import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
 import { api } from '@/lib/api-client';
-import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 import {
   axisRangeRevisionPart,
   buildPaddedAxisRange,
@@ -360,16 +356,15 @@ const formatIntervalTick = (value: string) => {
 export default function HealthInsightsPage() {
   const { user } = useAuth();
   const {
-    selectDataset: selectWorkspaceDataset,
-    selectSource: selectWorkspaceSource,
+    selectedDatasetId: datasetId,
+    filteredDatasetIds,
+    filteredDatasets,
+    isLoadingDatasets,
     logActivity,
     setMachineHealthSnapshot,
   } = useDashboardWorkspace();
   const plotTheme = usePlotTheme();
   const userId = user?.id;
-  const [datasetId, setDatasetId] = useState<number | null>(null);
-  const [manualDatasetId, setManualDatasetId] = useState('');
-  const [datasetError, setDatasetError] = useState<string | null>(null);
   const [metadataColumn, setMetadataColumn] = useState<string>('');
   const [includeMonitoring, setIncludeMonitoring] = useState(true);
   const [selectedClusterValues, setSelectedClusterValues] = useState<string[]>([]);
@@ -401,69 +396,12 @@ export default function HealthInsightsPage() {
   const hasHydratedUiPrefsRef = useRef(false);
   const hasHydratedPersistedConfigRef = useRef(false);
   const skipNextDatasetMetadataResetRef = useRef(false);
-  const hasPinnedDatasetRef = useRef(false);
   const pendingDraftRef = useRef<DraftWearTrendConfig | null>(null);
   const draftPersistTimerRef = useRef<number | null>(null);
   const lastLoggedWearResultRef = useRef('');
 
-  const { datasets, isLoading } = useDatasetDiscovery({
-    queryKey: ['available-dinsight-ids'],
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-  });
-  const {
-    groups: datasetSourceGroups,
-    selectedSourceKey,
-    filteredDatasets,
-    filteredDatasetIds,
-    latestFilteredDatasetId,
-  } = useDatasetSourceFilter(datasets);
-  const { activeStreamingDatasetId, statusesByDatasetId } =
-    useActiveStreamingDataset(filteredDatasetIds);
-  const preferredDatasetId = activeStreamingDatasetId ?? latestFilteredDatasetId ?? null;
-
-  useEffect(() => {
-    if (datasetId == null || !filteredDatasetIds.includes(datasetId)) {
-      hasPinnedDatasetRef.current = false;
-      setDatasetId(preferredDatasetId);
-      setManualDatasetId(preferredDatasetId ? String(preferredDatasetId) : '');
-      setDatasetError(null);
-    }
-  }, [datasetId, filteredDatasetIds, preferredDatasetId]);
-
-  useEffect(() => {
-    if (hasPinnedDatasetRef.current) {
-      return;
-    }
-    if (datasetId == null && preferredDatasetId) {
-      setDatasetId(preferredDatasetId);
-      setManualDatasetId(String(preferredDatasetId));
-    }
-  }, [datasetId, preferredDatasetId]);
-
-  useEffect(() => {
-    if (hasPinnedDatasetRef.current || hasHydratedPersistedConfigRef.current) {
-      return;
-    }
-    if (!activeStreamingDatasetId || datasetId === activeStreamingDatasetId) {
-      return;
-    }
-    const currentDatasetStatus = datasetId != null ? statusesByDatasetId[datasetId]?.status : null;
-    if (
-      datasetId == null ||
-      currentDatasetStatus === 'completed' ||
-      currentDatasetStatus === 'not_started'
-    ) {
-      setDatasetId(activeStreamingDatasetId);
-      setManualDatasetId(String(activeStreamingDatasetId));
-    }
-  }, [activeStreamingDatasetId, datasetId, statusesByDatasetId]);
-
-  useEffect(() => {
-    if (datasetId != null) {
-      setManualDatasetId(String(datasetId));
-    }
-  }, [datasetId]);
+  const { activeStreamingDatasetId } = useActiveStreamingDataset(filteredDatasetIds);
+  const selectedDataset = filteredDatasets.find((dataset) => dataset.dinsight_id === datasetId);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -609,6 +547,9 @@ export default function HealthInsightsPage() {
     if (hasHydratedPersistedConfigRef.current) {
       return;
     }
+    if (!datasetId) {
+      return;
+    }
     if (typeof window === 'undefined') {
       return;
     }
@@ -624,11 +565,12 @@ export default function HealthInsightsPage() {
       hasHydratedPersistedConfigRef.current = true;
       return;
     }
+    if (resolvedLocal.datasetId !== datasetId) {
+      hasHydratedPersistedConfigRef.current = true;
+      return;
+    }
 
     skipNextDatasetMetadataResetRef.current = true;
-    hasPinnedDatasetRef.current = true;
-    setDatasetId(resolvedLocal.datasetId);
-    setManualDatasetId(String(resolvedLocal.datasetId));
     setMetadataColumn(resolvedLocal.metadataColumn);
     setIncludeMonitoring(resolvedLocal.includeMonitoring);
     setSelectedClusterValues(resolvedLocal.baselineClusterValues);
@@ -653,10 +595,13 @@ export default function HealthInsightsPage() {
       setLastWearTrendRunAt(localConfig.appliedAt);
     }
     hasHydratedPersistedConfigRef.current = true;
-  }, [userId]);
+  }, [datasetId, userId]);
 
   useEffect(() => {
     if (!hasFetchedUserPreferences) {
+      return;
+    }
+    if (!datasetId) {
       return;
     }
     if (typeof window === 'undefined') {
@@ -682,11 +627,11 @@ export default function HealthInsightsPage() {
     if (!resolved) {
       return;
     }
+    if (resolved.datasetId !== datasetId) {
+      return;
+    }
 
     skipNextDatasetMetadataResetRef.current = true;
-    hasPinnedDatasetRef.current = true;
-    setDatasetId(resolved.datasetId);
-    setManualDatasetId(String(resolved.datasetId));
     setMetadataColumn(resolved.metadataColumn);
     setIncludeMonitoring(resolved.includeMonitoring);
     setSelectedClusterValues(resolved.baselineClusterValues);
@@ -716,7 +661,7 @@ export default function HealthInsightsPage() {
     if (resolvedDraft) {
       writeScoped(INSIGHTS_DRAFT_WEAR_CONFIG_KEY, userId, JSON.stringify(resolvedDraft));
     }
-  }, [hasFetchedUserPreferences, userPreferences, userId]);
+  }, [datasetId, hasFetchedUserPreferences, userPreferences, userId]);
 
   const persistWearConfigToServer = useCallback(async (nextConfig: AppliedWearTrendConfig) => {
     try {
@@ -1166,22 +1111,6 @@ export default function HealthInsightsPage() {
     },
     []
   );
-
-  const applyManualDataset = () => {
-    const parsed = Number(manualDatasetId.trim());
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-      setDatasetError('Enter a valid dataset ID.');
-      return;
-    }
-    if (!filteredDatasetIds.includes(parsed)) {
-      setDatasetError('Select the dataset device/source before applying this ID.');
-      return;
-    }
-    setDatasetError(null);
-    hasPinnedDatasetRef.current = true;
-    setDatasetId(parsed);
-    selectWorkspaceDataset(parsed);
-  };
 
   const distanceSummary = useMemo(() => {
     if (!wearResult?.intervals?.length) {
@@ -2048,62 +1977,31 @@ export default function HealthInsightsPage() {
 
       <Card className="border-border/60">
         <CardContent className="space-y-4 py-4">
-          <div className="grid gap-3 xl:grid-cols-12">
-            <div className="space-y-2 xl:col-span-3">
-              <label className="text-sm font-medium">Device / source</label>
-              <DatasetSourceSelect
-                groups={datasetSourceGroups}
-                selectedSourceKey={selectedSourceKey}
-                onChange={selectWorkspaceSource}
-              />
-            </div>
-
-            <div className="space-y-2 xl:col-span-3">
-              <label className="text-sm font-medium">Dataset</label>
-              <select
-                value={datasetId != null ? String(datasetId) : ''}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  const parsed = value ? Number(value) : null;
-                  hasPinnedDatasetRef.current = true;
-                  setDatasetId(parsed);
-                  selectWorkspaceDataset(parsed);
-                }}
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="">Select dataset</option>
-                {filteredDatasets.map((dataset) => (
-                  <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    {formatDatasetOptionLabel(dataset)}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">
-                {isLoading
-                  ? 'Loading datasets...'
-                  : `${filteredDatasets.length} dataset(s) found for this source`}
-              </p>
-            </div>
-
-            <div className="space-y-2 xl:col-span-2">
-              <label className="text-sm font-medium">Manual dataset ID</label>
-              <div className="flex gap-2">
-                <input
-                  value={manualDatasetId}
-                  onChange={(event) => setManualDatasetId(event.target.value)}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="e.g. 14"
-                />
-                <Button variant="outline" onClick={applyManualDataset}>
-                  Apply
-                </Button>
+          <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(280px,420px)]">
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-input bg-muted/20 p-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Dataset</p>
+                <p className="mt-1 text-lg font-semibold text-fg">
+                  {datasetId ? `#${datasetId}` : 'None'}
+                </p>
               </div>
-              {datasetError && <p className="text-xs text-danger-text">{datasetError}</p>}
+              <div className="rounded-lg border border-input bg-muted/20 p-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Source set</p>
+                <p className="mt-1 text-lg font-semibold text-fg">
+                  {isLoadingDatasets ? 'Loading' : filteredDatasets.length.toLocaleString()}
+                </p>
+              </div>
+              <div className="rounded-lg border border-input bg-muted/20 p-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Stream</p>
+                <p className="mt-1 text-lg font-semibold text-fg">
+                  {activeStreamingDatasetId === datasetId ? 'Active' : 'Idle'}
+                </p>
+              </div>
             </div>
 
-            <div className="rounded-lg border border-input bg-muted/20 p-3 xl:col-span-4">
+            <div className="rounded-lg border border-input bg-muted/20 p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm font-medium">Workflow guide</p>
+                <p className="text-sm font-medium">Workflow status</p>
                 {hasPendingChanges && <Badge variant="outline">Selection changed</Badge>}
                 {lastWearTrendRunAt && (
                   <Badge variant="outline">
@@ -2112,8 +2010,10 @@ export default function HealthInsightsPage() {
                 )}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Choose data, define the healthy baseline cluster in Controls, then review the plots.
-                Shortcut: <strong>Ctrl/Cmd+Enter</strong> runs wear trend.
+                {selectedDataset?.source.originalFileName ??
+                  selectedDataset?.source.deviceName ??
+                  selectedDataset?.source.deviceSlug ??
+                  'No dataset source selected'}
               </p>
             </div>
           </div>

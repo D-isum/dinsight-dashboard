@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
-import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
-import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
 import {
   normalizeCoordinateSeriesFromMonitoringCoordinates,
@@ -10,6 +8,7 @@ import {
 } from '@/lib/dataset-normalizers';
 import { buildScopedKey, readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
+import { useDashboardWorkspace } from '@/context/dashboard-workspace-context';
 import {
   appendHistoryPoint,
   buildWearTrendAlerts,
@@ -360,23 +359,17 @@ export function useDashboardOverview() {
   }, [userId]);
 
   const {
-    datasets,
-    isLoading: isLoadingDatasets,
-    refetch: refetchDatasets,
-  } = useDatasetDiscovery({
-    queryKey: ['dashboard-datasets'],
-    staleTime: 15_000,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-  });
-  const {
     groups: datasetSourceGroups,
+    selectedDatasetId,
     selectedSourceKey,
-    setSelectedSourceKey,
+    selectSource: setSelectedSourceKey,
+    datasets,
     filteredDatasets,
     filteredDatasetIds,
     latestFilteredDatasetId,
-  } = useDatasetSourceFilter(datasets);
+    isLoadingDatasets,
+    refetchDatasets,
+  } = useDashboardWorkspace();
 
   const { data: serverLivePrefs } = useQuery<DashboardLivePrefs | null>({
     queryKey: ['dashboard-live-monitor-preferences'],
@@ -433,7 +426,11 @@ export function useDashboardOverview() {
       ? livePrefs.selectedId
       : null;
   const activeDatasetId =
-    activeStreamingDatasetId ?? selectedLivePreferenceId ?? latestFilteredDatasetId ?? null;
+    selectedDatasetId ??
+    activeStreamingDatasetId ??
+    selectedLivePreferenceId ??
+    latestFilteredDatasetId ??
+    null;
   const resolvedWearConfig = useMemo(
     () => pickNewestWearConfig(appliedWearConfig, livePrefs?.insightsWearConfig ?? null),
     [appliedWearConfig, livePrefs?.insightsWearConfig]

@@ -20,7 +20,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { DeploymentStatusCard } from '@/components/deployment/deployment-status-card';
 import { useDashboardWorkspace } from '@/context/dashboard-workspace-context';
 import { useDashboardOverview } from '@/hooks/useDashboardOverview';
@@ -350,18 +349,10 @@ function RecommendedActions({
 }
 
 export default function DashboardPage() {
-  const {
-    selectedDatasetId: workspaceDatasetId,
-    selectDataset: selectWorkspaceDataset,
-    selectSource: selectWorkspaceSource,
-    setMachineHealthSnapshot,
-  } = useDashboardWorkspace();
+  const { setMachineHealthSnapshot } = useDashboardWorkspace();
   const {
     datasets,
     latestDatasetId,
-    datasetSourceGroups,
-    selectedSourceKey,
-    setSelectedSourceKey,
     selectedLiveDatasetId,
     streamingStatus,
     alerts,
@@ -398,12 +389,6 @@ export default function DashboardPage() {
       updatedAt: new Date().toISOString(),
     });
   }, [machineReasons, machineStatus.recommendation, machineStatus.state, setMachineHealthSnapshot]);
-
-  useEffect(() => {
-    if (selectedLiveDatasetId && workspaceDatasetId !== selectedLiveDatasetId) {
-      selectWorkspaceDataset(selectedLiveDatasetId);
-    }
-  }, [selectWorkspaceDataset, selectedLiveDatasetId, workspaceDatasetId]);
 
   const handleRefresh = async () => {
     try {
@@ -521,15 +506,6 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
-              <DatasetSourceSelect
-                groups={datasetSourceGroups}
-                selectedSourceKey={selectedSourceKey}
-                onChange={(key) => {
-                  setSelectedSourceKey(key);
-                  selectWorkspaceSource(key);
-                }}
-                className="min-w-56 rounded-md border border-border bg-surface px-3 py-2 text-sm"
-              />
               <Button
                 variant="outline"
                 onClick={() => void handleRefresh()}

@@ -11,6 +11,9 @@
  */
 @layer base {
   :root {
+    --font-plex-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --font-plex-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+
     /* Surfaces (§7.2 light) */
     --color-canvas: #f3f5f7;
     --color-surface: #ffffff;

@@ -206,6 +206,16 @@ export function DashboardWorkspaceProvider({ children }: { children: ReactNode }
     [datasets, effectiveSelectedDatasetId]
   );
 
+  useEffect(() => {
+    if (!storedSelectedDataset) {
+      return;
+    }
+    const sourceKey = getDatasetSourceGroupKey(storedSelectedDataset);
+    if (selectedSourceKey !== sourceKey) {
+      setSelectedSourceKey(sourceKey);
+    }
+  }, [selectedSourceKey, setSelectedSourceKey, storedSelectedDataset]);
+
   const persistSelectedDataset = useCallback(
     (datasetId: number | null) => {
       if (selectedDatasetIdRef.current === datasetId) {
