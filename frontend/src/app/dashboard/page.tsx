@@ -4,10 +4,8 @@ import Link from 'next/link';
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
-  AlertTriangle,
   ArrowRight,
   CheckCircle2,
-  Clock,
   Database,
   Eye,
   Gauge,
@@ -15,7 +13,6 @@ import {
   ListChecks,
   Radio,
   RefreshCw,
-  Server,
   Settings2,
   ShieldAlert,
   Upload,
@@ -188,8 +185,8 @@ function ActionQueue({
     <Card className="self-start">
       <SectionTitle
         icon={<ListChecks className="h-5 w-5" />}
-        title="Action queue"
-        description="Highest-value next steps for the selected dataset."
+        title="Next steps"
+        description="Tasks for the selected dataset."
       />
       <CardContent className="space-y-3 p-4 pt-0">
         {actions.map((action) => (
@@ -266,11 +263,11 @@ function PriorityQueue({
   }>;
 }) {
   return (
-    <Card className="h-full">
+    <Card>
       <SectionTitle
         icon={<Gauge className="h-5 w-5" />}
-        title="Asset priority"
-        description="Datasets ranked by operational attention."
+        title="Dataset queue"
+        description="Selected dataset first, followed by recent saved results."
       />
       <CardContent className="space-y-2 p-4 pt-0">
         {items.length === 0 ? (
@@ -378,7 +375,6 @@ export default function DashboardPage() {
     selectedLiveDatasetId,
     streamingStatus,
     alerts,
-    alertSummary,
     wearSnapshot,
     wearDirection,
     machineStatus,
@@ -389,8 +385,6 @@ export default function DashboardPage() {
     wearColumn,
     liveRefreshMs,
     appliedWearConfig,
-    isLoading,
-    isRefreshingWear,
     wearError,
     refetchAll,
   } = useDashboardOverview();
@@ -572,7 +566,7 @@ export default function DashboardPage() {
         };
       })
       .sort((a, b) => Number(b.isActive) - Number(a.isActive) || b.score - a.score || b.id - a.id)
-      .slice(0, 7);
+      .slice(0, 4);
   }, [
     datasets,
     hasCriticalAlerts,
@@ -606,7 +600,7 @@ export default function DashboardPage() {
     if (hasDatasets && !hasSelectedDataset) {
       nextActions.push({
         title: 'Choose an active dataset',
-        detail: 'Use the header dataset picker so every workspace page follows the same ID.',
+        detail: 'Use the header picker to set the dataset for every page.',
         href: '/dashboard/data?catalog=open',
         label: 'Review catalog',
         tone: 'warning',
@@ -668,8 +662,8 @@ export default function DashboardPage() {
         icon: <Eye className="h-5 w-5" />,
       });
       nextActions.push({
-        title: 'Audit dataset outputs',
-        detail: 'Export or delete generated files from the catalog when a run is complete.',
+        title: 'Review data files',
+        detail: 'Export or delete files from the catalog when a run is complete.',
         href: '/dashboard/data?catalog=open',
         label: 'Open catalog',
         tone: 'neutral',
@@ -695,8 +689,8 @@ export default function DashboardPage() {
 
     if (hasDatasets && nextActions.length < 3 && !hasCatalogAction) {
       nextActions.push({
-        title: 'Audit generated outputs',
-        detail: 'Open the catalog to export, inspect, or delete files tied to this dataset ID.',
+        title: 'Review data files',
+        detail: 'Export, inspect, or delete files for this dataset ID.',
         href: '/dashboard/data?catalog=open',
         label: 'Open catalog',
         tone: 'neutral',
@@ -763,7 +757,7 @@ export default function DashboardPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase">
                     <Activity className="h-4 w-4" />
-                    Operations command center
+                    Machine status
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <h1 className="text-3xl font-semibold tracking-normal">
@@ -893,8 +887,8 @@ export default function DashboardPage() {
           <Card>
             <SectionTitle
               icon={<Radio className="h-5 w-5" />}
-              title="Streaming detail"
-              description="Simulator flags currently reported by the API."
+              title="Stream settings"
+              description="Current stream settings reported by the API."
             />
             <CardContent className="grid gap-3 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryMetric
@@ -930,8 +924,8 @@ export default function DashboardPage() {
           <Card>
             <SectionTitle
               icon={<CheckCircle2 className="h-5 w-5" />}
-              title="Readiness"
-              description="The checks that make live decisions defensible."
+              title="Checks"
+              description="Inputs available for this dataset."
             />
             <CardContent className="space-y-2 p-4 pt-0">
               {readinessItems.map((item) => (
@@ -949,13 +943,13 @@ export default function DashboardPage() {
           <Card>
             <SectionTitle
               icon={<History className="h-5 w-5" />}
-              title="Recent operations"
-              description="Workspace events from uploads, streams, and analyses."
+              title="Recent activity"
+              description="Uploads, streams, and analysis runs."
             />
             <CardContent className="space-y-2 p-4 pt-0">
               {recentOperations.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-4 text-sm text-fg-muted">
-                  No recent workspace activity.
+                  No recent activity.
                 </div>
               ) : (
                 recentOperations.map((activity) => (
@@ -968,62 +962,6 @@ export default function DashboardPage() {
           <DeploymentStatusCard compact />
         </div>
       </div>
-
-      <Card>
-        <CardContent className="flex flex-wrap items-center gap-2 p-4">
-          <Button asChild>
-            <Link href="/dashboard/live">
-              <Eye className="mr-2 h-4 w-4" />
-              Live Monitor
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/insights">
-              <ShieldAlert className="mr-2 h-4 w-4" />
-              Health Insights
-            </Link>
-          </Button>
-          <Button variant="outline" asChild>
-            <Link href="/dashboard/data">
-              <Upload className="mr-2 h-4 w-4" />
-              Data Ingestion
-            </Link>
-          </Button>
-          <div className="ml-auto flex items-center text-sm text-fg-muted">
-            {isRefreshingWear || isLoading ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Updating dashboard
-              </>
-            ) : lastTimelinePoint != null ? (
-              <>
-                <Clock className="mr-2 h-4 w-4 text-success-text" />
-                Synced {formatRelativeTime(new Date(lastTimelinePoint))}
-              </>
-            ) : (
-              <>
-                <Server className="mr-2 h-4 w-4 text-info-text" />
-                Awaiting live signal
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {hasCriticalAlerts && (
-        <Card className="border-danger-border bg-danger-bg text-danger-text">
-          <CardContent className="flex items-start gap-3 p-4">
-            <AlertTriangle className="mt-0.5 h-5 w-5" />
-            <div>
-              <p className="font-semibold">Critical alerts require immediate action.</p>
-              <p className="text-sm opacity-85">
-                Validate the latest monitoring points in Live Monitor and review deterioration in
-                Health Insights.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -1250,8 +1250,8 @@ export default function DataIngestionPage() {
               </Badge>
             </div>
             <p className="max-w-3xl text-sm text-fg-muted">
-              Configure processing, upload combined or split CSV files, and review generated
-              DInsight results from one workspace.
+              Configure processing, upload combined or split CSV files, and review saved DInsight
+              results.
             </p>
           </div>
 
@@ -2226,7 +2226,7 @@ function DataNextActions({
   return (
     <Card className="border-info-border bg-info-bg/40">
       <CardHeader>
-        <CardTitle className="text-base text-info-text">Recommended Next Action</CardTitle>
+        <CardTitle className="text-base text-info-text">Next step</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="font-semibold text-fg">{action.title}</div>

@@ -134,16 +134,16 @@ describe('Dashboard page integration', () => {
   it('renders operator-critical cards and actions', () => {
     render(<DashboardPage />);
 
-    expect(screen.getByText('Operations command center')).toBeInTheDocument();
+    expect(screen.getByText('Machine status')).toBeInTheDocument();
     expect(screen.getAllByText('Deteriorating').length).toBeGreaterThan(0);
-    expect(screen.getByText('Action queue')).toBeInTheDocument();
-    expect(screen.getByText('Asset priority')).toBeInTheDocument();
-    expect(screen.getAllByText('Readiness').length).toBeGreaterThan(0);
+    expect(screen.getByText('Next steps')).toBeInTheDocument();
+    expect(screen.getByText('Dataset queue')).toBeInTheDocument();
+    expect(screen.getByText('Checks')).toBeInTheDocument();
     expect(screen.getByText('Live signal')).toBeInTheDocument();
-    expect(screen.getByText('Recent operations')).toBeInTheDocument();
-    expect(screen.getByText('Streaming detail')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /Live Monitor/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /Health Insights/i }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Recent activity')).toBeInTheDocument();
+    expect(screen.getByText('Stream settings')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Live stream/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /Open insights/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: /Open catalog/i }).length).toBeGreaterThan(0);
   });
 });
