@@ -61,6 +61,7 @@ import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import type { DinsightDatasetSource } from '@/lib/dataset-normalizers';
 import { usePlotTheme } from '@/lib/plot-theme';
+import { cn } from '@/utils/cn';
 
 // Catalog browses the dataset metadata + lineage + validation that
 // upload + processing pipelines record server-side.
@@ -366,48 +367,48 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
     [plotTheme, previewBaselineData, previewDatasetId, previewMonitoringData]
   );
   const previewItem = filtered.find((item) => item.dataset_id === previewDatasetId) ?? null;
-  const catalogColumnCount = isModal ? (canDelete ? 6 : 5) : canDelete ? 9 : 8;
+  const catalogColumnCount = canDelete ? 9 : 8;
 
   return (
     <div className={isModal ? 'space-y-4' : 'space-y-6'}>
       <Card className="border-border/60">
-        <CardHeader>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0">
-              <CardTitle className="flex items-center gap-2 text-2xl">
-                <Database className="h-6 w-6" />
-                Dataset catalog
-              </CardTitle>
-              <CardDescription>
-                Browse datasets registered for this organization with their lineage and validation
-                status. Mutations happen in the ingestion + processing pipelines.
-              </CardDescription>
-            </div>
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {canCreate && (
-                <Button
-                  onClick={() => {
-                    setRegisterInitialDatasetId(null);
-                    setRegisterOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Register metadata
-                </Button>
-              )}
-              {!isModal && (
+        {!isModal && (
+          <CardHeader>
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <CardTitle className="flex items-center gap-2 text-2xl">
+                  <Database className="h-6 w-6" />
+                  Dataset catalog
+                </CardTitle>
+                <CardDescription>
+                  Browse datasets registered for this organization with their lineage and validation
+                  status. Mutations happen in the ingestion + processing pipelines.
+                </CardDescription>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2">
+                {canCreate && (
+                  <Button
+                    onClick={() => {
+                      setRegisterInitialDatasetId(null);
+                      setRegisterOpen(true);
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Register metadata
+                  </Button>
+                )}
                 <Button variant="outline" asChild>
                   <Link href="/dashboard/data">
                     <ArrowLeft className="mr-2 h-4 w-4" />
                     Back to Data Ingestion
                   </Link>
                 </Button>
-              )}
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-3 lg:grid-cols-[minmax(220px,1fr)_auto_auto_auto] lg:items-center">
+          </CardHeader>
+        )}
+        <CardContent className={cn(isModal && 'p-4')}>
+          <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto] xl:items-center">
             <Input
               placeholder="Search by name, description, or tag"
               value={search}
@@ -435,97 +436,108 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 {filtered.length} of {catalogItems.length} datasets
               </span>
             )}
-          </div>
-          <div className="mt-4 grid gap-3 border-t border-border pt-4 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <div className="flex min-w-0 flex-wrap items-center gap-2">
-              <Input
-                inputMode="numeric"
-                placeholder="Dataset ID"
-                value={exportDatasetId}
-                onChange={(event) => setExportDatasetId(event.target.value)}
-                className="w-36"
-              />
+            {isModal && canCreate && (
               <Button
-                variant="outline"
-                onClick={requestManualExport}
-                disabled={exportingDatasetId != null}
+                className="xl:justify-self-end"
+                onClick={() => {
+                  setRegisterInitialDatasetId(null);
+                  setRegisterOpen(true);
+                }}
               >
-                {exportingDatasetId != null ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <Download className="mr-2 h-4 w-4" />
-                )}
-                Export by ID
+                <Plus className="mr-2 h-4 w-4" />
+                Register metadata
               </Button>
-              {exportFeedback && (
-                <span className="min-w-0 text-sm text-fg-muted">{exportFeedback}</span>
-              )}
-            </div>
-            {canDelete && (
-              <div className="flex min-w-0 flex-wrap items-center gap-2 md:justify-end">
+            )}
+          </div>
+          <div className="mt-4 grid gap-3 border-t border-border pt-4 lg:grid-cols-2">
+            <div className="rounded-md border border-border bg-surface-muted/35 p-3">
+              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
+                Export dataset
+              </div>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Input
                   inputMode="numeric"
                   placeholder="Dataset ID"
-                  value={deleteDatasetId}
-                  onChange={(event) => setDeleteDatasetId(event.target.value)}
+                  value={exportDatasetId}
+                  onChange={(event) => setExportDatasetId(event.target.value)}
                   className="w-36"
                 />
                 <Button
-                  variant="destructive"
-                  onClick={requestManualDelete}
-                  disabled={deleteMutation.isPending}
+                  variant="outline"
+                  onClick={requestManualExport}
+                  disabled={exportingDatasetId != null}
                 >
-                  {deleteMutation.isPending ? (
+                  {exportingDatasetId != null ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <Trash2 className="mr-2 h-4 w-4" />
+                    <Download className="mr-2 h-4 w-4" />
                   )}
-                  Delete by ID
+                  Export by ID
                 </Button>
-                {deleteFeedback && (
-                  <span className="min-w-0 text-sm text-fg-muted">{deleteFeedback}</span>
+                {exportFeedback && (
+                  <span className="min-w-0 text-sm text-fg-muted">{exportFeedback}</span>
                 )}
+              </div>
+            </div>
+            {canDelete && (
+              <div className="rounded-md border border-danger-border bg-danger-bg/45 p-3">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-danger-text">
+                  Delete dataset
+                </div>
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <Input
+                    inputMode="numeric"
+                    placeholder="Dataset ID"
+                    value={deleteDatasetId}
+                    onChange={(event) => setDeleteDatasetId(event.target.value)}
+                    className="w-36"
+                  />
+                  <Button
+                    variant="destructive"
+                    onClick={requestManualDelete}
+                    disabled={deleteMutation.isPending}
+                  >
+                    {deleteMutation.isPending ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="mr-2 h-4 w-4" />
+                    )}
+                    Delete by ID
+                  </Button>
+                  {deleteFeedback && (
+                    <span className="min-w-0 text-sm text-fg-muted">{deleteFeedback}</span>
+                  )}
+                </div>
               </div>
             )}
           </div>
         </CardContent>
       </Card>
 
-      <div className={isModal ? 'grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]' : 'space-y-4'}>
+      <div className="space-y-4">
         <Card className="min-w-0 border-border/60">
           <CardContent className="p-0">
-            <Table className={isModal ? 'min-w-[740px] table-fixed' : 'min-w-[980px] table-fixed'}>
-              {isModal ? (
-                <colgroup>
-                  <col className="w-[230px]" />
-                  <col className="w-[150px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[112px]" />
-                  <col className="w-[64px]" />
-                  {canDelete && <col className="w-[64px]" />}
-                </colgroup>
-              ) : (
-                <colgroup>
-                  <col className="w-[220px]" />
-                  <col className="w-[150px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[96px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[96px]" />
-                  <col className="w-[112px]" />
-                  <col className="w-[64px]" />
-                  {canDelete && <col className="w-[64px]" />}
-                </colgroup>
-              )}
+            <Table className="min-w-[980px] table-fixed">
+              <colgroup>
+                <col className="w-[220px]" />
+                <col className="w-[150px]" />
+                <col className="w-[120px]" />
+                <col className="w-[96px]" />
+                <col className="w-[120px]" />
+                <col className="w-[96px]" />
+                <col className="w-[112px]" />
+                <col className="w-[64px]" />
+                {canDelete && <col className="w-[64px]" />}
+              </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Source</TableHead>
                   <TableHead>Type</TableHead>
-                  {!isModal && <TableHead>Quality</TableHead>}
+                  <TableHead>Quality</TableHead>
                   <TableHead>Validation</TableHead>
-                  {!isModal && <TableHead>Records</TableHead>}
-                  {!isModal && <TableHead>Registered</TableHead>}
+                  <TableHead>Records</TableHead>
+                  <TableHead>Registered</TableHead>
                   <TableHead className="w-16 text-right">Export</TableHead>
                   {canDelete && <TableHead className="w-16 text-right">Delete</TableHead>}
                 </TableRow>
@@ -576,30 +588,24 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                           {item.has_metadata ? item.dataset_type : 'No metadata'}
                         </Badge>
                       </TableCell>
-                      {!isModal && (
-                        <TableCell className="text-sm">
-                          <QualityBadge score={item.data_quality_score} />
-                        </TableCell>
-                      )}
+                      <TableCell className="text-sm">
+                        <QualityBadge score={item.data_quality_score} />
+                      </TableCell>
                       <TableCell className="text-sm">
                         <ValidationBadge status={item.validation_status} />
                       </TableCell>
-                      {!isModal && (
-                        <TableCell className="text-sm text-fg-muted">
-                          {item.total_records?.toLocaleString() ?? '—'}
-                        </TableCell>
-                      )}
-                      {!isModal && (
-                        <TableCell className="text-sm text-fg-muted">
-                          {item.created_at
-                            ? new Date(item.created_at).toLocaleDateString(undefined, {
-                                year: 'numeric',
-                                month: 'short',
-                                day: 'numeric',
-                              })
-                            : '—'}
-                        </TableCell>
-                      )}
+                      <TableCell className="text-sm text-fg-muted">
+                        {item.total_records?.toLocaleString() ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-fg-muted">
+                        {item.created_at
+                          ? new Date(item.created_at).toLocaleDateString(undefined, {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                            })
+                          : '—'}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           variant="ghost"

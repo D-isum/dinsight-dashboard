@@ -1755,6 +1755,21 @@ export default function LiveMonitorPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold text-fg">Live Monitor</h1>
+            <Badge variant={statusLabel === 'streaming' ? 'success' : 'outline'}>
+              {statusLabel === 'not_started' ? 'Not started' : statusLabel}
+            </Badge>
+          </div>
+          <p className="max-w-3xl text-sm text-fg-muted">
+            Watch baseline and monitoring coordinates, streaming progress, latest points, and
+            boundary-based abnormal behavior in one live workspace.
+          </p>
+        </div>
+      </div>
+
       <Card className={cn('border', stateTone[machineStatus.state])}>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
           <div>

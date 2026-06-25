@@ -1137,7 +1137,7 @@ export default function DataIngestionPage() {
         onOpenChange={setIsCatalogOpen}
         title="Dataset Catalog"
         description="Browse processed datasets, export CSVs, register metadata, inspect lineage, run validation, and delete obsolete datasets."
-        contentClassName="w-[94vw] sm:max-w-[1180px]"
+        contentClassName="w-[96vw] sm:max-w-[1320px]"
       >
         <DatasetCatalog variant="modal" />
       </ConfigDialog>

@@ -1919,6 +1919,24 @@ export default function HealthInsightsPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-2xl font-semibold text-fg">Health Insights</h1>
+            <Badge variant={canRunWearTrend ? 'secondary' : 'outline'}>
+              {canRunWearTrend ? 'Ready to run' : 'Configure baseline selection'}
+            </Badge>
+            {streamingStatus?.is_active && hasAppliedWearTrendRun && appliedIncludeMonitoring && (
+              <Badge variant="outline">Live updating</Badge>
+            )}
+          </div>
+          <p className="max-w-3xl text-sm text-fg-muted">
+            Configure baseline behavior, review deterioration distance, and inspect interval
+            transitions with interactive ECharts plots.
+          </p>
+        </div>
+      </div>
+
       <Card className="border-border/60">
         <CardContent className="space-y-4 py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1941,12 +1959,6 @@ export default function HealthInsightsPage() {
                   </>
                 )}
               </Button>
-              <Badge variant={canRunWearTrend ? 'secondary' : 'outline'}>
-                {canRunWearTrend ? 'Ready to run' : 'Configure baseline selection'}
-              </Badge>
-              {streamingStatus?.is_active && hasAppliedWearTrendRun && appliedIncludeMonitoring && (
-                <Badge variant="outline">Live updating</Badge>
-              )}
               {hasPendingChanges && <Badge variant="outline">Selection changed</Badge>}
               {lastWearTrendRunAt && (
                 <Badge variant="outline">
