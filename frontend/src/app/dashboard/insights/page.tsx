@@ -41,6 +41,7 @@ import {
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { STREAMING_MONITORING_EMPHASIS_POINTS } from '@/lib/chart-focus-config';
+import { EChartsCanvas } from '@/components/charts/echarts-canvas';
 import {
   AppliedWearTrendConfig,
   DraftWearTrendConfig,
@@ -58,6 +59,7 @@ import {
 } from '@/lib/insights-wear-config';
 
 import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
+import type { EChartsOption } from 'echarts';
 const INSIGHTS_UI_PREFS_KEY = 'insights-ui-prefs-v1';
 const DISTANCE_AXIS_BASE_MAX = 2;
 const DISTANCE_WARNING_FALLBACK = 0.8;
@@ -1595,6 +1597,348 @@ export default function HealthInsightsPage() {
     };
   }, [datasetId, distanceSummary, plotTheme, shouldRenderWearPlots, wearResult]);
 
+  const distanceEChart = useMemo(() => {
+    if (!shouldRenderWearPlots || !wearResult?.intervals?.length) {
+      return null;
+    }
+
+    const sorted = [...wearResult.intervals].sort((a, b) => a.sort_index - b.sort_index);
+    const xValues = sorted.map((interval) => interval.sort_index);
+    const labelByX = new Map(
+      sorted.map((interval) => [interval.sort_index, interval.metadata_value])
+    );
+    const warningThreshold = distanceSummary.warningThreshold;
+    const dangerThreshold = distanceSummary.dangerThreshold;
+    const distanceValues = sorted
+      .map((interval) => interval.distance_from_g0)
+      .filter((value) => Number.isFinite(value) && value >= 0);
+    const xAxisRange = buildPaddedAxisRange(xValues, { minSpan: 1, paddingRatio: 0.03 });
+    const yAxisRange = buildPaddedAxisRange(
+      [...distanceValues, DISTANCE_AXIS_BASE_MAX, warningThreshold, dangerThreshold],
+      {
+        includeZero: true,
+        lowerBound: 0,
+        minSpan: 0.25,
+        paddingRatio: 0.08,
+      }
+    );
+    const baselineSeries = sorted.map((interval) =>
+      interval.dataset_type === 'baseline' ? interval.distance_from_g0 : null
+    );
+    const monitoringSeries = sorted.map((interval) =>
+      interval.dataset_type === 'monitoring' ? interval.distance_from_g0 : null
+    );
+    const baselineRollingSeries = rollingMean(baselineSeries, 12);
+    const monitoringRollingSeries = rollingMean(monitoringSeries, 12);
+    const monitoringIndices = sorted
+      .map((interval, index) => (interval.dataset_type === 'monitoring' ? index : -1))
+      .filter((index) => index >= 0);
+    const recentMonitoringIndexSet = new Set(
+      monitoringIndices.slice(
+        Math.max(0, monitoringIndices.length - STREAMING_MONITORING_EMPHASIS_POINTS)
+      )
+    );
+    const firstWarningIndex = sorted.findIndex(
+      (interval) =>
+        interval.dataset_type === 'monitoring' && interval.distance_from_g0 >= warningThreshold
+    );
+    const firstDangerIndex = sorted.findIndex(
+      (interval) =>
+        interval.dataset_type === 'monitoring' && interval.distance_from_g0 >= dangerThreshold
+    );
+    const crossingIndex = firstDangerIndex >= 0 ? firstDangerIndex : firstWarningIndex;
+    const crossingInterval = crossingIndex >= 0 ? sorted[crossingIndex] : null;
+    const crossingTone = firstDangerIndex >= 0 ? 'danger' : 'warning';
+    const crossingColor = crossingTone === 'danger' ? plotTheme.danger : plotTheme.warning;
+    const latestMonitoringIndex = monitoringIndices.at(-1);
+    const latestInterval =
+      latestMonitoringIndex != null && latestMonitoringIndex >= 0
+        ? sorted[latestMonitoringIndex]
+        : null;
+
+    const toPoint = (
+      interval: DeteriorationInterval,
+      extraType: 'Baseline' | 'Monitoring' = interval.dataset_type === 'baseline'
+        ? 'Baseline'
+        : 'Monitoring'
+    ) => [
+      interval.sort_index,
+      interval.distance_from_g0,
+      interval.metadata_value,
+      interval.point_count,
+      extraType,
+    ];
+    const toLinePoint = (index: number, value: number | null, label: string) =>
+      value == null ? null : [sorted[index].sort_index, value, label, sorted[index].metadata_value];
+    const selectedBaselineBands = sorted
+      .filter((interval) => interval.is_baseline_cluster)
+      .reduce<Array<{ start: number; end: number }>>((ranges, interval) => {
+        const start = interval.sort_index - 0.45;
+        const end = interval.sort_index + 0.45;
+        const last = ranges.at(-1);
+        if (last && start <= last.end + 0.05) {
+          last.end = Math.max(last.end, end);
+          return ranges;
+        }
+        ranges.push({ start, end });
+        return ranges;
+      }, []);
+
+    const markAreaData: any[] = [
+      [
+        { yAxis: warningThreshold, itemStyle: { color: alphaColor(plotTheme.warning, 0.08) } },
+        { yAxis: dangerThreshold },
+      ],
+      [
+        { yAxis: dangerThreshold, itemStyle: { color: alphaColor(plotTheme.danger, 0.07) } },
+        { yAxis: yAxisRange?.[1] ?? dangerThreshold + 0.5 },
+      ],
+      ...selectedBaselineBands.map((range) => [
+        { xAxis: range.start, itemStyle: { color: plotTheme.baselineSoft } },
+        { xAxis: range.end },
+      ]),
+    ];
+
+    const formatAxisLabel = (value: number) => {
+      const roundedValue = Math.round(value);
+      if (Math.abs(value - roundedValue) > 0.05) {
+        return '';
+      }
+      const label = labelByX.get(roundedValue);
+      return label ? formatIntervalTick(label).replace('<br>', '\n') : `#${roundedValue}`;
+    };
+    const formatDistanceAxisLabel = (value: number) =>
+      Number(value).toLocaleString(undefined, {
+        maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
+      });
+
+    const tooltipFormatter = (params: any) => {
+      const item = Array.isArray(params) ? params[0] : params;
+      const value = item?.data?.value ?? item?.data;
+      if (!Array.isArray(value)) {
+        return '';
+      }
+
+      if (/threshold/i.test(item.seriesName ?? '')) {
+        return `<b>${item.seriesName}</b><br/>Distance: ${Number(value[1]).toFixed(4)}`;
+      }
+
+      if (
+        item.seriesName === 'Baseline rolling mean' ||
+        item.seriesName === 'Monitoring rolling mean'
+      ) {
+        return `<b>${item.seriesName}</b><br/>Interval: ${value[3] ?? value[2]}<br/>Distance: ${Number(value[1]).toFixed(4)}`;
+      }
+
+      const pointCount = value[3] != null ? `<br/>${Number(value[3]).toLocaleString()} pts` : '';
+      return `<b>${item.seriesName}</b><br/>Interval: ${value[2] ?? formatAxisLabel(value[0])}${pointCount}<br/>Distance: ${Number(value[1]).toFixed(4)}`;
+    };
+
+    const option: EChartsOption = {
+      animation: false,
+      backgroundColor: 'transparent',
+      color: [
+        plotTheme.baseline,
+        plotTheme.baselineRolling,
+        plotTheme.warning,
+        plotTheme.danger,
+        plotTheme.monitoring,
+        plotTheme.monitoringRolling,
+        plotTheme.latest,
+      ],
+      tooltip: {
+        trigger: 'item',
+        confine: true,
+        axisPointer: { type: 'cross' },
+        formatter: tooltipFormatter,
+      },
+      legend: {
+        type: 'scroll',
+        top: 0,
+        left: 4,
+        right: 150,
+        itemWidth: 12,
+        itemHeight: 8,
+      },
+      toolbox: {
+        show: true,
+        right: 8,
+        top: 0,
+        feature: {
+          dataZoom: { yAxisIndex: 'none' },
+          brush: { type: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'] },
+          restore: {},
+          saveAsImage: { pixelRatio: 2 },
+        },
+      },
+      brush: {
+        toolbox: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'],
+        xAxisIndex: 0,
+        brushMode: 'multiple',
+        throttleType: 'debounce',
+        throttleDelay: 250,
+      },
+      grid: { top: 64, right: 72, bottom: 104, left: 82, containLabel: true },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 24, bottom: 34 },
+        { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', yAxisIndex: 0, filterMode: 'none', width: 18, right: 18 },
+      ],
+      xAxis: {
+        type: 'value',
+        name: `${wearResult.metadata_column} (Interval Order)`,
+        nameLocation: 'middle',
+        nameGap: 46,
+        min: xAxisRange?.[0],
+        max: xAxisRange?.[1],
+        axisLabel: { formatter: formatAxisLabel, hideOverlap: true },
+        splitLine: { lineStyle: { color: alphaColor(plotTheme.chartGrid, 0.75) } },
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Distance from baseline reference G0',
+        nameLocation: 'middle',
+        nameGap: 56,
+        min: yAxisRange?.[0],
+        max: yAxisRange?.[1],
+        axisLabel: { formatter: formatDistanceAxisLabel },
+        splitLine: { lineStyle: { color: alphaColor(plotTheme.chartGrid, 0.75) } },
+      },
+      series: [
+        {
+          type: 'line',
+          name: 'Baseline',
+          data: sorted
+            .filter((interval) => interval.dataset_type === 'baseline')
+            .map((interval) => toPoint(interval, 'Baseline')),
+          showSymbol: true,
+          symbolSize: 5.5,
+          lineStyle: { width: 1.7, color: alphaColor(plotTheme.baseline, 0.82) },
+          itemStyle: { color: alphaColor(plotTheme.baseline, 0.82) },
+          connectNulls: false,
+          progressive: 800,
+          markArea: { silent: true, data: markAreaData },
+        },
+        {
+          type: 'line',
+          name: 'Baseline rolling mean',
+          data: baselineRollingSeries
+            .map((value, index) => toLinePoint(index, value, 'Baseline rolling mean'))
+            .filter(Boolean),
+          showSymbol: false,
+          lineStyle: { color: plotTheme.baselineRolling, width: 4 },
+          progressive: 800,
+        },
+        {
+          type: 'line',
+          name: `Warning threshold (${warningThreshold.toFixed(3)})`,
+          data: [
+            [xAxisRange?.[0] ?? xValues[0] ?? 0, warningThreshold],
+            [xAxisRange?.[1] ?? xValues.at(-1) ?? 1, warningThreshold],
+          ],
+          showSymbol: false,
+          lineStyle: { color: plotTheme.warning, width: 2, type: 'dotted' },
+        },
+        {
+          type: 'line',
+          name: `Danger threshold (${dangerThreshold.toFixed(3)})`,
+          data: [
+            [xAxisRange?.[0] ?? xValues[0] ?? 0, dangerThreshold],
+            [xAxisRange?.[1] ?? xValues.at(-1) ?? 1, dangerThreshold],
+          ],
+          showSymbol: false,
+          lineStyle: { color: plotTheme.danger, width: 2, type: 'dotted' },
+        },
+        {
+          type: 'line',
+          name: 'Monitoring history',
+          data: sorted
+            .filter(
+              (interval, index) =>
+                interval.dataset_type === 'monitoring' && !recentMonitoringIndexSet.has(index)
+            )
+            .map((interval) => toPoint(interval, 'Monitoring')),
+          showSymbol: true,
+          symbolSize: 4.5,
+          lineStyle: { color: alphaColor(plotTheme.monitoring, 0.18), width: 1.2 },
+          itemStyle: { color: alphaColor(plotTheme.monitoring, 0.26) },
+          progressive: 800,
+        },
+        {
+          type: 'line',
+          name: 'Monitoring recent',
+          data: sorted
+            .filter(
+              (interval, index) =>
+                interval.dataset_type === 'monitoring' && recentMonitoringIndexSet.has(index)
+            )
+            .map((interval) => toPoint(interval, 'Monitoring')),
+          showSymbol: true,
+          symbolSize: 5.5,
+          lineStyle: { color: alphaColor(plotTheme.monitoring, 0.9), width: 2.2 },
+          itemStyle: { color: alphaColor(plotTheme.monitoring, 0.88) },
+          progressive: 800,
+        },
+        {
+          type: 'line',
+          name: 'Monitoring rolling mean',
+          data: monitoringRollingSeries
+            .map((value, index) => toLinePoint(index, value, 'Monitoring rolling mean'))
+            .filter(Boolean),
+          showSymbol: false,
+          lineStyle: { color: plotTheme.monitoringRolling, width: 4 },
+          progressive: 800,
+        },
+        ...(latestInterval
+          ? [
+              {
+                type: 'scatter',
+                name: 'Latest interval',
+                data: [toPoint(latestInterval, 'Monitoring')],
+                symbolSize: 14,
+                itemStyle: {
+                  color: plotTheme.latest,
+                  borderColor: plotTheme.latestLine,
+                  borderWidth: 2,
+                },
+                z: 20,
+              },
+            ]
+          : []),
+        ...(crossingInterval
+          ? [
+              {
+                type: 'scatter',
+                name: crossingTone === 'danger' ? 'Danger crossing' : 'Warning crossing',
+                data: [toPoint(crossingInterval, 'Monitoring')],
+                symbol: 'diamond',
+                symbolSize: 14,
+                itemStyle: {
+                  color: crossingColor,
+                  borderColor: plotTheme.surface,
+                  borderWidth: 1.5,
+                },
+                z: 21,
+                markLine: {
+                  silent: true,
+                  symbol: 'none',
+                  lineStyle: {
+                    color: crossingColor,
+                    width: 2,
+                    type: crossingTone === 'danger' ? 'dashed' : 'solid',
+                  },
+                  data: [{ xAxis: crossingInterval.sort_index }],
+                },
+              },
+            ]
+          : []),
+      ] as any,
+    };
+
+    return { option };
+  }, [distanceSummary, plotTheme, shouldRenderWearPlots, wearResult]);
+
   const transitionPlot = useMemo(() => {
     if (!shouldRenderWearPlots) {
       return null;
@@ -2543,7 +2887,7 @@ export default function HealthInsightsPage() {
                       {distancePlot ? (
                         <ChartFrame
                           title="Distance from baseline"
-                          description={`Monitoring movement from selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
+                          description={`Apache ECharts pilot. Monitoring movement from selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
                           stats={
                             <>
                               <ChartStat
@@ -2626,16 +2970,28 @@ export default function HealthInsightsPage() {
                           bodyClassName="p-2"
                         >
                           <div className="h-[540px]">
-                            <Plot
-                              key={`distance-${isControlsCollapsed ? 'expanded' : 'with-controls'}`}
-                              data={distancePlot.data as any}
-                              layout={distancePlot.layout as any}
-                              config={distancePlot.config as any}
-                              revision={distancePlot.revision}
-                              useResizeHandler
-                              style={{ width: '100%', height: '100%' }}
-                            />
+                            {distanceEChart ? (
+                              <EChartsCanvas
+                                option={distanceEChart.option}
+                                style={{ width: '100%', height: '100%' }}
+                              />
+                            ) : (
+                              <Plot
+                                key={`distance-${isControlsCollapsed ? 'expanded' : 'with-controls'}`}
+                                data={distancePlot.data as any}
+                                layout={distancePlot.layout as any}
+                                config={distancePlot.config as any}
+                                revision={distancePlot.revision}
+                                useResizeHandler
+                                style={{ width: '100%', height: '100%' }}
+                              />
+                            )}
                           </div>
+                          <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
+                            Pilot interactions: use the ECharts toolbox for zoom, brush, restore,
+                            and image export; use the bottom/right sliders or mouse wheel to inspect
+                            dense ranges.
+                          </p>
                         </ChartFrame>
                       ) : (
                         <p className="text-sm text-muted-foreground">
