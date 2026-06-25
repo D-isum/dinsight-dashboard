@@ -52,6 +52,7 @@ import {
   pickNewestDraftWearConfig,
   pickNewestWearConfig,
 } from '@/lib/insights-wear-config';
+import { cn } from '@/utils/cn';
 
 import type { EChartsOption } from 'echarts';
 const INSIGHTS_UI_PREFS_KEY = 'insights-ui-prefs-v1';
@@ -1939,38 +1940,6 @@ export default function HealthInsightsPage() {
 
       <Card className="border-border/60">
         <CardContent className="space-y-4 py-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsControlsCollapsed((prev) => !prev)}
-                className="gap-2"
-              >
-                {isControlsCollapsed ? (
-                  <>
-                    <PanelLeftOpen className="h-4 w-4" />
-                    Show controls
-                  </>
-                ) : (
-                  <>
-                    <PanelLeftClose className="h-4 w-4" />
-                    Hide controls
-                  </>
-                )}
-              </Button>
-              {hasPendingChanges && <Badge variant="outline">Selection changed</Badge>}
-              {lastWearTrendRunAt && (
-                <Badge variant="outline">
-                  Last run {new Date(lastWearTrendRunAt).toLocaleTimeString()}
-                </Badge>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Shortcut: <strong>Ctrl/Cmd+Enter</strong> run wear trend.
-            </p>
-          </div>
-
           <div className="grid gap-3 xl:grid-cols-12">
             <div className="space-y-2 xl:col-span-3">
               <label className="text-sm font-medium">Device / source</label>
@@ -2023,10 +1992,18 @@ export default function HealthInsightsPage() {
             </div>
 
             <div className="rounded-lg border border-input bg-muted/20 p-3 xl:col-span-4">
-              <p className="text-sm font-medium">Workflow guide</p>
-              <p className="text-sm text-muted-foreground">
-                Step 1: choose data. Step 2: define baseline cluster. Step 3: review results on the
-                right.
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium">Workflow guide</p>
+                {hasPendingChanges && <Badge variant="outline">Selection changed</Badge>}
+                {lastWearTrendRunAt && (
+                  <Badge variant="outline">
+                    Last run {new Date(lastWearTrendRunAt).toLocaleTimeString()}
+                  </Badge>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Choose data, define the healthy baseline cluster in Controls, then review the plots.
+                Shortcut: <strong>Ctrl/Cmd+Enter</strong> runs wear trend.
               </p>
             </div>
           </div>
@@ -2034,19 +2011,34 @@ export default function HealthInsightsPage() {
       </Card>
 
       <div
-        className={`grid grid-cols-1 gap-6 ${
-          isControlsCollapsed ? '' : 'xl:grid-cols-[minmax(300px,360px)_minmax(0,1fr)]'
-        }`}
+        className={cn(
+          'grid grid-cols-1 gap-5',
+          !isControlsCollapsed && 'xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'
+        )}
       >
         {!isControlsCollapsed && (
-          <Card className="min-w-0 border-border/60 xl:sticky xl:top-20 xl:h-fit">
-            <CardHeader>
-              <CardTitle className="text-lg">Controls</CardTitle>
-              <CardDescription>
-                Configure visualization settings and apply wear trend.
-              </CardDescription>
+          <Card className="min-w-0 border-border/60 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
+            <CardHeader className="border-b border-border/70 pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle className="text-base">Controls</CardTitle>
+                  <CardDescription className="mt-1">
+                    Baseline selection, thresholds, and analysis actions.
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsControlsCollapsed(true)}
+                  className="shrink-0 gap-2"
+                  aria-label="Hide controls"
+                >
+                  <PanelLeftClose className="h-4 w-4" />
+                  Hide
+                </Button>
+              </div>
             </CardHeader>
-            <CardContent className="space-y-5 xl:max-h-[calc(100vh-9.5rem)] xl:overflow-y-auto">
+            <CardContent className="space-y-5 py-4 xl:max-h-[calc(100vh-13rem)] xl:overflow-y-auto">
               <div className="space-y-2">
                 <label className="text-sm font-medium">Wear trend column</label>
                 <select
@@ -2377,7 +2369,27 @@ export default function HealthInsightsPage() {
           </Card>
         )}
 
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-5">
+          {isControlsCollapsed && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-fg">Controls hidden</p>
+                <p className="text-xs text-fg-muted">
+                  The plot workspace is using the full available width.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsControlsCollapsed(false)}
+                className="gap-2"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+                Show controls
+              </Button>
+            </div>
+          )}
+
           <Card className="border-border/60">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
@@ -2619,7 +2631,7 @@ export default function HealthInsightsPage() {
                           }
                           bodyClassName="p-2"
                         >
-                          <div className="h-[540px]">
+                          <div className="h-[clamp(560px,72vh,780px)]">
                             <EChartsCanvas
                               option={distanceEChart.option}
                               style={{ width: '100%', height: '100%' }}
@@ -2806,7 +2818,7 @@ export default function HealthInsightsPage() {
                           }
                           bodyClassName="p-2"
                         >
-                          <div className="h-[540px]">
+                          <div className="h-[clamp(560px,72vh,780px)]">
                             <EChartsCanvas
                               option={transitionPlot.option}
                               style={{ width: '100%', height: '100%' }}

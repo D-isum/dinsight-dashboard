@@ -7,6 +7,8 @@ import {
   Activity,
   ArrowRight,
   Clock,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pause,
   Play,
   RefreshCw,
@@ -102,6 +104,7 @@ type PersistedLiveMonitorPreferences = {
   selectedId?: number;
   manualDatasetId?: string;
   autoRefresh?: boolean;
+  isControlsCollapsed?: boolean;
   streamSpeed?: '0.5x' | '1x' | '2x';
   showAdvanced?: boolean;
   pointSize?: number;
@@ -484,6 +487,7 @@ export default function LiveMonitorPage() {
   const [manualDatasetId, setManualDatasetId] = useState('');
   const [datasetError, setDatasetError] = useState<string | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [isControlsCollapsed, setIsControlsCollapsed] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamSpeed, setStreamSpeed] = useState<'0.5x' | '1x' | '2x'>('1x');
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -696,6 +700,9 @@ export default function LiveMonitorPage() {
       }
       if (typeof parsed.manualDatasetId === 'string') setManualDatasetId(parsed.manualDatasetId);
       if (typeof parsed.autoRefresh === 'boolean') setAutoRefresh(parsed.autoRefresh);
+      if (typeof parsed.isControlsCollapsed === 'boolean') {
+        setIsControlsCollapsed(parsed.isControlsCollapsed);
+      }
       if (
         parsed.streamSpeed === '0.5x' ||
         parsed.streamSpeed === '1x' ||
@@ -856,6 +863,7 @@ export default function LiveMonitorPage() {
       selectedId,
       manualDatasetId,
       autoRefresh,
+      isControlsCollapsed,
       streamSpeed,
       showAdvanced,
       pointSize,
@@ -925,6 +933,7 @@ export default function LiveMonitorPage() {
     boundaries,
     enableMultipleSelections,
     followLatest,
+    isControlsCollapsed,
     isPrefsHydrated,
     manualDatasetId,
     manualSelectionEnabled,
@@ -1808,466 +1817,515 @@ export default function LiveMonitorPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(300px,340px)_minmax(0,1fr)]">
-        <Card className="min-w-0 border-border/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Activity className="h-5 w-5" />
-              Live Controls
-            </CardTitle>
-            <CardDescription>
-              Start or pause simulated streaming, define normal-area boundaries, and inspect status.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Device / source</label>
-              <DatasetSourceSelect
-                groups={datasetSourceGroups}
-                selectedSourceKey={selectedSourceKey}
-                onChange={setSelectedSourceKey}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Dataset</label>
-              <select
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={selectedId != null ? String(selectedId) : ''}
-                onChange={(event) => {
-                  const nextValue = event.target.value;
-                  setSelectedId(nextValue ? Number(nextValue) : null);
-                }}
-              >
-                <option value="">Select dataset</option>
-                {filteredDatasets.map((dataset) => (
-                  <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    {formatDatasetOptionLabel(dataset)}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-muted-foreground">
-                {isLoadingDatasets
-                  ? 'Loading datasets...'
-                  : `${filteredDatasets.length} dataset(s) available for this source`}
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Manual dataset ID</label>
-              <div className="flex gap-2">
-                <Input
-                  value={manualDatasetId}
-                  onChange={(event) => setManualDatasetId(event.target.value)}
-                  placeholder="e.g. 14"
-                />
-                <Button variant="outline" onClick={applyManualDataset}>
-                  Apply
-                </Button>
-              </div>
-              {datasetError && <p className="text-xs text-danger-text">{datasetError}</p>}
-            </div>
-
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
-              <Button onClick={startStreaming} disabled={!selectedId || isStreaming}>
-                <Play className="mr-2 h-4 w-4" />
-                Start stream
-              </Button>
-              <Button
-                variant="outline"
-                onClick={toggleStreaming}
-                disabled={!selectedId}
-                className="w-full"
-              >
-                {isStreaming ? (
-                  <>
-                    <Pause className="mr-2 h-4 w-4" />
-                    Pause stream
-                  </>
-                ) : (
-                  <>
-                    <Play className="mr-2 h-4 w-4" />
-                    Resume stream
-                  </>
-                )}
-              </Button>
-              <Button variant="outline" onClick={stopStreaming} disabled={!selectedId}>
-                <Square className="mr-2 h-4 w-4" />
-                Stop stream
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => void resetStreamingState()}
-                disabled={!selectedId}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Reset stream state
-              </Button>
-            </div>
-
-            <div className="space-y-2 rounded-md border border-input p-3">
-              <p className="text-sm font-medium">Streaming speed</p>
-              <div className="grid grid-cols-3 gap-2">
-                {(['0.5x', '1x', '2x'] as const).map((speed) => (
-                  <Button
-                    key={speed}
-                    size="sm"
-                    variant={streamSpeed === speed ? 'default' : 'outline'}
-                    onClick={() => setStreamSpeed(speed)}
-                  >
-                    {speed}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Refresh every {isStreaming ? refreshIntervalMs / 1000 : 10}s
-              </p>
-            </div>
-
-            <div className="flex items-center justify-between rounded-md border border-input px-3 py-2">
-              <span className="text-sm">Auto refresh</span>
-              <button
-                type="button"
-                onClick={() => setAutoRefresh((prev) => !prev)}
-                className={cn(
-                  'h-6 w-11 rounded-full p-1 transition-colors',
-                  autoRefresh ? 'bg-accent' : 'bg-surface-muted'
-                )}
-                aria-pressed={autoRefresh}
-                aria-label="Toggle auto refresh"
-              >
-                <span
-                  className={cn(
-                    'block h-4 w-4 rounded-full bg-white transition-transform',
-                    autoRefresh ? 'translate-x-5' : 'translate-x-0'
-                  )}
-                />
-              </button>
-            </div>
-
-            <div className="space-y-3 rounded-md border border-input p-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium">Plot focus</p>
-                <Badge variant={monitorView === 'recent' ? 'info' : 'outline'}>
-                  {monitorView === 'recent' ? `Recent ${LIVE_RECENT_WINDOW_POINTS}` : 'All points'}
-                </Badge>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+      <div
+        className={cn(
+          'grid grid-cols-1 gap-5',
+          !isControlsCollapsed && 'xl:grid-cols-[minmax(280px,320px)_minmax(0,1fr)]'
+        )}
+      >
+        {!isControlsCollapsed && (
+          <Card className="min-w-0 border-border/60 xl:sticky xl:top-20 xl:max-h-[calc(100vh-6rem)] xl:overflow-hidden">
+            <CardHeader className="border-b border-border/70 pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Activity className="h-5 w-5" />
+                    Live Controls
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    Streaming controls, normal-area boundaries, and hover metadata.
+                  </CardDescription>
+                </div>
                 <Button
-                  size="sm"
-                  variant={monitorView === 'all' ? 'default' : 'outline'}
-                  onClick={() => setMonitorView('all')}
-                >
-                  All points
-                </Button>
-                <Button
-                  size="sm"
-                  variant={monitorView === 'recent' ? 'default' : 'outline'}
-                  onClick={() => setMonitorView('recent')}
-                >
-                  Recent
-                </Button>
-              </div>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={followLatest}
-                  onChange={(event) => setFollowLatest(event.target.checked)}
-                />
-                Follow latest range
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={showTrajectoryLine}
-                  onChange={(event) => setShowTrajectoryLine(event.target.checked)}
-                />
-                Show faint trajectory line
-              </label>
-            </div>
-
-            <Button variant="outline" onClick={refreshNow} className="w-full">
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh now
-            </Button>
-
-            <div className="rounded-lg border border-input p-3 text-sm space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <Badge
                   variant="outline"
-                  className={cn(
-                    statusLabel === 'completed' && 'border-success-border text-success-text',
-                    statusLabel === 'streaming' && 'border-info-border text-info-text',
-                    statusLabel === 'not_started' && 'border-strong text-fg'
-                  )}
+                  size="sm"
+                  onClick={() => setIsControlsCollapsed(true)}
+                  className="shrink-0 gap-2"
+                  aria-label="Hide live controls"
                 >
-                  {statusLabel === 'completed'
-                    ? 'Completed'
-                    : statusLabel === 'streaming'
-                      ? 'Streaming'
-                      : 'Not started'}
-                </Badge>
+                  <PanelLeftClose className="h-4 w-4" />
+                  Hide
+                </Button>
               </div>
-              <Progress value={streamingStatus?.progress_percentage ?? 0} className="w-full" />
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <p className="text-muted-foreground">Streamed</p>
-                  <p className="font-semibold">{streamingStatus?.streamed_points ?? 0}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Total</p>
-                  <p className="font-semibold">{streamingStatus?.total_points ?? 0}</p>
-                </div>
+            </CardHeader>
+            <CardContent className="space-y-4 py-4 xl:max-h-[calc(100vh-13rem)] xl:overflow-y-auto">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Device / source</label>
+                <DatasetSourceSelect
+                  groups={datasetSourceGroups}
+                  selectedSourceKey={selectedSourceKey}
+                  onChange={setSelectedSourceKey}
+                />
               </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <p className="text-muted-foreground">Batch size</p>
-                  <p className="font-semibold">{streamingStatus?.batch_size ?? '-'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Delay</p>
-                  <p className="font-semibold">
-                    {streamingStatus ? `${streamingStatus.delay_seconds}s` : '-'}
-                  </p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div>
-                  <p className="text-muted-foreground">Glow points</p>
-                  <p className="font-semibold">{latestGlowCount}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Trail points</p>
-                  <p className="font-semibold">{trailPoints}</p>
-                </div>
-              </div>
-            </div>
 
-            <Button
-              onClick={() => void runQuickHealthCheck()}
-              disabled={
-                !selectedId || isAnalyzing || monitoringCount === 0 || manualSelectionEnabled
-              }
-              className="w-full"
-            >
-              {isAnalyzing ? 'Checking status...' : 'Run anomaly check'}
-            </Button>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Dataset</label>
+                <select
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={selectedId != null ? String(selectedId) : ''}
+                  onChange={(event) => {
+                    const nextValue = event.target.value;
+                    setSelectedId(nextValue ? Number(nextValue) : null);
+                  }}
+                >
+                  <option value="">Select dataset</option>
+                  {filteredDatasets.map((dataset) => (
+                    <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
+                      {formatDatasetOptionLabel(dataset)}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  {isLoadingDatasets
+                    ? 'Loading datasets...'
+                    : `${filteredDatasets.length} dataset(s) available for this source`}
+                </p>
+              </div>
 
-            <Button
-              variant={manualSelectionEnabled ? 'default' : 'outline'}
-              className="w-full"
-              onClick={() => {
-                setManualSelectionEnabled((prev) => !prev);
-                setAnomalyResult(null);
-              }}
-            >
-              {manualSelectionEnabled ? 'Manual selection ON' : 'Manual selection OFF'}
-            </Button>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Manual dataset ID</label>
+                <div className="flex gap-2">
+                  <Input
+                    value={manualDatasetId}
+                    onChange={(event) => setManualDatasetId(event.target.value)}
+                    placeholder="e.g. 14"
+                  />
+                  <Button variant="outline" onClick={applyManualDataset}>
+                    Apply
+                  </Button>
+                </div>
+                {datasetError && <p className="text-xs text-danger-text">{datasetError}</p>}
+              </div>
 
-            {manualSelectionEnabled && (
-              <div className="space-y-3 rounded-lg border border-input p-3">
-                <p className="text-sm font-medium">Normal-area boundary shape</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {(['rectangle', 'lasso', 'circle', 'oval'] as SelectionMode[]).map((mode) => (
+              <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
+                <Button onClick={startStreaming} disabled={!selectedId || isStreaming}>
+                  <Play className="mr-2 h-4 w-4" />
+                  Start stream
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={toggleStreaming}
+                  disabled={!selectedId}
+                  className="w-full"
+                >
+                  {isStreaming ? (
+                    <>
+                      <Pause className="mr-2 h-4 w-4" />
+                      Pause stream
+                    </>
+                  ) : (
+                    <>
+                      <Play className="mr-2 h-4 w-4" />
+                      Resume stream
+                    </>
+                  )}
+                </Button>
+                <Button variant="outline" onClick={stopStreaming} disabled={!selectedId}>
+                  <Square className="mr-2 h-4 w-4" />
+                  Stop stream
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => void resetStreamingState()}
+                  disabled={!selectedId}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Reset stream state
+                </Button>
+              </div>
+
+              <div className="space-y-2 rounded-md border border-input p-3">
+                <p className="text-sm font-medium">Streaming speed</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['0.5x', '1x', '2x'] as const).map((speed) => (
                     <Button
-                      key={mode}
+                      key={speed}
                       size="sm"
-                      variant={selectionMode === mode ? 'default' : 'outline'}
-                      onClick={() => setSelectionMode(mode)}
+                      variant={streamSpeed === speed ? 'default' : 'outline'}
+                      onClick={() => setStreamSpeed(speed)}
                     >
-                      {mode}
+                      {speed}
                     </Button>
                   ))}
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Refresh every {isStreaming ? refreshIntervalMs / 1000 : 10}s
+                </p>
+              </div>
 
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={enableMultipleSelections}
-                    onChange={(event) => setEnableMultipleSelections(event.target.checked)}
+              <div className="flex items-center justify-between rounded-md border border-input px-3 py-2">
+                <span className="text-sm">Auto refresh</span>
+                <button
+                  type="button"
+                  onClick={() => setAutoRefresh((prev) => !prev)}
+                  className={cn(
+                    'h-6 w-11 rounded-full p-1 transition-colors',
+                    autoRefresh ? 'bg-accent' : 'bg-surface-muted'
+                  )}
+                  aria-pressed={autoRefresh}
+                  aria-label="Toggle auto refresh"
+                >
+                  <span
+                    className={cn(
+                      'block h-4 w-4 rounded-full bg-white transition-transform',
+                      autoRefresh ? 'translate-x-5' : 'translate-x-0'
+                    )}
                   />
-                  Enable multiple normal areas
-                </label>
+                </button>
+              </div>
 
-                <div className="flex gap-2">
+              <div className="space-y-3 rounded-md border border-input p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-medium">Plot focus</p>
+                  <Badge variant={monitorView === 'recent' ? 'info' : 'outline'}>
+                    {monitorView === 'recent'
+                      ? `Recent ${LIVE_RECENT_WINDOW_POINTS}`
+                      : 'All points'}
+                  </Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
                   <Button
-                    variant="outline"
                     size="sm"
-                    onClick={clearBoundaries}
-                    disabled={boundaries.length === 0}
+                    variant={monitorView === 'all' ? 'default' : 'outline'}
+                    onClick={() => setMonitorView('all')}
                   >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear areas
+                    All points
                   </Button>
-                  <span className="self-center text-xs text-muted-foreground">
-                    {boundaries.length} area(s)
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setShowAdvanced((prev) => !prev)}
-            >
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
-              {showAdvanced ? 'Hide advanced' : 'Show advanced'}
-            </Button>
-
-            {showAdvanced && (
-              <div className="space-y-3 rounded-lg border border-input p-3">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium">Point size: {pointSize}</label>
-                  <input
-                    type="range"
-                    min={4}
-                    max={14}
-                    step={1}
-                    value={pointSize}
-                    onChange={(event) => setPointSize(Number(event.target.value))}
-                    className="w-full"
-                  />
+                  <Button
+                    size="sm"
+                    variant={monitorView === 'recent' ? 'default' : 'outline'}
+                    onClick={() => setMonitorView('recent')}
+                  >
+                    Recent
+                  </Button>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
-                    checked={showContours}
-                    onChange={(event) => setShowContours(event.target.checked)}
+                    checked={followLatest}
+                    onChange={(event) => setFollowLatest(event.target.checked)}
                   />
-                  Show baseline contours
+                  Follow latest range
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={showTrajectoryLine}
+                    onChange={(event) => setShowTrajectoryLine(event.target.checked)}
+                  />
+                  Show faint trajectory line
                 </label>
               </div>
-            )}
 
-            <MetadataHoverControls
-              availableKeys={availableMetadataKeys}
-              selectedKeys={selectedMetadataKeys}
-              onToggleKey={toggleMetadataKey}
-              onSelectAll={selectAllMetadataKeys}
-              onClearAll={clearMetadataKeys}
-              metadataEnabled={metadataEnabled}
-              onToggleEnabled={setMetadataEnabled}
-              disabled={!selectedId}
-            />
+              <Button variant="outline" onClick={refreshNow} className="w-full">
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Refresh now
+              </Button>
 
-            {manualClassification && (
-              <div className="rounded-lg border border-input p-3 text-sm">
-                <p className="font-medium">Manual classification</p>
-                <p>Normal: {manualClassification.normalIndices.length}</p>
-                <p>Anomaly: {manualClassification.anomalyIndices.length}</p>
+              <div className="rounded-lg border border-input p-3 text-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Status</span>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      statusLabel === 'completed' && 'border-success-border text-success-text',
+                      statusLabel === 'streaming' && 'border-info-border text-info-text',
+                      statusLabel === 'not_started' && 'border-strong text-fg'
+                    )}
+                  >
+                    {statusLabel === 'completed'
+                      ? 'Completed'
+                      : statusLabel === 'streaming'
+                        ? 'Streaming'
+                        : 'Not started'}
+                  </Badge>
+                </div>
+                <Progress value={streamingStatus?.progress_percentage ?? 0} className="w-full" />
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Streamed</p>
+                    <p className="font-semibold">{streamingStatus?.streamed_points ?? 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Total</p>
+                    <p className="font-semibold">{streamingStatus?.total_points ?? 0}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Batch size</p>
+                    <p className="font-semibold">{streamingStatus?.batch_size ?? '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Delay</p>
+                    <p className="font-semibold">
+                      {streamingStatus ? `${streamingStatus.delay_seconds}s` : '-'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-muted-foreground">Glow points</p>
+                    <p className="font-semibold">{latestGlowCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Trail points</p>
+                    <p className="font-semibold">{trailPoints}</p>
+                  </div>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
 
-        <Card className="min-w-0 border-border/60">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <ShieldAlert className="h-5 w-5" />
-              Machine Live View
-            </CardTitle>
-            <CardDescription>
-              Baseline vs monitoring trajectory with live-point highlighting and boundary-based
-              normal areas.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {(baselineError || monitoringError) && (
-              <div className="mb-4 space-y-1 rounded-lg border border-warning-border bg-warning-bg p-3 text-sm text-warning-text ">
-                {baselineError && <p>{baselineError}</p>}
-                {monitoringError && <p>{monitoringError}</p>}
-              </div>
-            )}
+              <Button
+                onClick={() => void runQuickHealthCheck()}
+                disabled={
+                  !selectedId || isAnalyzing || monitoringCount === 0 || manualSelectionEnabled
+                }
+                className="w-full"
+              >
+                {isAnalyzing ? 'Checking status...' : 'Run anomaly check'}
+              </Button>
 
-            {manualSelectionEnabled && boundaries.length > 0 && (
-              <div className="mb-4 space-y-2 rounded-lg border border-input p-3">
-                <p className="text-sm font-medium">Normal operating areas</p>
-                <div className="space-y-2">
-                  {boundaries.map((boundary, index) => (
-                    <div key={boundary.id} className="flex items-center justify-between text-sm">
-                      <span>
-                        Area {index + 1}: {boundary.type}
-                      </span>
-                      <Button variant="ghost" size="sm" onClick={() => removeBoundary(boundary.id)}>
-                        Remove
+              <Button
+                variant={manualSelectionEnabled ? 'default' : 'outline'}
+                className="w-full"
+                onClick={() => {
+                  setManualSelectionEnabled((prev) => !prev);
+                  setAnomalyResult(null);
+                }}
+              >
+                {manualSelectionEnabled ? 'Manual selection ON' : 'Manual selection OFF'}
+              </Button>
+
+              {manualSelectionEnabled && (
+                <div className="space-y-3 rounded-lg border border-input p-3">
+                  <p className="text-sm font-medium">Normal-area boundary shape</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(['rectangle', 'lasso', 'circle', 'oval'] as SelectionMode[]).map((mode) => (
+                      <Button
+                        key={mode}
+                        size="sm"
+                        variant={selectionMode === mode ? 'default' : 'outline'}
+                        onClick={() => setSelectionMode(mode)}
+                      >
+                        {mode}
                       </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                    ))}
+                  </div>
 
-            <ChartFrame
-              title="Coordinate map"
-              description={
-                followLatest
-                  ? 'Apache ECharts. Range follows the latest monitoring segment; the page and plot stay mounted.'
-                  : 'Apache ECharts. Baseline, monitoring, recent trail, and latest stream points in one view.'
-              }
-              stats={
-                <>
-                  <ChartStat label="Dataset" value={selectedId ? `#${selectedId}` : '—'} />
-                  <ChartStat label="View" value={monitorView === 'recent' ? 'Recent' : 'All'} />
-                  <ChartStat
-                    label="Streamed"
-                    value={`${monitoringCount.toLocaleString()} / ${
-                      streamingStatus?.total_points?.toLocaleString() ?? '—'
-                    }`}
-                    tone="info"
-                  />
-                  <ChartStat
-                    label="Abnormal"
-                    value={anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : '—'}
-                    tone={
-                      anomalyPercentage == null
-                        ? 'neutral'
-                        : anomalyPercentage >= 25
-                          ? 'danger'
-                          : anomalyPercentage >= 10
-                            ? 'warning'
-                            : 'success'
-                    }
-                  />
-                </>
-              }
-              actions={
-                <>
-                  <ChartSwatch color={plotTheme.baseline} label="Baseline" />
-                  <ChartSwatch color={plotTheme.monitoring} label="Monitoring" />
-                  <ChartSwatch color={plotTheme.latest} label="Latest" />
-                </>
-              }
-              bodyClassName="p-2"
-            >
-              {isLoadingBaseline || (selectedId && isLoadingMonitoring) ? (
-                <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
-                  Loading monitor view...
-                </div>
-              ) : liveEChartOption ? (
-                <>
-                  <EChartsCanvas
-                    option={liveEChartOption.option}
-                    onEvents={liveEChartEvents}
-                    style={{ width: '100%', height: 'min(62vh, 560px)', minHeight: '420px' }}
-                  />
-                  <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
-                    Interactions: use the ECharts toolbox for zoom, brush, restore, and image
-                    export; use bottom/right sliders or mouse wheel to inspect dense ranges.
-                    {showContours
-                      ? ' Baseline density overlay is rendered natively in ECharts.'
-                      : ''}
-                  </p>
-                </>
-              ) : (
-                <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
-                  Select a dataset with baseline coordinates to start live monitoring.
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={enableMultipleSelections}
+                      onChange={(event) => setEnableMultipleSelections(event.target.checked)}
+                    />
+                    Enable multiple normal areas
+                  </label>
+
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearBoundaries}
+                      disabled={boundaries.length === 0}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Clear areas
+                    </Button>
+                    <span className="self-center text-xs text-muted-foreground">
+                      {boundaries.length} area(s)
+                    </span>
+                  </div>
                 </div>
               )}
-            </ChartFrame>
-          </CardContent>
-        </Card>
+
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowAdvanced((prev) => !prev)}
+              >
+                <SlidersHorizontal className="mr-2 h-4 w-4" />
+                {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+              </Button>
+
+              {showAdvanced && (
+                <div className="space-y-3 rounded-lg border border-input p-3">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium">Point size: {pointSize}</label>
+                    <input
+                      type="range"
+                      min={4}
+                      max={14}
+                      step={1}
+                      value={pointSize}
+                      onChange={(event) => setPointSize(Number(event.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={showContours}
+                      onChange={(event) => setShowContours(event.target.checked)}
+                    />
+                    Show baseline contours
+                  </label>
+                </div>
+              )}
+
+              <MetadataHoverControls
+                availableKeys={availableMetadataKeys}
+                selectedKeys={selectedMetadataKeys}
+                onToggleKey={toggleMetadataKey}
+                onSelectAll={selectAllMetadataKeys}
+                onClearAll={clearMetadataKeys}
+                metadataEnabled={metadataEnabled}
+                onToggleEnabled={setMetadataEnabled}
+                disabled={!selectedId}
+              />
+
+              {manualClassification && (
+                <div className="rounded-lg border border-input p-3 text-sm">
+                  <p className="font-medium">Manual classification</p>
+                  <p>Normal: {manualClassification.normalIndices.length}</p>
+                  <p>Anomaly: {manualClassification.anomalyIndices.length}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        <div className="min-w-0 space-y-5">
+          {isControlsCollapsed && (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-fg">Live controls hidden</p>
+                <p className="text-xs text-fg-muted">
+                  The coordinate map is using the full available width.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsControlsCollapsed(false)}
+                className="gap-2"
+              >
+                <PanelLeftOpen className="h-4 w-4" />
+                Show controls
+              </Button>
+            </div>
+          )}
+
+          <Card className="min-w-0 border-border/60">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ShieldAlert className="h-5 w-5" />
+                Machine Live View
+              </CardTitle>
+              <CardDescription>
+                Baseline vs monitoring trajectory with live-point highlighting and boundary-based
+                normal areas.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {(baselineError || monitoringError) && (
+                <div className="mb-4 space-y-1 rounded-lg border border-warning-border bg-warning-bg p-3 text-sm text-warning-text ">
+                  {baselineError && <p>{baselineError}</p>}
+                  {monitoringError && <p>{monitoringError}</p>}
+                </div>
+              )}
+
+              {manualSelectionEnabled && boundaries.length > 0 && (
+                <div className="mb-4 space-y-2 rounded-lg border border-input p-3">
+                  <p className="text-sm font-medium">Normal operating areas</p>
+                  <div className="space-y-2">
+                    {boundaries.map((boundary, index) => (
+                      <div key={boundary.id} className="flex items-center justify-between text-sm">
+                        <span>
+                          Area {index + 1}: {boundary.type}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeBoundary(boundary.id)}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <ChartFrame
+                title="Coordinate map"
+                description={
+                  followLatest
+                    ? 'Apache ECharts. Range follows the latest monitoring segment; the page and plot stay mounted.'
+                    : 'Apache ECharts. Baseline, monitoring, recent trail, and latest stream points in one view.'
+                }
+                stats={
+                  <>
+                    <ChartStat label="Dataset" value={selectedId ? `#${selectedId}` : '—'} />
+                    <ChartStat label="View" value={monitorView === 'recent' ? 'Recent' : 'All'} />
+                    <ChartStat
+                      label="Streamed"
+                      value={`${monitoringCount.toLocaleString()} / ${
+                        streamingStatus?.total_points?.toLocaleString() ?? '—'
+                      }`}
+                      tone="info"
+                    />
+                    <ChartStat
+                      label="Abnormal"
+                      value={anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : '—'}
+                      tone={
+                        anomalyPercentage == null
+                          ? 'neutral'
+                          : anomalyPercentage >= 25
+                            ? 'danger'
+                            : anomalyPercentage >= 10
+                              ? 'warning'
+                              : 'success'
+                      }
+                    />
+                  </>
+                }
+                actions={
+                  <>
+                    <ChartSwatch color={plotTheme.baseline} label="Baseline" />
+                    <ChartSwatch color={plotTheme.monitoring} label="Monitoring" />
+                    <ChartSwatch color={plotTheme.latest} label="Latest" />
+                  </>
+                }
+                bodyClassName="p-2"
+              >
+                {isLoadingBaseline || (selectedId && isLoadingMonitoring) ? (
+                  <div className="flex h-[clamp(560px,74vh,800px)] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
+                    Loading monitor view...
+                  </div>
+                ) : liveEChartOption ? (
+                  <>
+                    <EChartsCanvas
+                      option={liveEChartOption.option}
+                      onEvents={liveEChartEvents}
+                      style={{ width: '100%', height: 'clamp(560px, 74vh, 800px)' }}
+                    />
+                    <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
+                      Interactions: use the ECharts toolbox for zoom, brush, restore, and image
+                      export; use bottom/right sliders or mouse wheel to inspect dense ranges.
+                      {showContours
+                        ? ' Baseline density overlay is rendered natively in ECharts.'
+                        : ''}
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex h-[clamp(560px,74vh,800px)] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
+                    Select a dataset with baseline coordinates to start live monitoring.
+                  </div>
+                )}
+              </ChartFrame>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card className="border-border/60">
