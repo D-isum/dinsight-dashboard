@@ -32,12 +32,7 @@ import {
   buildPaddedAxisRange,
   plotRevisionFromParts,
 } from '@/lib/plot-autoscale';
-import {
-  alphaColor,
-  createThemedPlotConfig,
-  createThemedPlotLayout,
-  usePlotTheme,
-} from '@/lib/plot-theme';
+import { alphaColor, usePlotTheme } from '@/lib/plot-theme';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { STREAMING_MONITORING_EMPHASIS_POINTS } from '@/lib/chart-focus-config';
@@ -58,7 +53,6 @@ import {
   pickNewestWearConfig,
 } from '@/lib/insights-wear-config';
 
-import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 import type { EChartsOption } from 'echarts';
 const INSIGHTS_UI_PREFS_KEY = 'insights-ui-prefs-v1';
 const DISTANCE_AXIS_BASE_MAX = 2;
@@ -1196,407 +1190,6 @@ export default function HealthInsightsPage() {
     };
   }, [distanceThresholdConfig, wearResult?.intervals]);
 
-  const distancePlot = useMemo(() => {
-    if (!shouldRenderWearPlots || !wearResult?.intervals?.length) {
-      return null;
-    }
-
-    const sorted = [...wearResult.intervals].sort((a, b) => a.sort_index - b.sort_index);
-    const x = sorted.map((interval) => interval.sort_index);
-    const fullLabels = sorted.map((interval) => interval.metadata_value);
-    const maxTicks = 5;
-    const tickStep = Math.max(1, Math.ceil(sorted.length / maxTicks));
-    const tickVals: number[] = [];
-    const tickText: string[] = [];
-
-    x.forEach((value, index) => {
-      if (index % tickStep === 0 || index === sorted.length - 1) {
-        tickVals.push(value);
-        tickText.push(fullLabels[index]);
-      }
-    });
-
-    const baselineSeries = sorted.map((interval) =>
-      interval.dataset_type === 'baseline' ? interval.distance_from_g0 : null
-    );
-    const monitoringSeries = sorted.map((interval) =>
-      interval.dataset_type === 'monitoring' ? interval.distance_from_g0 : null
-    );
-    const hasMonitoringSeries = monitoringSeries.some((value) => value != null);
-    const distanceValues = sorted
-      .map((interval) => interval.distance_from_g0)
-      .filter((value) => Number.isFinite(value) && value >= 0);
-    const warningThreshold = distanceSummary.warningThreshold;
-    const dangerThreshold = distanceSummary.dangerThreshold;
-    const xAxisRange = buildPaddedAxisRange(x, { minSpan: 1, paddingRatio: 0.03 });
-    const yAxisRange = buildPaddedAxisRange(
-      [...distanceValues, DISTANCE_AXIS_BASE_MAX, warningThreshold, dangerThreshold],
-      {
-        includeZero: true,
-        lowerBound: 0,
-        minSpan: 0.25,
-        paddingRatio: 0.08,
-      }
-    );
-    const autoscaleRevision = plotRevisionFromParts([
-      'insights-distance',
-      wearResult.metadata_column,
-      axisRangeRevisionPart(xAxisRange),
-      axisRangeRevisionPart(yAxisRange),
-    ]);
-    const monitoringIndices = sorted
-      .map((interval, index) => (interval.dataset_type === 'monitoring' ? index : -1))
-      .filter((index) => index >= 0);
-    const recentMonitoringIndexSet = new Set(
-      monitoringIndices.slice(
-        Math.max(0, monitoringIndices.length - STREAMING_MONITORING_EMPHASIS_POINTS)
-      )
-    );
-    const monitoringHistorySeries = sorted.map((interval, index) =>
-      interval.dataset_type === 'monitoring' && !recentMonitoringIndexSet.has(index)
-        ? interval.distance_from_g0
-        : null
-    );
-    const monitoringRecentSeries = sorted.map((interval, index) =>
-      interval.dataset_type === 'monitoring' && recentMonitoringIndexSet.has(index)
-        ? interval.distance_from_g0
-        : null
-    );
-    const baselineClusterShapes = sorted
-      .filter((interval) => interval.is_baseline_cluster)
-      .map((interval) => ({
-        type: 'rect',
-        x0: interval.sort_index - 0.45,
-        x1: interval.sort_index + 0.45,
-        y0: 0,
-        y1: 1,
-        yref: 'paper',
-        fillcolor: plotTheme.baselineSoft,
-        line: { width: 0 },
-      }));
-    const baselineSelectedDistances = sorted
-      .filter((interval) => interval.dataset_type === 'baseline' && interval.is_baseline_cluster)
-      .map((interval) => interval.distance_from_g0);
-    const monitoringDistances = sorted
-      .filter((interval) => interval.dataset_type === 'monitoring')
-      .map((interval) => interval.distance_from_g0);
-    const baselineSelectedMean = distanceSummary.baseline ?? mean(baselineSelectedDistances);
-    const monitoringMean = distanceSummary.monitoring ?? mean(monitoringDistances);
-    const baselineRollingSeries = rollingMean(baselineSeries, 12);
-    const monitoringRollingSeries = rollingMean(monitoringSeries, 12);
-    const latestMonitoringIndex = monitoringIndices.at(-1);
-    const firstWarningIndex = sorted.findIndex(
-      (interval) =>
-        interval.dataset_type === 'monitoring' && interval.distance_from_g0 >= warningThreshold
-    );
-    const firstDangerIndex = sorted.findIndex(
-      (interval) =>
-        interval.dataset_type === 'monitoring' && interval.distance_from_g0 >= dangerThreshold
-    );
-    const crossingIndex = firstDangerIndex >= 0 ? firstDangerIndex : firstWarningIndex;
-    const crossingInterval = crossingIndex >= 0 ? sorted[crossingIndex] : null;
-    const crossingTone = firstDangerIndex >= 0 ? 'danger' : 'warning';
-    const crossingColor = crossingTone === 'danger' ? plotTheme.danger : plotTheme.warning;
-    const thresholdShapes = [
-      {
-        type: 'rect' as const,
-        xref: 'paper' as const,
-        yref: 'y' as const,
-        x0: 0,
-        x1: 1,
-        y0: warningThreshold,
-        y1: dangerThreshold,
-        fillcolor: alphaColor(plotTheme.warning, 0.08),
-        line: { width: 0 },
-        layer: 'below' as const,
-      },
-      {
-        type: 'rect' as const,
-        xref: 'paper' as const,
-        yref: 'y' as const,
-        x0: 0,
-        x1: 1,
-        y0: dangerThreshold,
-        y1: yAxisRange?.[1] ?? dangerThreshold + 0.5,
-        fillcolor: alphaColor(plotTheme.danger, 0.07),
-        line: { width: 0 },
-        layer: 'below' as const,
-      },
-    ];
-    const thresholdX0 = xAxisRange?.[0] ?? x[0] ?? 0;
-    const thresholdX1 = xAxisRange?.[1] ?? x.at(-1) ?? thresholdX0 + 1;
-    const crossingGuideShapes =
-      crossingInterval != null
-        ? [
-            {
-              type: 'line' as const,
-              xref: 'x' as const,
-              yref: 'paper' as const,
-              x0: crossingInterval.sort_index,
-              x1: crossingInterval.sort_index,
-              y0: 0,
-              y1: 1,
-              line: {
-                color: crossingColor,
-                dash: crossingTone === 'danger' ? 'dashdot' : 'dash',
-                width: 2,
-              },
-              layer: 'below' as const,
-            },
-          ]
-        : [];
-    const meanLines = [
-      ...(baselineSelectedMean != null
-        ? [
-            {
-              type: 'line' as const,
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x0: 0,
-              x1: 1,
-              y0: baselineSelectedMean,
-              y1: baselineSelectedMean,
-              line: { color: plotTheme.baseline, dash: 'dot', width: 2 },
-            },
-          ]
-        : []),
-      ...(monitoringMean != null
-        ? [
-            {
-              type: 'line' as const,
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x0: 0,
-              x1: 1,
-              y0: monitoringMean,
-              y1: monitoringMean,
-              line: { color: plotTheme.monitoring, dash: 'dash', width: 2 },
-            },
-          ]
-        : []),
-    ];
-    const thresholdAnnotations = [
-      {
-        xref: 'paper' as const,
-        yref: 'y' as const,
-        x: 1,
-        y: warningThreshold,
-        xanchor: 'right' as const,
-        yanchor: 'bottom' as const,
-        text: `Warning ${warningThreshold.toFixed(3)}`,
-        showarrow: false,
-        font: { color: plotTheme.warning, size: 11 },
-        bgcolor: alphaColor(plotTheme.surface, 0.86),
-        bordercolor: alphaColor(plotTheme.warning, 0.35),
-        borderpad: 4,
-      },
-      {
-        xref: 'paper' as const,
-        yref: 'y' as const,
-        x: 1,
-        y: dangerThreshold,
-        xanchor: 'right' as const,
-        yanchor: 'bottom' as const,
-        text: `Danger ${dangerThreshold.toFixed(3)}`,
-        showarrow: false,
-        font: { color: plotTheme.danger, size: 11 },
-        bgcolor: alphaColor(plotTheme.surface, 0.86),
-        bordercolor: alphaColor(plotTheme.danger, 0.35),
-        borderpad: 4,
-      },
-    ];
-    const traces: any[] = [
-      {
-        x,
-        y: baselineSeries,
-        text: fullLabels,
-        mode: 'lines+markers',
-        type: 'scatter',
-        name: 'Baseline',
-        line: { color: alphaColor(plotTheme.baseline, 0.82), width: 1.7 },
-        marker: { color: alphaColor(plotTheme.baseline, 0.82), size: 5.5 },
-        customdata: sorted.map((interval) => [
-          interval.metadata_value,
-          interval.dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
-          interval.point_count,
-        ]),
-        hovertemplate:
-          'Interval %{customdata[0]}<br>%{customdata[2]} pts · %{customdata[1]}<br>Distance: %{y:.4f}<extra></extra>',
-        connectgaps: false,
-      },
-      {
-        x,
-        y: baselineRollingSeries,
-        text: fullLabels,
-        mode: 'lines',
-        type: 'scatter',
-        name: 'Baseline rolling mean',
-        line: { color: plotTheme.baselineRolling, width: 4, dash: 'solid' },
-        hovertemplate: 'Baseline rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
-        connectgaps: false,
-      },
-      {
-        x: [thresholdX0, thresholdX1],
-        y: [warningThreshold, warningThreshold],
-        mode: 'lines',
-        type: 'scatter',
-        name: `Warning threshold (${warningThreshold.toFixed(3)})`,
-        line: { color: plotTheme.warning, width: 2, dash: 'dot' },
-        hovertemplate: 'Warning threshold<br>Distance: %{y:.4f}<extra></extra>',
-        connectgaps: false,
-      },
-      {
-        x: [thresholdX0, thresholdX1],
-        y: [dangerThreshold, dangerThreshold],
-        mode: 'lines',
-        type: 'scatter',
-        name: `Danger threshold (${dangerThreshold.toFixed(3)})`,
-        line: { color: plotTheme.danger, width: 2, dash: 'dot' },
-        hovertemplate: 'Danger threshold<br>Distance: %{y:.4f}<extra></extra>',
-        connectgaps: false,
-      },
-    ];
-
-    if (hasMonitoringSeries) {
-      traces.push(
-        {
-          x,
-          y: monitoringHistorySeries,
-          text: fullLabels,
-          mode: 'lines+markers',
-          type: 'scatter',
-          name: 'Monitoring history',
-          line: { color: alphaColor(plotTheme.monitoring, 0.18), width: 1.2 },
-          marker: { color: alphaColor(plotTheme.monitoring, 0.26), size: 4.5 },
-          customdata: sorted.map((interval) => [
-            interval.metadata_value,
-            interval.dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
-            interval.point_count,
-          ]),
-          hovertemplate:
-            'Interval %{customdata[0]}<br>%{customdata[2]} pts · %{customdata[1]}<br>Distance: %{y:.4f}<extra></extra>',
-          connectgaps: false,
-        },
-        {
-          x,
-          y: monitoringRecentSeries,
-          text: fullLabels,
-          mode: 'lines+markers',
-          type: 'scatter',
-          name: 'Monitoring recent',
-          line: { color: alphaColor(plotTheme.monitoring, 0.9), width: 2.2 },
-          marker: { color: alphaColor(plotTheme.monitoring, 0.88), size: 5.5 },
-          customdata: sorted.map((interval) => [
-            interval.metadata_value,
-            interval.dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
-            interval.point_count,
-          ]),
-          hovertemplate:
-            'Interval %{customdata[0]}<br>%{customdata[2]} pts · %{customdata[1]}<br>Distance: %{y:.4f}<extra></extra>',
-          connectgaps: false,
-        }
-      );
-
-      traces.push({
-        x,
-        y: monitoringRollingSeries,
-        text: fullLabels,
-        mode: 'lines',
-        type: 'scatter',
-        name: 'Monitoring rolling mean',
-        line: { color: plotTheme.monitoringRolling, width: 4, dash: 'solid' },
-        hovertemplate: 'Monitoring rolling mean at %{text}<br>Distance: %{y:.4f}<extra></extra>',
-        connectgaps: false,
-      });
-
-      if (latestMonitoringIndex != null && latestMonitoringIndex >= 0) {
-        const latestInterval = sorted[latestMonitoringIndex];
-        traces.push({
-          x: [latestInterval.sort_index],
-          y: [latestInterval.distance_from_g0],
-          text: [latestInterval.metadata_value],
-          mode: 'markers',
-          type: 'scatter',
-          name: 'Latest interval',
-          marker: {
-            color: plotTheme.latest,
-            size: 14,
-            line: { color: plotTheme.latestLine, width: 2 },
-          },
-          hovertemplate: 'Latest interval %{text}<br>Distance: %{y:.4f}<extra></extra>',
-        });
-      }
-
-      if (crossingInterval != null) {
-        traces.push({
-          x: [crossingInterval.sort_index],
-          y: [crossingInterval.distance_from_g0],
-          text: [crossingInterval.metadata_value],
-          mode: 'markers',
-          type: 'scatter',
-          name: crossingTone === 'danger' ? 'Danger crossing' : 'Warning crossing',
-          marker: {
-            symbol: 'diamond',
-            color: crossingColor,
-            size: 12,
-            line: { color: plotTheme.surface, width: 1.5 },
-          },
-          hovertemplate: '%{fullData.name}<br>%{text}<br>Distance: %{y:.4f}<extra></extra>',
-        });
-      }
-    }
-
-    return {
-      data: traces,
-      revision: autoscaleRevision,
-      layout: createThemedPlotLayout(plotTheme, {
-        height: 540,
-        title: '',
-        xaxis: {
-          title: `${wearResult.metadata_column} (Interval Order)`,
-          autorange: !xAxisRange,
-          ...(xAxisRange ? { range: xAxisRange } : {}),
-          tickmode: 'array',
-          tickvals: tickVals,
-          ticktext: tickText.map(formatIntervalTick),
-          tickangle: 0,
-          automargin: true,
-          tickfont: { size: 11 },
-        },
-        yaxis: {
-          title: 'Distance from baseline reference G0',
-          autorange: !yAxisRange,
-          ...(yAxisRange ? { range: yAxisRange } : {}),
-        },
-        margin: { t: 56, r: 20, b: 100, l: 56 },
-        uirevision: `insights-distance-${datasetId ?? 'none'}-${wearResult.metadata_column}`,
-        transition: { duration: 120 },
-        legend: {
-          orientation: 'h',
-          yanchor: 'top',
-          y: -0.2,
-          xanchor: 'center',
-          x: 0.5,
-        },
-        shapes: [
-          ...thresholdShapes,
-          ...baselineClusterShapes,
-          ...meanLines,
-          ...crossingGuideShapes,
-        ],
-        annotations: thresholdAnnotations,
-      }) as any,
-      config: {
-        ...createThemedPlotConfig({ modeBar: true }),
-        modeBarButtonsToRemove: [
-          ...createThemedPlotConfig({ modeBar: true }).modeBarButtonsToRemove,
-          'lasso2d',
-          'select2d',
-        ],
-      },
-    };
-  }, [datasetId, distanceSummary, plotTheme, shouldRenderWearPlots, wearResult]);
-
   const distanceEChart = useMemo(() => {
     if (!shouldRenderWearPlots || !wearResult?.intervals?.length) {
       return null;
@@ -1984,32 +1577,24 @@ export default function HealthInsightsPage() {
       .map((transition) => transition.distance);
     const baselineTransitionMean = mean(baselineTransitionDistances);
     const monitoringTransitionMean = mean(monitoringTransitionDistances);
-    const transitionMeanLines = [
+    const transitionMeanMarkData = [
       ...(baselineTransitionMean != null
         ? [
             {
-              type: 'line' as const,
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x0: 0,
-              x1: 1,
-              y0: baselineTransitionMean,
-              y1: baselineTransitionMean,
-              line: { color: plotTheme.baseline, dash: 'dot', width: 2 },
+              name: `Baseline mean ${baselineTransitionMean.toFixed(3)}`,
+              yAxis: baselineTransitionMean,
+              lineStyle: { color: plotTheme.baseline, type: 'dotted', width: 2 },
+              label: { formatter: 'Baseline mean' },
             },
           ]
         : []),
       ...(monitoringTransitionMean != null
         ? [
             {
-              type: 'line' as const,
-              xref: 'paper' as const,
-              yref: 'y' as const,
-              x0: 0,
-              x1: 1,
-              y0: monitoringTransitionMean,
-              y1: monitoringTransitionMean,
-              line: { color: plotTheme.monitoring, dash: 'dash', width: 2 },
+              name: `Monitoring mean ${monitoringTransitionMean.toFixed(3)}`,
+              yAxis: monitoringTransitionMean,
+              lineStyle: { color: plotTheme.monitoring, type: 'dashed', width: 2 },
+              label: { formatter: 'Monitoring mean' },
             },
           ]
         : []),
@@ -2053,132 +1638,177 @@ export default function HealthInsightsPage() {
           : null
       ),
     };
-    const autoscaleRevision = plotRevisionFromParts([
-      'insights-transitions',
-      wearResult?.metadata_column ?? 'selected-interval',
-      axisRangeRevisionPart(xAxisRange),
-      axisRangeRevisionPart(yAxisRange),
-    ]);
-    const transitionCustomData = transitions.map((transition) => [
+    const transitionPoint = (
+      transition: (typeof transitions)[number],
+      index: number,
+      value: number | null,
+      label: string
+    ) => [
+      xValues[index],
+      value,
       transition.from_label,
       transition.to_label,
       transition.from_dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
       transition.to_dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
-    ]);
-    const transitionHoverTemplate =
-      'Transition %{x}: %{customdata[0]} → %{customdata[1]}<br>Source %{customdata[2]} · Dest %{customdata[3]}<br>Distance: %{y:.4f}<extra></extra>';
-    const transitionTraces: any[] = [
+      label,
+    ];
+    const transitionTooltip = (params: any) => {
+      const value = params?.data?.value ?? params?.data;
+      if (!Array.isArray(value)) {
+        return `<b>${params?.seriesName ?? 'Transition'}</b>`;
+      }
+      return `<b>${params.seriesName}</b><br/>Transition ${value[0]}: ${value[2]} → ${value[3]}<br/>Source ${value[4]} · Dest ${value[5]}<br/>Distance: ${Number(value[1]).toFixed(4)}`;
+    };
+    const transitionSeriesOptions: any[] = [
       {
-        x: xValues,
-        text: transitions.map((entry) => `${entry.from_label} → ${entry.to_label}`),
-        y: transitionSeries.baseline,
-        mode: 'lines+markers',
-        type: 'scattergl',
-        marker: { color: plotTheme.baseline, size: 6 },
-        line: { color: plotTheme.baseline, width: 2 },
-        customdata: transitionCustomData,
-        hovertemplate: transitionHoverTemplate,
+        type: 'line',
         name: 'Baseline',
-        connectgaps: false,
+        data: transitions.map((transition, index) =>
+          transitionPoint(transition, index, transitionSeries.baseline[index], 'Baseline')
+        ),
+        showSymbol: true,
+        symbol: 'circle',
+        symbolSize: 6,
+        connectNulls: false,
+        lineStyle: { color: plotTheme.baseline, width: 2 },
+        itemStyle: { color: plotTheme.baseline, borderWidth: 0 },
+        markLine:
+          transitionMeanMarkData.length > 0
+            ? { silent: true, symbol: 'none', data: transitionMeanMarkData }
+            : undefined,
       },
       {
-        x: xValues,
-        text: transitions.map((entry) => `${entry.from_label} → ${entry.to_label}`),
-        y: transitionSeries.handoff,
-        mode: 'lines+markers',
-        type: 'scattergl',
-        marker: { color: plotTheme.warning, size: 7 },
-        line: { color: plotTheme.warning, width: 2, dash: 'dot' },
-        customdata: transitionCustomData,
-        hovertemplate: transitionHoverTemplate,
+        type: 'line',
         name: 'Handoff',
-        connectgaps: false,
+        data: transitions.map((transition, index) =>
+          transitionPoint(transition, index, transitionSeries.handoff[index], 'Handoff')
+        ),
+        showSymbol: true,
+        symbol: 'circle',
+        symbolSize: 7,
+        connectNulls: false,
+        lineStyle: { color: plotTheme.warning, width: 2, type: 'dotted' },
+        itemStyle: { color: plotTheme.warning, borderWidth: 0 },
       },
       {
-        x: xValues,
-        text: transitions.map((entry) => `${entry.from_label} → ${entry.to_label}`),
-        y: transitionSeries.monitoring,
-        mode: 'lines+markers',
-        type: 'scattergl',
-        marker: { color: plotTheme.monitoring, size: 7 },
-        line: { color: plotTheme.monitoring, width: 2.5 },
-        customdata: transitionCustomData,
-        hovertemplate: transitionHoverTemplate,
+        type: 'line',
         name: 'Monitoring',
-        connectgaps: false,
+        data: transitions.map((transition, index) =>
+          transitionPoint(transition, index, transitionSeries.monitoring[index], 'Monitoring')
+        ),
+        showSymbol: true,
+        symbol: 'circle',
+        symbolSize: 7,
+        connectNulls: false,
+        lineStyle: { color: plotTheme.monitoring, width: 2.5 },
+        itemStyle: { color: plotTheme.monitoring, borderWidth: 0 },
       },
     ];
 
     if (spikeTransitions.length > 0) {
-      transitionTraces.push({
-        x: spikeTransitions.map(({ index }) => xValues[index]),
-        y: spikeTransitions.map(({ transition }) => transition.distance),
-        text: spikeTransitions.map(
-          ({ transition }) => `${transition.from_label} → ${transition.to_label}`
-        ),
-        mode: 'markers',
-        type: 'scattergl',
-        marker: {
-          color: plotTheme.danger,
-          size: 12,
-          symbol: 'diamond',
-          line: { color: plotTheme.surface, width: 1.5 },
-        },
+      transitionSeriesOptions.push({
+        type: 'scatter',
         name: 'Spike',
-        hovertemplate: 'Spike %{text}<br>Distance: %{y:.4f}<extra></extra>',
+        data: spikeTransitions.map(({ transition, index }) =>
+          transitionPoint(transition, index, transition.distance, 'Spike')
+        ),
+        symbol: 'diamond',
+        symbolSize: 12,
+        itemStyle: {
+          color: plotTheme.danger,
+          borderColor: plotTheme.surface,
+          borderWidth: 1.5,
+        },
+        z: 12,
       });
     }
+    const formatTransitionAxisLabel = (value: number) => {
+      const rounded = Math.round(value);
+      if (Math.abs(value - rounded) > 0.05) {
+        return '';
+      }
+      const tickIndex = tickVals.indexOf(rounded);
+      return tickIndex >= 0 ? tickText[tickIndex] : `#${rounded}`;
+    };
+    const formatDistanceAxisLabel = (value: number) =>
+      Number(value).toLocaleString(undefined, {
+        maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
+      });
+    const option: EChartsOption = {
+      animation: false,
+      backgroundColor: 'transparent',
+      color: [plotTheme.baseline, plotTheme.warning, plotTheme.monitoring, plotTheme.danger],
+      tooltip: {
+        trigger: 'item',
+        confine: true,
+        axisPointer: { type: 'cross' },
+        formatter: transitionTooltip,
+      },
+      legend: {
+        type: 'scroll',
+        top: 0,
+        left: 4,
+        right: 150,
+        itemWidth: 12,
+        itemHeight: 8,
+      },
+      toolbox: {
+        show: true,
+        right: 8,
+        top: 0,
+        feature: {
+          dataZoom: { yAxisIndex: 'none' },
+          brush: { type: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'] },
+          restore: {},
+          saveAsImage: { pixelRatio: 2 },
+        },
+      },
+      brush: {
+        toolbox: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'],
+        xAxisIndex: 0,
+        yAxisIndex: 0,
+        brushMode: 'multiple',
+        throttleType: 'debounce',
+        throttleDelay: 250,
+      },
+      grid: { top: 64, right: 72, bottom: 106, left: 82, containLabel: true },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 24, bottom: 34 },
+        { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+        { type: 'slider', yAxisIndex: 0, filterMode: 'none', width: 18, right: 18 },
+      ],
+      xAxis: {
+        type: 'value',
+        name:
+          wearResult?.metadata_column != null
+            ? `${wearResult.metadata_column} Transition # (Gi -> Gi+1)`
+            : 'Transition # (Gi -> Gi+1)',
+        nameLocation: 'middle',
+        nameGap: 52,
+        min: xAxisRange?.[0],
+        max: xAxisRange?.[1],
+        axisLabel: { formatter: formatTransitionAxisLabel, hideOverlap: true },
+        splitLine: { lineStyle: { color: alphaColor(plotTheme.chartGrid, 0.75) } },
+      },
+      yAxis: {
+        type: 'value',
+        name: 'Centroid movement distance (Gi->Gi+1)',
+        nameLocation: 'middle',
+        nameGap: 58,
+        min: yAxisRange?.[0],
+        max: yAxisRange?.[1],
+        axisLabel: { formatter: formatDistanceAxisLabel },
+        splitLine: { lineStyle: { color: alphaColor(plotTheme.chartGrid, 0.75) } },
+      },
+      series: transitionSeriesOptions,
+    };
 
     return {
-      data: transitionTraces,
-      revision: autoscaleRevision,
-      layout: createThemedPlotLayout(plotTheme, {
-        height: 540,
-        title: '',
-        xaxis: {
-          title:
-            wearResult?.metadata_column != null
-              ? `${wearResult.metadata_column} Transition # (Gi → Gi+1)`
-              : 'Transition # (Gi → Gi+1)',
-          autorange: !xAxisRange,
-          ...(xAxisRange ? { range: xAxisRange } : {}),
-          tickmode: 'array',
-          tickvals: tickVals,
-          ticktext: tickText,
-          tickangle: 0,
-          automargin: true,
-          tickfont: { size: 11 },
-        },
-        yaxis: {
-          title: 'Centroid movement distance (Gi→Gi+1)',
-          autorange: !yAxisRange,
-          ...(yAxisRange ? { range: yAxisRange } : {}),
-        },
-        margin: { t: 48, r: 20, b: 100, l: 56 },
-        uirevision: `insights-transitions-${datasetId ?? 'none'}-${wearResult?.metadata_column ?? 'selected-interval'}`,
-        transition: { duration: 120 },
-        showlegend: true,
-        legend: {
-          orientation: 'h',
-          yanchor: 'top',
-          y: -0.2,
-          xanchor: 'center',
-          x: 0.5,
-        },
-        shapes: transitionMeanLines,
-        annotations: [],
-      }) as any,
-      config: {
-        ...createThemedPlotConfig({ modeBar: true }),
-        modeBarButtonsToRemove: [
-          ...createThemedPlotConfig({ modeBar: true }).modeBarButtonsToRemove,
-          'lasso2d',
-          'select2d',
-        ],
-      },
+      option,
       spikeCount: spikeTransitions.length,
     };
-  }, [datasetId, plotTheme, shouldRenderWearPlots, transitionRows, wearResult?.metadata_column]);
+  }, [plotTheme, shouldRenderWearPlots, transitionRows, wearResult?.metadata_column]);
 
   const latestMonitoringInterval = useMemo(() => {
     const monitoringIntervals = (wearResult?.intervals ?? [])
@@ -2892,10 +2522,10 @@ export default function HealthInsightsPage() {
                         )}
                       </div>
 
-                      {distancePlot ? (
+                      {distanceEChart ? (
                         <ChartFrame
                           title="Distance from baseline"
-                          description={`Apache ECharts pilot. Monitoring movement from selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
+                          description={`Apache ECharts. Monitoring movement from selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
                           stats={
                             <>
                               <ChartStat
@@ -2978,26 +2608,14 @@ export default function HealthInsightsPage() {
                           bodyClassName="p-2"
                         >
                           <div className="h-[540px]">
-                            {distanceEChart ? (
-                              <EChartsCanvas
-                                option={distanceEChart.option}
-                                style={{ width: '100%', height: '100%' }}
-                              />
-                            ) : (
-                              <Plot
-                                key={`distance-${isControlsCollapsed ? 'expanded' : 'with-controls'}`}
-                                data={distancePlot.data as any}
-                                layout={distancePlot.layout as any}
-                                config={distancePlot.config as any}
-                                revision={distancePlot.revision}
-                                useResizeHandler
-                                style={{ width: '100%', height: '100%' }}
-                              />
-                            )}
+                            <EChartsCanvas
+                              option={distanceEChart.option}
+                              style={{ width: '100%', height: '100%' }}
+                            />
                           </div>
                           <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
-                            Pilot interactions: use the ECharts toolbox for zoom, brush, restore,
-                            and image export; use the bottom/right sliders or mouse wheel to inspect
+                            Interactions: use the ECharts toolbox for zoom, brush, restore, and
+                            image export; use the bottom/right sliders or mouse wheel to inspect
                             dense ranges.
                           </p>
                         </ChartFrame>
@@ -3177,13 +2795,8 @@ export default function HealthInsightsPage() {
                           bodyClassName="p-2"
                         >
                           <div className="h-[540px]">
-                            <Plot
-                              key={`transitions-${isControlsCollapsed ? 'expanded' : 'with-controls'}`}
-                              data={transitionPlot.data as any}
-                              layout={transitionPlot.layout as any}
-                              config={transitionPlot.config as any}
-                              revision={transitionPlot.revision}
-                              useResizeHandler
+                            <EChartsCanvas
+                              option={transitionPlot.option}
                               style={{ width: '100%', height: '100%' }}
                             />
                           </div>

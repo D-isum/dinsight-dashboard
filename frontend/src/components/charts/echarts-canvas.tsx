@@ -127,8 +127,8 @@ export function EChartsCanvas(props: EChartsCanvasProps) {
         <Alert variant="warning" className="m-4">
           <AlertTitle>Chart failed to render</AlertTitle>
           <AlertDescription>
-            Something went wrong rendering this ECharts pilot chart. The rest of the page is
-            unaffected; refresh to try again.
+            Something went wrong rendering this ECharts chart. The rest of the page is unaffected;
+            refresh to try again.
           </AlertDescription>
         </Alert>
       }

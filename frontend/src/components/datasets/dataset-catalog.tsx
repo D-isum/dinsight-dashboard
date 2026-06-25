@@ -51,7 +51,7 @@ import { RegisterMetadataDialog } from '@/components/datasets/register-metadata-
 import { ValidationRulesPanel } from '@/components/datasets/validation-rules-panel';
 import { usePermission } from '@/components/auth/require-permission';
 import { ChartEmptyState, ChartFrame, ChartStat } from '@/components/charts/chart-frame';
-import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
+import { EChartsCanvas } from '@/components/charts/echarts-canvas';
 import { Actions } from '@/lib/permissions';
 import { useAuth } from '@/context/auth-context';
 import { api } from '@/lib/api-client';
@@ -716,12 +716,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 <ChartEmptyState title="Preview unavailable" description={previewBaselineError} />
               ) : previewPlot ? (
                 <div className="h-[280px]">
-                  <Plot
-                    data={previewPlot.data as any}
-                    layout={previewPlot.layout as any}
-                    config={previewPlot.config as any}
-                    revision={previewPlot.revision}
-                    useResizeHandler
+                  <EChartsCanvas
+                    key={previewPlot.revision}
+                    option={previewPlot.option}
                     style={{ width: '100%', height: '100%' }}
                   />
                 </div>

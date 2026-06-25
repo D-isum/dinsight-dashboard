@@ -25,7 +25,7 @@ describe('plot-autoscale', () => {
     expect(range?.[1]).toBeGreaterThan(2);
   });
 
-  it('expands single-point ranges so Plotly has a usable span', () => {
+  it('expands single-point ranges so charts have a usable span', () => {
     const range = buildPaddedAxisRange([3], { minSpan: 2 });
 
     expect(range).toEqual([1.5, 4.5]);
@@ -36,7 +36,7 @@ describe('plot-autoscale', () => {
     expect(axisRangeRevisionPart([0, 1])).toBe('0.0000000:1.0000000');
   });
 
-  it('creates deterministic numeric Plotly revisions from key parts', () => {
+  it('creates deterministic numeric chart revisions from key parts', () => {
     const first = plotRevisionFromParts(['dataset-1', '0:1', '0:2']);
     const second = plotRevisionFromParts(['dataset-1', '0:1', '0:2']);
     const changed = plotRevisionFromParts(['dataset-1', '0:1', '0:3']);

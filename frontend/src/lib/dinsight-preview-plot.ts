@@ -3,7 +3,8 @@ import {
   buildPaddedAxisRange,
   plotRevisionFromParts,
 } from '@/lib/plot-autoscale';
-import { createThemedPlotConfig, createThemedPlotLayout, type PlotTheme } from '@/lib/plot-theme';
+import { alphaColor, type PlotTheme } from '@/lib/plot-theme';
+import type { EChartsOption } from 'echarts';
 
 interface CoordinateInput {
   dinsight_x: number[];
@@ -26,41 +27,48 @@ export function createDinsightPreviewPlot(
   }
 
   const compact = options.compact ?? false;
+  const modeBar = options.modeBar ?? !compact;
   const baselineCount = baselineData.dinsight_x.length;
   const monitoringCount = monitoringData?.dinsight_x.length ?? 0;
-  const traces: any[] = [
+  const pointSize = compact ? 4 : 6;
+  const tooltipFormatter = (params: any) => {
+    const value = params?.data?.value ?? params?.data;
+    if (!Array.isArray(value)) {
+      return `<b>${params?.seriesName ?? 'Point'}</b>`;
+    }
+    return `<b>${params.seriesName}</b><br/>Point: ${Number(value[2]).toLocaleString()}<br/>X: ${Number(value[0]).toFixed(4)}<br/>Y: ${Number(value[1]).toFixed(4)}`;
+  };
+  const series: any[] = [
     {
-      x: baselineData.dinsight_x,
-      y: baselineData.dinsight_y,
-      type: 'scattergl',
-      mode: 'markers',
+      type: 'scatter',
       name: `Baseline (${baselineCount.toLocaleString()})`,
-      marker: {
-        color: theme.baseline,
-        size: compact ? 4 : 6,
-        opacity: compact ? 0.5 : 0.58,
-        line: { color: theme.surface, width: compact ? 0 : 0.25 },
-      },
-      customdata: baselineData.dinsight_x.map((_, index) => index + 1),
-      hovertemplate: 'Baseline point %{customdata}<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
+      data: baselineData.dinsight_x.map((x, index) => [
+        x,
+        baselineData.dinsight_y[index],
+        index + 1,
+      ]),
+      symbolSize: pointSize,
+      large: true,
+      largeThreshold: 2000,
+      progressive: 1000,
+      itemStyle: { color: alphaColor(theme.baseline, compact ? 0.5 : 0.58), borderWidth: 0 },
     },
   ];
 
   if (monitoringData && monitoringData.dinsight_x.length > 0) {
-    traces.push({
-      x: monitoringData.dinsight_x,
-      y: monitoringData.dinsight_y,
-      type: 'scattergl',
-      mode: 'markers',
+    series.push({
+      type: 'scatter',
       name: `Monitoring (${monitoringCount.toLocaleString()})`,
-      marker: {
-        color: theme.monitoring,
-        size: compact ? 4 : 6,
-        opacity: compact ? 0.62 : 0.72,
-        line: { color: theme.surface, width: compact ? 0 : 0.25 },
-      },
-      customdata: monitoringData.dinsight_x.map((_, index) => index + 1),
-      hovertemplate: 'Monitoring point %{customdata}<br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
+      data: monitoringData.dinsight_x.map((x, index) => [
+        x,
+        monitoringData.dinsight_y[index],
+        index + 1,
+      ]),
+      symbolSize: pointSize,
+      large: true,
+      largeThreshold: 2000,
+      progressive: 1000,
+      itemStyle: { color: alphaColor(theme.monitoring, compact ? 0.62 : 0.72), borderWidth: 0 },
     });
   }
 
@@ -79,36 +87,105 @@ export function createDinsightPreviewPlot(
     axisRangeRevisionPart(xAxisRange),
     axisRangeRevisionPart(yAxisRange),
   ]);
+  const formatAxisLabel = (value: number) =>
+    Number(value).toLocaleString(undefined, {
+      maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
+    });
+  const option: EChartsOption = {
+    animation: false,
+    backgroundColor: 'transparent',
+    color: [theme.baseline, theme.monitoring],
+    tooltip: {
+      trigger: 'item',
+      confine: true,
+      axisPointer: { type: 'cross' },
+      formatter: tooltipFormatter,
+    },
+    legend: {
+      type: 'scroll',
+      top: compact ? 0 : 4,
+      right: compact ? 4 : 12,
+      itemWidth: 10,
+      itemHeight: 8,
+      textStyle: { color: theme.mutedText, fontSize: compact ? 10 : 12 },
+    },
+    toolbox: modeBar
+      ? {
+          show: true,
+          right: 8,
+          top: compact ? 22 : 28,
+          feature: {
+            dataZoom: { yAxisIndex: 'none' },
+            brush: { type: ['rect', 'polygon', 'keep', 'clear'] },
+            restore: {},
+            saveAsImage: { pixelRatio: 2 },
+          },
+        }
+      : undefined,
+    brush: modeBar
+      ? {
+          toolbox: ['rect', 'polygon', 'keep', 'clear'],
+          xAxisIndex: 0,
+          yAxisIndex: 0,
+          brushMode: 'multiple',
+          throttleType: 'debounce',
+          throttleDelay: 250,
+        }
+      : undefined,
+    grid: compact
+      ? { top: 32, right: 16, bottom: 42, left: 46, containLabel: true }
+      : { top: options.title ? 76 : 58, right: 54, bottom: 80, left: 72, containLabel: true },
+    title:
+      options.title && !compact
+        ? {
+            text: options.title,
+            left: 4,
+            top: 4,
+            textStyle: { color: theme.text, fontSize: 13, fontWeight: 600 },
+          }
+        : undefined,
+    dataZoom: modeBar
+      ? [
+          { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+          { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+          { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 18, bottom: 18 },
+          { type: 'slider', yAxisIndex: 0, filterMode: 'none', width: 16, right: 12 },
+        ]
+      : [
+          { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+          { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+        ],
+    xAxis: {
+      type: 'value',
+      name: compact ? '' : "D'insight X",
+      nameLocation: 'middle',
+      nameGap: compact ? 28 : 44,
+      min: xAxisRange?.[0],
+      max: xAxisRange?.[1],
+      scale: true,
+      axisLabel: { formatter: formatAxisLabel },
+      axisLine: { lineStyle: { color: theme.border } },
+      axisTick: { lineStyle: { color: theme.border } },
+      splitLine: { lineStyle: { color: alphaColor(theme.chartGrid, 0.75) } },
+    },
+    yAxis: {
+      type: 'value',
+      name: compact ? '' : "D'insight Y",
+      nameLocation: 'middle',
+      nameGap: compact ? 34 : 52,
+      min: yAxisRange?.[0],
+      max: yAxisRange?.[1],
+      scale: true,
+      axisLabel: { formatter: formatAxisLabel },
+      axisLine: { lineStyle: { color: theme.border } },
+      axisTick: { lineStyle: { color: theme.border } },
+      splitLine: { lineStyle: { color: alphaColor(theme.chartGrid, 0.75) } },
+    },
+    series,
+  };
 
   return {
-    data: traces,
+    option,
     revision,
-    layout: createThemedPlotLayout(
-      theme,
-      {
-        title: options.title ? { text: options.title, x: 0, xanchor: 'left' } : '',
-        margin: compact ? { t: 14, r: 10, b: 34, l: 42 } : { t: 42, r: 22, b: 56, l: 62 },
-        xaxis: {
-          title: compact ? '' : "D'insight X",
-          autorange: !xAxisRange,
-          ...(xAxisRange ? { range: xAxisRange } : {}),
-        },
-        yaxis: {
-          title: compact ? '' : "D'insight Y",
-          autorange: !yAxisRange,
-          ...(yAxisRange ? { range: yAxisRange } : {}),
-        },
-        legend: {
-          orientation: 'h',
-          yanchor: 'bottom',
-          y: 1.02,
-          xanchor: 'right',
-          x: 1,
-        },
-        uirevision: options.datasetId ?? 'preview',
-      },
-      { compact }
-    ),
-    config: createThemedPlotConfig({ modeBar: options.modeBar ?? !compact }),
   };
 }

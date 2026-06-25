@@ -36,18 +36,12 @@ import {
   buildPaddedAxisRange,
   plotRevisionFromParts,
 } from '@/lib/plot-autoscale';
-import {
-  alphaColor,
-  createThemedPlotConfig,
-  createThemedPlotLayout,
-  usePlotTheme,
-} from '@/lib/plot-theme';
+import { alphaColor, usePlotTheme } from '@/lib/plot-theme';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/utils/cn';
 import { EChartsCanvas } from '@/components/charts/echarts-canvas';
 
-import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 import type { EChartsOption } from 'echarts';
 
 type SelectionMode = 'rectangle' | 'lasso' | 'circle' | 'oval';
@@ -444,6 +438,43 @@ const boundaryToLineData = (boundary: Boundary): number[][] => {
   }
 
   return [];
+};
+
+const buildDensityHeatmapData = (xValues: number[], yValues: number[], bins = 44) => {
+  if (xValues.length < 20 || yValues.length < 20) {
+    return { data: [] as number[][], maxDensity: 0 };
+  }
+
+  const xRange = buildPaddedAxisRange(xValues, { paddingRatio: 0 });
+  const yRange = buildPaddedAxisRange(yValues, { paddingRatio: 0 });
+  if (!xRange || !yRange || xRange[0] === xRange[1] || yRange[0] === yRange[1]) {
+    return { data: [] as number[][], maxDensity: 0 };
+  }
+
+  const xStep = (xRange[1] - xRange[0]) / bins;
+  const yStep = (yRange[1] - yRange[0]) / bins;
+  const counts = new Map<string, number>();
+  let maxDensity = 0;
+
+  xValues.forEach((x, index) => {
+    const y = yValues[index];
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return;
+    }
+    const xBin = Math.min(bins - 1, Math.max(0, Math.floor((x - xRange[0]) / xStep)));
+    const yBin = Math.min(bins - 1, Math.max(0, Math.floor((y - yRange[0]) / yStep)));
+    const key = `${xBin}:${yBin}`;
+    const next = (counts.get(key) ?? 0) + 1;
+    counts.set(key, next);
+    maxDensity = Math.max(maxDensity, next);
+  });
+
+  const data = Array.from(counts.entries()).map(([key, count]) => {
+    const [xBin, yBin] = key.split(':').map(Number);
+    return [xRange[0] + (xBin + 0.5) * xStep, yRange[0] + (yBin + 0.5) * yStep, count];
+  });
+
+  return { data, maxDensity };
 };
 
 export default function LiveMonitorPage() {
@@ -1222,460 +1253,6 @@ export default function LiveMonitorPage() {
   const removeBoundary = (id: string) =>
     setBoundaries((current) => current.filter((boundary) => boundary.id !== id));
 
-  const plotShapes = useMemo(
-    () =>
-      boundaries.map((boundary) => buildBoundaryShape(boundary, plotTheme.accent)).filter(Boolean),
-    [boundaries, plotTheme.accent]
-  );
-
-  const plotData = useMemo(() => {
-    if (!baselineData || baselineData.dinsight_x.length === 0) {
-      return null;
-    }
-
-    const withMetadata = (
-      trace: Record<string, unknown>,
-      hoverText?: string[],
-      template = '<b>%{fullData.name}</b><br>X: %{x:.4f}<br>Y: %{y:.4f}<br>%{text}<extra></extra>'
-    ) => {
-      const withStableSelectionStyles = (value: Record<string, unknown>) => {
-        const traceType = value.type;
-        const isScatterTrace = traceType === 'scatter' || traceType === 'scattergl';
-        if (!isScatterTrace) {
-          return value;
-        }
-
-        const marker = (value.marker ?? {}) as Record<string, unknown>;
-        const opacity = typeof marker.opacity === 'number' ? marker.opacity : 1;
-
-        return {
-          ...value,
-          selected: { marker: { opacity } },
-          unselected: { marker: { opacity } },
-        };
-      };
-
-      if (!hasActiveMetadata || !hoverText || hoverText.length === 0) {
-        return withStableSelectionStyles({
-          ...trace,
-          hovertemplate: '<b>%{fullData.name}</b><br>X: %{x:.4f}<br>Y: %{y:.4f}<extra></extra>',
-        });
-      }
-
-      return withStableSelectionStyles({
-        ...trace,
-        text: hoverText,
-        hovertemplate: template,
-      });
-    };
-
-    const traces: any[] = [
-      withMetadata(
-        {
-          x: baselineData.dinsight_x,
-          y: baselineData.dinsight_y,
-          type: 'scattergl',
-          mode: 'markers',
-          name: 'Baseline',
-          marker: { color: plotTheme.baseline, size: pointSize, opacity: 0.38 },
-        },
-        buildHoverText(baselineData.metadata)
-      ),
-    ];
-
-    if (showContours && baselineData.dinsight_x.length > 20) {
-      traces.push({
-        x: baselineData.dinsight_x,
-        y: baselineData.dinsight_y,
-        type: 'histogram2dcontour',
-        name: 'Baseline density',
-        showscale: false,
-        contours: { coloring: 'none' },
-        line: { color: alphaColor(plotTheme.baseline, 0.35) },
-        hoverinfo: 'skip',
-      });
-    }
-
-    if (effectiveMonitoringData && effectiveMonitoringData.dinsight_x.length > 0) {
-      const visibleStartIndex =
-        monitorView === 'recent'
-          ? Math.max(0, effectiveMonitoringData.dinsight_x.length - LIVE_RECENT_WINDOW_POINTS)
-          : 0;
-      const isVisibleMonitoringIndex = (index: number) => index >= visibleStartIndex;
-      const hoverForIndices = (indices: number[]) =>
-        buildHoverText(
-          effectiveMonitoringData.metadata,
-          indices.filter((index) => index >= 0 && index < effectiveMonitoringData.metadata.length)
-        );
-
-      if (manualClassification) {
-        const visibleNormalIndices =
-          manualClassification.normalIndices.filter(isVisibleMonitoringIndex);
-        const visibleAnomalyIndices =
-          manualClassification.anomalyIndices.filter(isVisibleMonitoringIndex);
-
-        if (visibleNormalIndices.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: visibleNormalIndices.map((index) => effectiveMonitoringData.dinsight_x[index]),
-                y: visibleNormalIndices.map((index) => effectiveMonitoringData.dinsight_y[index]),
-                type: 'scattergl',
-                mode: 'markers',
-                name: `Normal (${visibleNormalIndices.length.toLocaleString()})`,
-                marker: {
-                  color: visibleNormalIndices,
-                  colorscale: [
-                    [0, alphaColor(plotTheme.normal, 0.65)],
-                    [0.75, plotTheme.normal],
-                    [1, plotTheme.latest],
-                  ],
-                  cmin: 0,
-                  cmax: Math.max(effectiveMonitoringData.dinsight_x.length - 1, 1),
-                  size: pointSize + 1,
-                  opacity: 0.88,
-                  showscale: false,
-                },
-              },
-              hoverForIndices(visibleNormalIndices)
-            )
-          );
-        }
-
-        const normalLatest = manualClassification.normalIndices.filter((index) =>
-          latestIndices.has(index)
-        );
-        if (normalLatest.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: normalLatest.map((index) => effectiveMonitoringData.dinsight_x[index]),
-                y: normalLatest.map((index) => effectiveMonitoringData.dinsight_y[index]),
-                type: 'scattergl',
-                mode: 'markers',
-                name: `Normal (latest ${normalLatest.length})`,
-                marker: {
-                  color: plotTheme.normal,
-                  size: pointSize + 4,
-                  opacity: 1,
-                  line: { color: plotTheme.latest, width: 2 },
-                },
-              },
-              hoverForIndices(normalLatest)
-            )
-          );
-        }
-
-        if (visibleAnomalyIndices.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: visibleAnomalyIndices.map((index) => effectiveMonitoringData.dinsight_x[index]),
-                y: visibleAnomalyIndices.map((index) => effectiveMonitoringData.dinsight_y[index]),
-                type: 'scattergl',
-                mode: 'markers',
-                name: `Anomaly (${visibleAnomalyIndices.length.toLocaleString()})`,
-                marker: {
-                  color: visibleAnomalyIndices,
-                  colorscale: [
-                    [0, alphaColor(plotTheme.anomaly, 0.72)],
-                    [0.75, plotTheme.anomaly],
-                    [1, plotTheme.latest],
-                  ],
-                  cmin: 0,
-                  cmax: Math.max(effectiveMonitoringData.dinsight_x.length - 1, 1),
-                  size: pointSize + 2,
-                  opacity: 0.92,
-                  showscale: false,
-                },
-              },
-              hoverForIndices(visibleAnomalyIndices)
-            )
-          );
-        }
-
-        const anomalyLatest = manualClassification.anomalyIndices.filter((index) =>
-          latestIndices.has(index)
-        );
-        if (anomalyLatest.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: anomalyLatest.map((index) => effectiveMonitoringData.dinsight_x[index]),
-                y: anomalyLatest.map((index) => effectiveMonitoringData.dinsight_y[index]),
-                type: 'scattergl',
-                mode: 'markers',
-                name: `Anomaly (latest ${anomalyLatest.length})`,
-                marker: {
-                  color: plotTheme.anomaly,
-                  size: pointSize + 5,
-                  opacity: 1,
-                  line: { color: plotTheme.latest, width: 2 },
-                },
-              },
-              hoverForIndices(anomalyLatest)
-            )
-          );
-        }
-      } else if (anomalyResult?.anomalous_points?.length) {
-        const normal = anomalyResult.anomalous_points.filter(
-          (point) => !point.is_anomaly && isVisibleMonitoringIndex(point.index)
-        );
-        const anomalies = anomalyResult.anomalous_points.filter(
-          (point) => point.is_anomaly && isVisibleMonitoringIndex(point.index)
-        );
-
-        if (normal.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: normal.map((point) => point.x),
-                y: normal.map((point) => point.y),
-                type: 'scattergl',
-                mode: 'markers',
-                name: 'Monitoring (normal)',
-                marker: { color: plotTheme.normal, size: pointSize, opacity: 0.75 },
-              },
-              hoverForIndices(normal.map((point) => point.index))
-            )
-          );
-        }
-
-        if (anomalies.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: anomalies.map((point) => point.x),
-                y: anomalies.map((point) => point.y),
-                type: 'scattergl',
-                mode: 'markers',
-                name: 'Monitoring (anomaly)',
-                marker: { color: plotTheme.anomaly, size: pointSize + 1, opacity: 0.95 },
-              },
-              hoverForIndices(anomalies.map((point) => point.index))
-            )
-          );
-        }
-      } else {
-        const regularIndices = effectiveMonitoringData.dinsight_x
-          .map((_, index) => index)
-          .filter(
-            (index) =>
-              isVisibleMonitoringIndex(index) &&
-              !latestIndices.has(index) &&
-              !trailIndices.has(index)
-          );
-        const trailOnly = effectiveMonitoringData.dinsight_x
-          .map((_, index) => index)
-          .filter((index) => trailIndices.has(index));
-        const latestOnly = effectiveMonitoringData.dinsight_x
-          .map((_, index) => index)
-          .filter((index) => latestIndices.has(index));
-        const trajectoryLine = [...trailOnly, ...latestOnly];
-
-        if (regularIndices.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: regularIndices.map((index) => effectiveMonitoringData.dinsight_x[index]),
-                y: regularIndices.map((index) => effectiveMonitoringData.dinsight_y[index]),
-                type: 'scattergl',
-                mode: 'markers',
-                name: 'Monitoring',
-                marker: {
-                  color: plotTheme.monitoring,
-                  size: pointSize,
-                  opacity: monitorView === 'recent' ? 0.82 : 0.7,
-                },
-              },
-              hoverForIndices(regularIndices)
-            )
-          );
-        }
-
-        if (trailOnly.length > 0) {
-          const trailOpacity = trailOnly.map((_, index) => {
-            if (trailOnly.length === 1) return 0.7;
-            return 0.32 + (index / (trailOnly.length - 1)) * 0.48;
-          });
-
-          if (showTrajectoryLine && trajectoryLine.length > 1) {
-            traces.push({
-              x: trajectoryLine.map((index) => effectiveMonitoringData.dinsight_x[index]),
-              y: trajectoryLine.map((index) => effectiveMonitoringData.dinsight_y[index]),
-              type: 'scattergl',
-              mode: 'lines',
-              name: 'Trajectory',
-              hoverinfo: 'skip',
-              line: { color: alphaColor(plotTheme.trailMid, 0.22), width: 2 },
-              showlegend: false,
-            });
-          }
-
-          traces.push({
-            x: trailOnly.map((index) => effectiveMonitoringData.dinsight_x[index]),
-            y: trailOnly.map((index) => effectiveMonitoringData.dinsight_y[index]),
-            type: 'scattergl',
-            mode: 'markers',
-            name: `Trail (${trailOnly.length})`,
-            hoverinfo: 'skip',
-            marker: {
-              color: trailOnly.map((_, index) => index),
-              colorscale: [
-                [0, plotTheme.trailOld],
-                [0.5, plotTheme.trailMid],
-                [1, plotTheme.trailLatest],
-              ],
-              cmin: 0,
-              cmax: Math.max(trailOnly.length - 1, 1),
-              size: pointSize + 2,
-              opacity: trailOpacity,
-              line: { color: alphaColor(plotTheme.trailMid, 0.35), width: 0.5 },
-              showscale: false,
-            },
-          });
-        }
-
-        if (latestOnly.length > 0) {
-          traces.push(
-            withMetadata(
-              {
-                x: latestOnly.map((index) => effectiveMonitoringData.dinsight_x[index]),
-                y: latestOnly.map((index) => effectiveMonitoringData.dinsight_y[index]),
-                type: 'scattergl',
-                mode: 'markers',
-                name: `Latest (${latestOnly.length})`,
-                marker: {
-                  color: plotTheme.latest,
-                  size: pointSize + 5,
-                  opacity: 1,
-                  line: { color: plotTheme.latestLine, width: 2 },
-                },
-              },
-              hoverForIndices(latestOnly)
-            )
-          );
-        }
-      }
-
-      const latestOverlayIndices = effectiveMonitoringData.dinsight_x
-        .map((_, index) => index)
-        .filter((index) => latestIndices.has(index));
-      if (latestOverlayIndices.length > 0) {
-        traces.push({
-          x: latestOverlayIndices.map((index) => effectiveMonitoringData.dinsight_x[index]),
-          y: latestOverlayIndices.map((index) => effectiveMonitoringData.dinsight_y[index]),
-          type: 'scattergl',
-          mode: 'markers',
-          name: 'Latest stream points',
-          showlegend: false,
-          hoverinfo: 'skip',
-          marker: {
-            size: pointSize + 8,
-            color: 'rgba(0,0,0,0)',
-            line: { color: plotTheme.latest, width: 2.5 },
-            opacity: 1,
-          },
-        });
-      }
-    }
-
-    const monitoringRangeStart = (() => {
-      if (!effectiveMonitoringData) {
-        return 0;
-      }
-      const count = effectiveMonitoringData.dinsight_x.length;
-      if (followLatest) {
-        return Math.max(0, count - Math.max(50, latestGlowCount + trailPoints + 25));
-      }
-      if (monitorView === 'recent') {
-        return Math.max(0, count - LIVE_RECENT_WINDOW_POINTS);
-      }
-      return 0;
-    })();
-    const monitoringRangeX = effectiveMonitoringData?.dinsight_x.slice(monitoringRangeStart) ?? [];
-    const monitoringRangeY = effectiveMonitoringData?.dinsight_y.slice(monitoringRangeStart) ?? [];
-
-    const xAxisRange = buildPaddedAxisRange([
-      ...(baselineData?.dinsight_x ?? []),
-      ...monitoringRangeX,
-      ...(anomalyResult?.anomalous_points?.map((point) => point.x) ?? []),
-    ]);
-    const yAxisRange = buildPaddedAxisRange([
-      ...(baselineData?.dinsight_y ?? []),
-      ...monitoringRangeY,
-      ...(anomalyResult?.anomalous_points?.map((point) => point.y) ?? []),
-    ]);
-    const autoscaleRevision = plotRevisionFromParts([
-      selectedId ?? 'live-monitor',
-      followLatest ? 'follow-latest' : monitorView,
-      axisRangeRevisionPart(xAxisRange),
-      axisRangeRevisionPart(yAxisRange),
-    ]);
-    const baseConfig = createThemedPlotConfig({ modeBar: true });
-    const selectionModeButtonsToRemove = manualSelectionEnabled
-      ? selectionMode === 'lasso'
-        ? ['select2d']
-        : ['lasso2d']
-      : [];
-
-    return {
-      data: traces,
-      revision: autoscaleRevision,
-      layout: createThemedPlotLayout(plotTheme, {
-        height: 560,
-        title: '',
-        xaxis: {
-          title: "D'insight X Coordinate",
-          autorange: !xAxisRange,
-          ...(xAxisRange ? { range: xAxisRange } : {}),
-        },
-        yaxis: {
-          title: "D'insight Y Coordinate",
-          autorange: !yAxisRange,
-          ...(yAxisRange ? { range: yAxisRange } : {}),
-        },
-        legend: { orientation: 'h', y: 1.04, x: 0, xanchor: 'left' },
-        margin: { t: 52, r: 24, b: 60, l: 64 },
-        uirevision: selectedId ?? 'live-monitor',
-        dragmode: manualSelectionEnabled
-          ? selectionMode === 'lasso'
-            ? 'lasso'
-            : 'select'
-          : 'zoom',
-        shapes: plotShapes,
-      }) as any,
-      config: {
-        ...baseConfig,
-        modeBarButtonsToRemove: [
-          ...baseConfig.modeBarButtonsToRemove,
-          ...selectionModeButtonsToRemove,
-        ],
-      },
-    };
-  }, [
-    anomalyResult,
-    baselineData,
-    buildHoverText,
-    followLatest,
-    hasActiveMetadata,
-    latestIndices,
-    latestGlowCount,
-    trailIndices,
-    manualClassification,
-    manualSelectionEnabled,
-    effectiveMonitoringData,
-    monitorView,
-    plotShapes,
-    plotTheme,
-    pointSize,
-    selectedId,
-    selectionMode,
-    showContours,
-    showTrajectoryLine,
-    trailPoints,
-  ]);
-
   const liveEChartOption = useMemo(() => {
     if (!baselineData || baselineData.dinsight_x.length === 0) {
       return null;
@@ -1709,20 +1286,54 @@ export default function LiveMonitorPage() {
       Number(value).toLocaleString(undefined, {
         maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
       });
-    const series: any[] = [
-      {
-        type: 'scatter',
-        name: 'Baseline',
-        data: baselineData.dinsight_x.map((x, index) =>
-          toSeriesPoint(x, baselineData.dinsight_y[index], index, baselineHover[index], 'Baseline')
-        ),
-        symbolSize: pointSize,
-        large: true,
-        largeThreshold: 2000,
-        progressive: 1000,
-        itemStyle: { color: alphaColor(plotTheme.baseline, 0.38) },
-      },
-    ];
+    const series: any[] = [];
+    let visualMap: EChartsOption['visualMap'] | undefined;
+
+    if (showContours && baselineData.dinsight_x.length > 20) {
+      const density = buildDensityHeatmapData(baselineData.dinsight_x, baselineData.dinsight_y);
+      if (density.data.length > 0) {
+        const densitySeriesIndex = series.length;
+        series.push({
+          type: 'scatter',
+          name: 'Baseline density',
+          data: density.data,
+          symbol: 'rect',
+          symbolSize: 11,
+          silent: true,
+          progressive: 1000,
+          z: 1,
+          emphasis: { disabled: true },
+        });
+        visualMap = {
+          show: false,
+          dimension: 2,
+          min: 0,
+          max: density.maxDensity,
+          seriesIndex: [densitySeriesIndex],
+          inRange: {
+            color: [
+              'rgba(37, 99, 235, 0)',
+              alphaColor(plotTheme.baseline, 0.08),
+              alphaColor(plotTheme.baseline, 0.18),
+            ],
+          },
+        } as any;
+      }
+    }
+
+    series.push({
+      type: 'scatter',
+      name: 'Baseline',
+      data: baselineData.dinsight_x.map((x, index) =>
+        toSeriesPoint(x, baselineData.dinsight_y[index], index, baselineHover[index], 'Baseline')
+      ),
+      symbolSize: pointSize,
+      large: true,
+      largeThreshold: 2000,
+      progressive: 1000,
+      itemStyle: { color: alphaColor(plotTheme.baseline, 0.38) },
+      z: 4,
+    });
 
     if (effectiveMonitoringData && effectiveMonitoringData.dinsight_x.length > 0) {
       const visibleStartIndex =
@@ -2000,6 +1611,7 @@ export default function LiveMonitorPage() {
         throttleType: 'debounce',
         throttleDelay: 250,
       },
+      visualMap,
       grid: { top: 64, right: 84, bottom: 96, left: 78, containLabel: true },
       dataZoom: [
         { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
@@ -2047,6 +1659,7 @@ export default function LiveMonitorPage() {
     monitorView,
     plotTheme,
     pointSize,
+    showContours,
     showTrajectoryLine,
     trailIndices,
     trailPoints,
@@ -2583,8 +2196,8 @@ export default function LiveMonitorPage() {
               title="Coordinate map"
               description={
                 followLatest
-                  ? 'Apache ECharts pilot. Range follows the latest monitoring segment; the page and plot stay mounted.'
-                  : 'Apache ECharts pilot. Baseline, monitoring, recent trail, and latest stream points in one view.'
+                  ? 'Apache ECharts. Range follows the latest monitoring segment; the page and plot stay mounted.'
+                  : 'Apache ECharts. Baseline, monitoring, recent trail, and latest stream points in one view.'
               }
               stats={
                 <>
@@ -2633,34 +2246,13 @@ export default function LiveMonitorPage() {
                     style={{ width: '100%', height: 'min(62vh, 560px)', minHeight: '420px' }}
                   />
                   <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
-                    Pilot interactions: use the ECharts toolbox for zoom, brush, restore, and image
+                    Interactions: use the ECharts toolbox for zoom, brush, restore, and image
                     export; use bottom/right sliders or mouse wheel to inspect dense ranges.
                     {showContours
-                      ? ' Baseline contour overlay remains Plotly-only during this pilot.'
+                      ? ' Baseline density overlay is rendered natively in ECharts.'
                       : ''}
                   </p>
                 </>
-              ) : plotData ? (
-                <Plot
-                  data={plotData.data}
-                  layout={plotData.layout as any}
-                  config={plotData.config as any}
-                  revision={plotData.revision}
-                  useResizeHandler
-                  style={{ width: '100%', height: 'min(62vh, 560px)', minHeight: '420px' }}
-                  onSelecting={() => {
-                    if (manualSelectionEnabled) {
-                      setIsSelecting(true);
-                    }
-                  }}
-                  onSelected={(selection: any) => {
-                    setIsSelecting(false);
-                    handleSelection(selection);
-                  }}
-                  onDeselect={() => {
-                    setIsSelecting(false);
-                  }}
-                />
               ) : (
                 <div className="flex h-[min(62vh,560px)] min-h-[420px] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
                   Select a dataset with baseline coordinates to start live monitoring.

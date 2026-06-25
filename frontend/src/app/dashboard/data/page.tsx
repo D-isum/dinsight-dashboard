@@ -26,6 +26,7 @@ import { ConfigDialog } from '@/components/ui/config-dialog';
 import { ProcessingDialog } from '@/components/ui/processing-dialog';
 import { DeploymentStatusCard } from '@/components/deployment/deployment-status-card';
 import { ChartFrame, ChartStat } from '@/components/charts/chart-frame';
+import { EChartsCanvas } from '@/components/charts/echarts-canvas';
 import { DatasetCatalog } from '@/components/datasets/dataset-catalog';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { usePermission } from '@/components/auth/require-permission';
@@ -44,8 +45,6 @@ import { createDinsightPreviewPlot } from '@/lib/dinsight-preview-plot';
 import { formatDatasetOptionLabel, getDatasetSourceGroupKey } from '@/lib/dataset-source-groups';
 import { Actions } from '@/lib/permissions';
 import { usePlotTheme } from '@/lib/plot-theme';
-
-import { PlotCanvas as Plot } from '@/components/charts/plot-canvas';
 
 type ProcessingConfig = {
   id?: number;
@@ -1115,12 +1114,9 @@ export default function DataIngestionPage() {
               }
             >
               <div className="mx-auto aspect-square w-full max-w-[820px] max-h-[75vh]">
-                <Plot
-                  data={previewPlot.data as any}
-                  layout={previewPlot.layout as any}
-                  config={previewPlot.config as any}
-                  revision={previewPlot.revision}
-                  useResizeHandler
+                <EChartsCanvas
+                  key={previewPlot.revision}
+                  option={previewPlot.option}
                   style={{ width: '100%', height: '100%' }}
                 />
               </div>
@@ -1786,12 +1782,9 @@ export default function DataIngestionPage() {
                     <EmptyState title="Preview unavailable" description={inlineBaselineError} />
                   ) : inlinePreviewPlot ? (
                     <div className="h-[250px]">
-                      <Plot
-                        data={inlinePreviewPlot.data as any}
-                        layout={inlinePreviewPlot.layout as any}
-                        config={inlinePreviewPlot.config as any}
-                        revision={inlinePreviewPlot.revision}
-                        useResizeHandler
+                      <EChartsCanvas
+                        key={inlinePreviewPlot.revision}
+                        option={inlinePreviewPlot.option}
                         style={{ width: '100%', height: '100%' }}
                       />
                     </div>
