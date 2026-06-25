@@ -3,6 +3,15 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import DashboardPage from '@/app/dashboard/page';
 
+vi.mock('@/context/dashboard-workspace-context', () => ({
+  useDashboardWorkspace: () => ({
+    selectedDatasetId: 14,
+    selectDataset: () => undefined,
+    selectSource: () => undefined,
+    setMachineHealthSnapshot: () => undefined,
+  }),
+}));
+
 vi.mock('@/hooks/useDeploymentStatus', () => ({
   useDeploymentStatus: () => ({
     runtime: {
@@ -75,7 +84,11 @@ vi.mock('@/hooks/useDashboardOverview', () => ({
       datasetId: 14,
     },
     wearDirection: 'up',
-    machineStatus: { state: 'Deteriorating', recommendation: 'Inspect machine soon.' },
+    machineStatus: {
+      state: 'Deteriorating',
+      recommendation: 'Inspect machine soon.',
+      reasons: ['Anomaly is rising.'],
+    },
     history: [
       {
         timestamp: Date.now() - 1000,

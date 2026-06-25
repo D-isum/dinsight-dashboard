@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   AlertTriangle,
@@ -22,6 +22,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { DeploymentStatusCard } from '@/components/deployment/deployment-status-card';
+import { useDashboardWorkspace } from '@/context/dashboard-workspace-context';
 import { useDashboardOverview } from '@/hooks/useDashboardOverview';
 import { buildSparklinePath } from '@/lib/dashboard-overview';
 import { cn } from '@/utils/cn';
@@ -337,7 +338,7 @@ function RecommendedActions({
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard/data/catalog">
+            <Link href="/dashboard/data?catalog=open">
               <Database className="mr-2 h-4 w-4" />
               Catalog
             </Link>
@@ -349,6 +350,12 @@ function RecommendedActions({
 }
 
 export default function DashboardPage() {
+  const {
+    selectedDatasetId: workspaceDatasetId,
+    selectDataset: selectWorkspaceDataset,
+    selectSource: selectWorkspaceSource,
+    setMachineHealthSnapshot,
+  } = useDashboardWorkspace();
   const {
     datasets,
     latestDatasetId,
@@ -375,6 +382,28 @@ export default function DashboardPage() {
     refetchAll,
   } = useDashboardOverview();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const machineReasons = useMemo(
+    () =>
+      machineStatus.reasons && machineStatus.reasons.length > 0
+        ? machineStatus.reasons
+        : [machineStatus.recommendation],
+    [machineStatus.reasons, machineStatus.recommendation]
+  );
+
+  useEffect(() => {
+    setMachineHealthSnapshot({
+      state: machineStatus.state,
+      recommendation: machineStatus.recommendation,
+      reasons: machineReasons,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [machineReasons, machineStatus.recommendation, machineStatus.state, setMachineHealthSnapshot]);
+
+  useEffect(() => {
+    if (selectedLiveDatasetId && workspaceDatasetId !== selectedLiveDatasetId) {
+      selectWorkspaceDataset(selectedLiveDatasetId);
+    }
+  }, [selectWorkspaceDataset, selectedLiveDatasetId, workspaceDatasetId]);
 
   const handleRefresh = async () => {
     try {
@@ -480,11 +509,25 @@ export default function DashboardPage() {
               />
             </div>
 
+            <div className="rounded-lg border border-current/20 bg-white/25 p-3 text-sm dark:bg-black/10">
+              <div className="text-xs font-semibold uppercase">Why this state</div>
+              <div className="mt-2 grid gap-2 md:grid-cols-3">
+                {machineReasons.map((reason) => (
+                  <div key={reason} className="rounded-md border border-current/15 px-3 py-2">
+                    {reason}
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center gap-2">
               <DatasetSourceSelect
                 groups={datasetSourceGroups}
                 selectedSourceKey={selectedSourceKey}
-                onChange={setSelectedSourceKey}
+                onChange={(key) => {
+                  setSelectedSourceKey(key);
+                  selectWorkspaceSource(key);
+                }}
                 className="min-w-56 rounded-md border border-border bg-surface px-3 py-2 text-sm"
               />
               <Button

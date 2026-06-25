@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import {
   Search,
-  Bell,
   Menu,
   User,
   LogOut,
@@ -14,9 +13,13 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
+import { useDashboardWorkspace } from '@/context/dashboard-workspace-context';
 import { usePlatformAdmin } from '@/components/auth/require-permission';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ActivityTimeline } from '@/components/layout/activity-timeline';
+import { CommandPalette } from '@/components/layout/command-palette';
+import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +27,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 import { cn } from '@/utils/cn';
 
 interface HeaderProps {
@@ -34,10 +38,20 @@ interface HeaderProps {
 export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
   const isPlatformAdmin = usePlatformAdmin();
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const {
+    groups,
+    selectedSourceKey,
+    selectSource,
+    selectedDatasetId,
+    filteredDatasets,
+    selectDataset,
+    isLoadingDatasets,
+  } = useDashboardWorkspace();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-surface">
+      <CommandPalette open={isCommandOpen} onOpenChange={setIsCommandOpen} />
       <div className="flex h-16 items-center px-4 sm:px-6">
         {/* Mobile menu button */}
         <Button
@@ -59,30 +73,50 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
           </Link>
         </div>
 
-        {/* Search Bar */}
-        <div className="flex-1 max-w-2xl mx-4 hidden md:flex">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle" />
-            <input
-              type="search"
-              placeholder="Search analyses, datasets, or features..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className={cn(
-                'w-full rounded-lg border border-border bg-surface-muted pl-10 pr-4 py-2.5 text-sm transition-colors duration-150',
-                'placeholder:text-fg-subtle',
-                'focus:outline-none focus-visible:border-control-border-focus focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-canvas'
-              )}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted dark:hover:text-fg-subtle"
-              >
-                <span className="text-xs">ESC</span>
-              </button>
+        {/* Search / command bar */}
+        <div className="mx-4 hidden max-w-xl flex-1 md:flex">
+          <button
+            type="button"
+            onClick={() => setIsCommandOpen(true)}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-lg border border-border bg-surface-muted px-3 py-2.5 text-left text-sm transition-colors duration-150',
+              'text-fg-muted hover:border-control-border-focus hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-canvas'
             )}
-          </div>
+          >
+            <Search className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
+            <span className="min-w-0 flex-1 truncate">
+              Search pages, datasets, saved views, or actions...
+            </span>
+            <span className="hidden rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] text-fg-subtle lg:inline-flex">
+              Ctrl/Cmd K
+            </span>
+          </button>
+        </div>
+
+        <div className="hidden min-w-0 items-center gap-2 xl:flex">
+          <DatasetSourceSelect
+            groups={groups}
+            selectedSourceKey={selectedSourceKey}
+            onChange={selectSource}
+            disabled={isLoadingDatasets}
+            className="h-10 max-w-[13rem] rounded-lg border border-border bg-background px-2 text-xs text-fg"
+          />
+          <select
+            value={selectedDatasetId != null ? String(selectedDatasetId) : ''}
+            onChange={(event) =>
+              selectDataset(event.target.value ? Number(event.target.value) : null)
+            }
+            disabled={isLoadingDatasets || filteredDatasets.length === 0}
+            className="h-10 max-w-[14rem] rounded-lg border border-border bg-background px-2 text-xs text-fg disabled:opacity-60"
+            title="Global dataset context"
+          >
+            <option value="">{isLoadingDatasets ? 'Loading datasets...' : 'Select dataset'}</option>
+            {filteredDatasets.map((dataset) => (
+              <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
+                {formatDatasetOptionLabel(dataset)}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div className="flex-1" />
@@ -94,6 +128,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
             variant="ghost"
             size="icon"
             className="md:hidden hover:bg-surface-hover rounded-lg transition-colors"
+            onClick={() => setIsCommandOpen(true)}
           >
             <Search className="h-5 w-5" />
             <span className="sr-only">Search</span>
@@ -102,78 +137,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
           {/* Theme Toggle */}
           <ThemeToggle />
 
-          {/* Notifications */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="relative hover:bg-surface-hover rounded-lg transition-colors"
-              >
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-danger text-xs font-medium text-accent-contrast shadow-sm">
-                  3
-                </span>
-                <span className="sr-only">Notifications</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="right" className="w-80 rounded-lg">
-              <div className="px-4 py-3 border-b dark:border-border">
-                <h3 className="font-semibold text-fg">Notifications</h3>
-                <p className="text-sm text-fg-muted">You have 3 unread notifications</p>
-              </div>
-              <div className="py-2">
-                <DropdownMenuItem className="px-4 py-3 hover:bg-surface-hover/50 transition-colors">
-                  <div className="flex gap-3 w-full">
-                    <div className="flex-shrink-0">
-                      <div className="h-2 w-2 bg-danger rounded-full mt-1.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-fg">High Anomaly Detected</p>
-                      <p className="text-xs text-fg-muted mt-0.5">
-                        Dataset analysis - 18.5% anomaly rate
-                      </p>
-                      <p className="text-xs text-fg-subtle mt-1">2 minutes ago</p>
-                    </div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="px-4 py-3 hover:bg-surface-hover/50 transition-colors">
-                  <div className="flex gap-3 w-full">
-                    <div className="flex-shrink-0">
-                      <div className="h-2 w-2 bg-success rounded-full mt-1.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-fg">Analysis Complete</p>
-                      <p className="text-xs text-fg-muted mt-0.5">
-                        Baseline data processing finished
-                      </p>
-                      <p className="text-xs text-fg-subtle mt-1">1 hour ago</p>
-                    </div>
-                  </div>
-                </DropdownMenuItem>
-                <DropdownMenuItem className="px-4 py-3 hover:bg-surface-hover/50 transition-colors">
-                  <div className="flex gap-3 w-full">
-                    <div className="flex-shrink-0">
-                      <div className="h-2 w-2 bg-warning rounded-full mt-1.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-fg">Maintenance Due</p>
-                      <p className="text-xs text-fg-muted mt-0.5">System maintenance scheduled</p>
-                      <p className="text-xs text-fg-subtle mt-1">3 hours ago</p>
-                    </div>
-                  </div>
-                </DropdownMenuItem>
-              </div>
-              <div className="border-t dark:border-border p-2">
-                <Link
-                  href="/dashboard/insights"
-                  className="flex items-center justify-center w-full px-3 py-2 text-sm font-medium text-accent hover:bg-surface-hover/50 rounded-lg transition-colors"
-                >
-                  Open health insights
-                </Link>
-              </div>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <ActivityTimeline />
 
           {/* User menu */}
           <DropdownMenu>

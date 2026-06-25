@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  Activity,
   ArrowRight,
   ChevronDown,
   ChevronUp,
@@ -21,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartFrame, ChartStat, ChartSwatch } from '@/components/charts/chart-frame';
+import { WorkflowState } from '@/components/ui/workflow-state';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
@@ -35,6 +37,10 @@ import {
 import { alphaColor, usePlotTheme } from '@/lib/plot-theme';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
+import {
+  DASHBOARD_COMMAND_EVENT,
+  useDashboardWorkspace,
+} from '@/context/dashboard-workspace-context';
 import { STREAMING_MONITORING_EMPHASIS_POINTS } from '@/lib/chart-focus-config';
 import { EChartsCanvas } from '@/components/charts/echarts-canvas';
 import {
@@ -353,6 +359,12 @@ const formatIntervalTick = (value: string) => {
 
 export default function HealthInsightsPage() {
   const { user } = useAuth();
+  const {
+    selectDataset: selectWorkspaceDataset,
+    selectSource: selectWorkspaceSource,
+    logActivity,
+    setMachineHealthSnapshot,
+  } = useDashboardWorkspace();
   const plotTheme = usePlotTheme();
   const userId = user?.id;
   const [datasetId, setDatasetId] = useState<number | null>(null);
@@ -392,6 +404,7 @@ export default function HealthInsightsPage() {
   const hasPinnedDatasetRef = useRef(false);
   const pendingDraftRef = useRef<DraftWearTrendConfig | null>(null);
   const draftPersistTimerRef = useRef<number | null>(null);
+  const lastLoggedWearResultRef = useRef('');
 
   const { datasets, isLoading } = useDatasetDiscovery({
     queryKey: ['available-dinsight-ids'],
@@ -401,7 +414,6 @@ export default function HealthInsightsPage() {
   const {
     groups: datasetSourceGroups,
     selectedSourceKey,
-    setSelectedSourceKey,
     filteredDatasets,
     filteredDatasetIds,
     latestFilteredDatasetId,
@@ -900,6 +912,27 @@ export default function HealthInsightsPage() {
     !isFetchingWearTrend;
 
   useEffect(() => {
+    if (!wearResult || !datasetId || !hasAppliedWearTrendRun) {
+      return;
+    }
+
+    const signature = `${datasetId}:${wearResult.metadata_column}:${wearResult.intervals.length}:${wearResult.stats.monitoring_point_count}`;
+    if (signature === lastLoggedWearResultRef.current) {
+      return;
+    }
+    lastLoggedWearResultRef.current = signature;
+
+    logActivity({
+      type: 'analysis',
+      title: `Wear trend result ready for dataset #${datasetId}`,
+      description: `${wearResult.intervals.length.toLocaleString()} intervals analyzed: ${wearResult.stats.baseline_point_count.toLocaleString()} baseline points and ${wearResult.stats.monitoring_point_count.toLocaleString()} monitoring points.`,
+      datasetId,
+      href: '/dashboard/insights',
+      status: 'success',
+    });
+  }, [datasetId, hasAppliedWearTrendRun, logActivity, wearResult]);
+
+  useEffect(() => {
     if (!wearResult) {
       return;
     }
@@ -1017,6 +1050,16 @@ export default function HealthInsightsPage() {
     setLastWearTrendRunAt(new Date().toISOString());
     setIntervalPage(1);
     setTransitionPage(1);
+    logActivity({
+      type: 'analysis',
+      title: `Wear trend run for dataset #${datasetId}`,
+      description: `${metadataColumn} with ${
+        selectedClusterValues.length
+      } selected baseline interval(s)${rangeStart && rangeEnd ? ' plus a baseline range' : ''}.`,
+      datasetId,
+      href: '/dashboard/insights',
+      status: 'info',
+    });
 
     if (typeof window !== 'undefined') {
       const dedupedValues = Array.from(new Set(selectedClusterValues)).sort();
@@ -1047,6 +1090,7 @@ export default function HealthInsightsPage() {
     selectedClusterValues,
     persistWearConfigToServer,
     userId,
+    logActivity,
   ]);
 
   const resetToLastAppliedSelection = () => {
@@ -1136,6 +1180,7 @@ export default function HealthInsightsPage() {
     setDatasetError(null);
     hasPinnedDatasetRef.current = true;
     setDatasetId(parsed);
+    selectWorkspaceDataset(parsed);
   };
 
   const distanceSummary = useMemo(() => {
@@ -1856,6 +1901,45 @@ export default function HealthInsightsPage() {
             ? `Fallback threshold: adaptive spread was unavailable, so danger uses selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
             : 'Fixed fallback danger threshold used because a valid selected baseline distribution is unavailable.';
 
+  const insightsMachineState =
+    latestMonitoringTone === 'danger'
+      ? 'Failing'
+      : latestMonitoringTone === 'warning'
+        ? 'Deteriorating'
+        : latestMonitoringTone === 'success'
+          ? 'OK'
+          : 'Unknown';
+
+  useEffect(() => {
+    if (!wearResult || !latestMonitoringInterval) {
+      return;
+    }
+
+    setMachineHealthSnapshot({
+      state: insightsMachineState,
+      recommendation:
+        insightsMachineState === 'Failing'
+          ? 'Latest monitoring interval is beyond the danger threshold.'
+          : insightsMachineState === 'Deteriorating'
+            ? 'Latest monitoring interval is beyond the warning threshold.'
+            : 'Latest monitoring interval remains within the selected baseline threshold model.',
+      reasons: [
+        `Latest distance ${latestMonitoringInterval.distance_from_g0.toFixed(3)}.`,
+        `Warning ${distanceSummary.warningThreshold.toFixed(3)}, danger ${distanceSummary.dangerThreshold.toFixed(3)}.`,
+        `Threshold model: ${distanceThresholdMethodLabel}.`,
+      ],
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    distanceSummary.dangerThreshold,
+    distanceSummary.warningThreshold,
+    distanceThresholdMethodLabel,
+    insightsMachineState,
+    latestMonitoringInterval,
+    setMachineHealthSnapshot,
+    wearResult,
+  ]);
+
   const g0ToGiMeans = useMemo(() => {
     if (!wearResult) {
       return {
@@ -1918,6 +2002,30 @@ export default function HealthInsightsPage() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [applyWearTrendSelection, canRunWearTrend]);
 
+  useEffect(() => {
+    const onCommand = (event: Event) => {
+      const action = (event as CustomEvent<{ action?: string }>).detail?.action;
+      if (action !== 'run-wear-trend') {
+        return;
+      }
+      if (canRunWearTrend) {
+        applyWearTrendSelection();
+      } else {
+        logActivity({
+          type: 'analysis',
+          title: 'Wear trend not ready',
+          description: 'Select a dataset, wear trend column, and healthy baseline intervals first.',
+          datasetId: datasetId ?? undefined,
+          href: '/dashboard/insights',
+          status: 'warning',
+        });
+      }
+    };
+
+    window.addEventListener(DASHBOARD_COMMAND_EVENT, onCommand);
+    return () => window.removeEventListener(DASHBOARD_COMMAND_EVENT, onCommand);
+  }, [applyWearTrendSelection, canRunWearTrend, datasetId, logActivity]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
@@ -1946,7 +2054,7 @@ export default function HealthInsightsPage() {
               <DatasetSourceSelect
                 groups={datasetSourceGroups}
                 selectedSourceKey={selectedSourceKey}
-                onChange={setSelectedSourceKey}
+                onChange={selectWorkspaceSource}
               />
             </div>
 
@@ -1956,8 +2064,10 @@ export default function HealthInsightsPage() {
                 value={datasetId != null ? String(datasetId) : ''}
                 onChange={(event) => {
                   const value = event.target.value;
+                  const parsed = value ? Number(value) : null;
                   hasPinnedDatasetRef.current = true;
-                  setDatasetId(value ? Number(value) : null);
+                  setDatasetId(parsed);
+                  selectWorkspaceDataset(parsed);
                 }}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
@@ -2644,9 +2754,21 @@ export default function HealthInsightsPage() {
                           </p>
                         </ChartFrame>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
-                          No distance plot available for the current selection.
-                        </p>
+                        <WorkflowState
+                          icon={<TrendingDown className="h-5 w-5" aria-hidden="true" />}
+                          title="Distance plot is not ready"
+                          description="Select a dataset, choose the wear trend column, mark healthy baseline intervals, then run wear trend analysis."
+                          action={
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={applyWearTrendSelection}
+                              disabled={!canRunWearTrend}
+                            >
+                              Run wear trend
+                            </Button>
+                          }
+                        />
                       )}
 
                       <div className="space-y-3 rounded-lg border border-input p-3">
@@ -2826,10 +2948,11 @@ export default function HealthInsightsPage() {
                           </div>
                         </ChartFrame>
                       ) : (
-                        <p className="text-sm text-muted-foreground">
-                          No transition plot available. Enable monitoring intervals or choose a
-                          dataset with enough ordered intervals.
-                        </p>
+                        <WorkflowState
+                          icon={<Activity className="h-5 w-5" aria-hidden="true" />}
+                          title="Transition plot is not ready"
+                          description="Enable monitoring intervals or choose a dataset with enough ordered baseline and monitoring intervals to calculate Gi to Gi+1 movement."
+                        />
                       )}
 
                       <div className="space-y-3 rounded-lg border border-input p-3">

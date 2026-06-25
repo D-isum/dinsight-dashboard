@@ -7,6 +7,7 @@ import { AlertTriangle, RefreshCw, ScrollText } from 'lucide-react';
 import { Header } from './header';
 import { Sidebar } from './sidebar';
 import { useAuth, withAuth } from '@/context/auth-context';
+import { DashboardWorkspaceProvider } from '@/context/dashboard-workspace-context';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -145,38 +146,40 @@ function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="h-screen flex min-w-0 bg-canvas">
-      {/* Sidebar */}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <DashboardWorkspaceProvider>
+      <div className="h-screen flex min-w-0 bg-canvas">
+        {/* Sidebar */}
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-      {/* Main content */}
-      <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <Header onMenuClick={() => setSidebarOpen(true)} isSidebarOpen={sidebarOpen} />
+        {/* Main content */}
+        <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
+          {/* Header */}
+          <Header onMenuClick={() => setSidebarOpen(true)} isSidebarOpen={sidebarOpen} />
 
-        {/* Page content — wrapped so a render-time crash in one page surfaces
-            the ErrorBoundary fallback instead of breaking the entire app shell. */}
-        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-canvas">
-          <div className="mx-auto w-full max-w-7xl min-w-0 px-4 py-6">
-            {licenseIssue && showingAccountSettings && (
-              <Alert variant="danger" className="mb-4">
-                <AlertTriangle aria-hidden="true" />
-                <AlertTitle>Deployment license requires attention</AlertTitle>
-                <AlertDescription>
-                  {licenseIssue.message} Licensed analysis and monitoring routes are locked until an
-                  administrator installs a renewed license.
-                </AlertDescription>
-              </Alert>
-            )}
-            {licenseIssue && !showingAccountSettings ? (
-              <LicenseLockout issue={licenseIssue} />
-            ) : (
-              <ErrorBoundary>{children}</ErrorBoundary>
-            )}
-          </div>
-        </main>
+          {/* Page content — wrapped so a render-time crash in one page surfaces
+              the ErrorBoundary fallback instead of breaking the entire app shell. */}
+          <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-canvas">
+            <div className="mx-auto w-full max-w-7xl min-w-0 px-4 py-6">
+              {licenseIssue && showingAccountSettings && (
+                <Alert variant="danger" className="mb-4">
+                  <AlertTriangle aria-hidden="true" />
+                  <AlertTitle>Deployment license requires attention</AlertTitle>
+                  <AlertDescription>
+                    {licenseIssue.message} Licensed analysis and monitoring routes are locked until
+                    an administrator installs a renewed license.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {licenseIssue && !showingAccountSettings ? (
+                <LicenseLockout issue={licenseIssue} />
+              ) : (
+                <ErrorBoundary>{children}</ErrorBoundary>
+              )}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </DashboardWorkspaceProvider>
   );
 }
 

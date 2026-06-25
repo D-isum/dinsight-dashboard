@@ -7,6 +7,7 @@ import {
   Activity,
   ArrowRight,
   Clock,
+  Database,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
@@ -23,6 +24,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ChartFrame, ChartStat, ChartSwatch } from '@/components/charts/chart-frame';
+import { WorkflowState } from '@/components/ui/workflow-state';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
 import { MetadataHoverControls } from '@/components/metadata-hover-controls';
 import { useMetadataHover } from '@/hooks/useMetadataHover';
@@ -41,6 +43,7 @@ import {
 import { alphaColor, usePlotTheme } from '@/lib/plot-theme';
 import { readScoped, writeScoped } from '@/lib/scoped-storage';
 import { useAuth } from '@/context/auth-context';
+import { useDashboardWorkspace } from '@/context/dashboard-workspace-context';
 import { cn } from '@/utils/cn';
 import { EChartsCanvas } from '@/components/charts/echarts-canvas';
 
@@ -482,6 +485,13 @@ const buildDensityHeatmapData = (xValues: number[], yValues: number[], bins = 44
 
 export default function LiveMonitorPage() {
   const { user } = useAuth();
+  const {
+    selectedDatasetId: workspaceDatasetId,
+    selectDataset: selectWorkspaceDataset,
+    selectSource: selectWorkspaceSource,
+    setMachineHealthSnapshot,
+    logActivity,
+  } = useDashboardWorkspace();
   const plotTheme = usePlotTheme();
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [manualDatasetId, setManualDatasetId] = useState('');
@@ -517,6 +527,7 @@ export default function LiveMonitorPage() {
   const isApplyingPersistedPrefsRef = useRef(false);
   const boundariesByDatasetRef = useRef<Record<string, Boundary[]>>({});
   const serverSaveTimerRef = useRef<number | null>(null);
+  const lastLoggedStreamingStateRef = useRef('');
   const deviceIdRef = useRef('');
   const localPrefsUpdatedAtRef = useRef(0);
   const hasLocalEditsRef = useRef(false);
@@ -542,7 +553,6 @@ export default function LiveMonitorPage() {
   const {
     groups: datasetSourceGroups,
     selectedSourceKey,
-    setSelectedSourceKey,
     filteredDatasets,
     filteredDatasetIds,
     latestFilteredDatasetId,
@@ -961,11 +971,39 @@ export default function LiveMonitorPage() {
   );
 
   useEffect(() => {
+    const selectedDatasetExists =
+      selectedId != null && datasets.some((dataset) => dataset.dinsight_id === selectedId);
+    if (selectedDatasetExists && workspaceDatasetId === selectedId) {
+      return;
+    }
+
     if (selectedId === null || !filteredDatasetIds.includes(selectedId)) {
       setSelectedId(latestFilteredDatasetId);
       setDatasetError(null);
     }
-  }, [filteredDatasetIds, latestFilteredDatasetId, selectedId]);
+  }, [datasets, filteredDatasetIds, latestFilteredDatasetId, selectedId, workspaceDatasetId]);
+
+  useEffect(() => {
+    if (
+      workspaceDatasetId &&
+      workspaceDatasetId !== selectedId &&
+      datasets.some((dataset) => dataset.dinsight_id === workspaceDatasetId)
+    ) {
+      setSelectedId(workspaceDatasetId);
+      setManualDatasetId(String(workspaceDatasetId));
+      setDatasetError(null);
+    }
+  }, [datasets, selectedId, workspaceDatasetId]);
+
+  useEffect(() => {
+    if (!selectedId || workspaceDatasetId === selectedId) {
+      return;
+    }
+    if (workspaceDatasetId && !filteredDatasetIds.includes(workspaceDatasetId)) {
+      return;
+    }
+    selectWorkspaceDataset(selectedId);
+  }, [filteredDatasetIds, selectWorkspaceDataset, selectedId, workspaceDatasetId]);
 
   useEffect(() => {
     if (selectedId) {
@@ -1199,6 +1237,53 @@ export default function LiveMonitorPage() {
 
   const baselineCount = baselineData?.dinsight_x.length ?? 0;
   const monitoringCount = effectiveMonitoringData?.dinsight_x.length ?? 0;
+
+  useEffect(() => {
+    setMachineHealthSnapshot({
+      state: machineStatus.state,
+      recommendation: machineStatus.recommendation,
+      reasons: machineStatus.reasons,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    machineStatus.reasons,
+    machineStatus.recommendation,
+    machineStatus.state,
+    setMachineHealthSnapshot,
+  ]);
+
+  useEffect(() => {
+    if (!streamingStatus || !selectedId) {
+      return;
+    }
+
+    const signature = `${selectedId}:${streamingStatus.status}:${streamingStatus.is_active}:${streamingStatus.streamed_points}:${streamingStatus.total_points}`;
+    const statusOnlySignature = `${selectedId}:${streamingStatus.status}:${streamingStatus.is_active}`;
+    if (lastLoggedStreamingStateRef.current === statusOnlySignature) {
+      return;
+    }
+    lastLoggedStreamingStateRef.current = statusOnlySignature;
+
+    logActivity({
+      type: 'streaming',
+      title:
+        streamingStatus.status === 'completed'
+          ? `Streaming completed for dataset #${selectedId}`
+          : streamingStatus.is_active
+            ? `Streaming active for dataset #${selectedId}`
+            : `Streaming paused for dataset #${selectedId}`,
+      description: `${streamingStatus.streamed_points.toLocaleString()} of ${streamingStatus.total_points.toLocaleString()} points streamed.`,
+      datasetId: selectedId,
+      href: '/dashboard/live',
+      status:
+        streamingStatus.status === 'completed'
+          ? 'success'
+          : streamingStatus.is_active
+            ? 'info'
+            : 'warning',
+      id: `streaming-${signature}`,
+    });
+  }, [logActivity, selectedId, streamingStatus]);
 
   const { latestIndices, trailIndices } = useMemo(() => {
     if (!effectiveMonitoringData || effectiveMonitoringData.dinsight_x.length === 0) {
@@ -1691,6 +1776,7 @@ export default function LiveMonitorPage() {
 
     setDatasetError(null);
     setSelectedId(parsed);
+    selectWorkspaceDataset(parsed);
   };
 
   const refreshNow = useCallback(() => {
@@ -1772,25 +1858,35 @@ export default function LiveMonitorPage() {
       </div>
 
       <Card className={cn('border', stateTone[machineStatus.state])}>
-        <CardContent className="flex flex-wrap items-center justify-between gap-4 py-4">
+        <CardContent className="grid gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(260px,360px)] lg:items-start">
           <div>
             <p className="text-sm font-medium">Current machine state</p>
             <p className="text-2xl font-bold">{machineStatus.state}</p>
             <p className="text-sm">{machineStatus.recommendation}</p>
           </div>
-          <div className="text-sm">
-            <p>
-              Abnormal behavior:{' '}
-              <span className="font-semibold">
-                {anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : 'Not checked'}
-              </span>
-            </p>
-            <p>
-              Monitoring points: <span className="font-semibold">{monitoringCount}</span>
-            </p>
-            <p>
-              Baseline points: <span className="font-semibold">{baselineCount}</span>
-            </p>
+          <div className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-1">
+            <div>
+              <p>
+                Abnormal behavior:{' '}
+                <span className="font-semibold">
+                  {anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : 'Not checked'}
+                </span>
+              </p>
+              <p>
+                Monitoring points: <span className="font-semibold">{monitoringCount}</span>
+              </p>
+              <p>
+                Baseline points: <span className="font-semibold">{baselineCount}</span>
+              </p>
+            </div>
+            <div className="rounded-md border border-current/20 bg-white/25 p-3 dark:bg-black/10">
+              <p className="text-xs font-semibold uppercase">Why this state</p>
+              <ul className="mt-2 space-y-1 text-xs">
+                {machineStatus.reasons.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1854,7 +1950,7 @@ export default function LiveMonitorPage() {
                 <DatasetSourceSelect
                   groups={datasetSourceGroups}
                   selectedSourceKey={selectedSourceKey}
-                  onChange={setSelectedSourceKey}
+                  onChange={selectWorkspaceSource}
                 />
               </div>
 
@@ -1865,7 +1961,9 @@ export default function LiveMonitorPage() {
                   value={selectedId != null ? String(selectedId) : ''}
                   onChange={(event) => {
                     const nextValue = event.target.value;
-                    setSelectedId(nextValue ? Number(nextValue) : null);
+                    const parsed = nextValue ? Number(nextValue) : null;
+                    setSelectedId(parsed);
+                    selectWorkspaceDataset(parsed);
                   }}
                 >
                   <option value="">Select dataset</option>
@@ -2299,9 +2397,12 @@ export default function LiveMonitorPage() {
                 bodyClassName="p-2"
               >
                 {isLoadingBaseline || (selectedId && isLoadingMonitoring) ? (
-                  <div className="flex h-[clamp(560px,74vh,800px)] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
-                    Loading monitor view...
-                  </div>
+                  <WorkflowState
+                    icon={<RefreshCw className="h-5 w-5 animate-spin" aria-hidden="true" />}
+                    title="Loading monitor view"
+                    description="Fetching baseline coordinates, monitoring coordinates, and metadata for the selected dataset."
+                    className="h-[clamp(560px,74vh,800px)]"
+                  />
                 ) : liveEChartOption ? (
                   <>
                     <EChartsCanvas
@@ -2318,9 +2419,17 @@ export default function LiveMonitorPage() {
                     </p>
                   </>
                 ) : (
-                  <div className="flex h-[clamp(560px,74vh,800px)] items-center justify-center rounded-md border border-dashed border-input text-muted-foreground">
-                    Select a dataset with baseline coordinates to start live monitoring.
-                  </div>
+                  <WorkflowState
+                    icon={<Database className="h-5 w-5" aria-hidden="true" />}
+                    title="No coordinate map available"
+                    description="Select a processed dataset with baseline coordinates, or upload a baseline from Data Ingestion before starting live monitoring."
+                    action={
+                      <Button asChild variant="outline" size="sm">
+                        <Link href="/dashboard/data">Open Data Ingestion</Link>
+                      </Button>
+                    }
+                    className="h-[clamp(560px,74vh,800px)]"
+                  />
                 )}
               </ChartFrame>
             </CardContent>

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -45,6 +46,11 @@ import { createDinsightPreviewPlot } from '@/lib/dinsight-preview-plot';
 import { formatDatasetOptionLabel, getDatasetSourceGroupKey } from '@/lib/dataset-source-groups';
 import { Actions } from '@/lib/permissions';
 import { usePlotTheme } from '@/lib/plot-theme';
+import {
+  DASHBOARD_COMMAND_EVENT,
+  publishDashboardActivity,
+  useDashboardWorkspace,
+} from '@/context/dashboard-workspace-context';
 
 type ProcessingConfig = {
   id?: number;
@@ -94,8 +100,11 @@ function sortByCreatedAtDesc(
 }
 
 export default function DataIngestionPage() {
+  const searchParams = useSearchParams();
   const plotTheme = usePlotTheme();
   const queryClient = useQueryClient();
+  const { selectedDatasetId: workspaceDatasetId, selectDataset: selectWorkspaceDataset } =
+    useDashboardWorkspace();
   const canCreateDatasetMetadata = usePermission(Actions.DatasetCreate);
   const { state, uploadBaseline, uploadMonitoring, uploadCombinedSplit, resetWorkflow } =
     useUploadWorkflow();
@@ -154,6 +163,7 @@ export default function DataIngestionPage() {
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [lastAutoOpenedPreviewId, setLastAutoOpenedPreviewId] = useState<number | null>(null);
   const lastSourceSyncedWorkflowIdRef = useRef<number | null>(null);
+  const lastLoggedWorkflowStateRef = useRef('');
   const autoRegisteredMetadataIdsRef = useRef<Set<number>>(new Set());
   const [metadataRegistrationStatus, setMetadataRegistrationStatus] = useState<string | null>(null);
 
@@ -188,6 +198,73 @@ export default function DataIngestionPage() {
     staleTime: 60_000,
     refetchOnWindowFocus: false,
   });
+
+  useEffect(() => {
+    if (searchParams.get('catalog') === 'open') {
+      setIsCatalogOpen(true);
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const onCommand = (event: Event) => {
+      const action = (event as CustomEvent<{ action?: string }>).detail?.action;
+      if (action === 'open-catalog') {
+        setIsCatalogOpen(true);
+      }
+      if (action === 'open-results') {
+        setPreviewMode('latest');
+        setIsResultsModalOpen(true);
+        setPreviewRefreshKey((prev) => prev + 1);
+      }
+    };
+
+    window.addEventListener(DASHBOARD_COMMAND_EVENT, onCommand);
+    return () => window.removeEventListener(DASHBOARD_COMMAND_EVENT, onCommand);
+  }, []);
+
+  useEffect(() => {
+    if (state.status === 'idle') {
+      return;
+    }
+
+    const signature = `${state.step}:${state.status}:${state.dinsightId ?? state.fileUploadId ?? ''}`;
+    if (signature === lastLoggedWorkflowStateRef.current) {
+      return;
+    }
+    lastLoggedWorkflowStateRef.current = signature;
+
+    const datasetId = state.dinsightId ?? state.fileUploadId;
+    const stepLabel =
+      state.step === 'baseline'
+        ? 'baseline'
+        : state.step === 'monitoring'
+          ? 'monitoring'
+          : 'dataset';
+    const statusLabel =
+      state.status === 'completed'
+        ? 'completed'
+        : state.status === 'error'
+          ? 'failed'
+          : state.status;
+
+    publishDashboardActivity({
+      type: 'upload',
+      title: `${stepLabel[0].toUpperCase()}${stepLabel.slice(1)} ${statusLabel}`,
+      description:
+        state.errorMessage ?? state.statusMessage ?? `Data ingestion workflow is ${statusLabel}.`,
+      datasetId,
+      href: '/dashboard/data',
+      status:
+        state.status === 'completed' ? 'success' : state.status === 'error' ? 'danger' : 'info',
+    });
+  }, [
+    state.dinsightId,
+    state.errorMessage,
+    state.fileUploadId,
+    state.status,
+    state.statusMessage,
+    state.step,
+  ]);
 
   useEffect(() => {
     const isPendingWorkflowDataset =
@@ -692,6 +769,13 @@ export default function DataIngestionPage() {
       : latestFilteredDatasetId;
   const previewDatasetId = previewMode === 'latest' ? latestProcessedPreviewId : savedPreviewId;
   const inlinePreviewDatasetId = latestProcessedPreviewId ?? savedPreviewId;
+
+  useEffect(() => {
+    const contextDatasetId = previewDatasetId ?? selectedBaselineDatasetId ?? null;
+    if (contextDatasetId && workspaceDatasetId !== contextDatasetId) {
+      selectWorkspaceDataset(contextDatasetId);
+    }
+  }, [previewDatasetId, selectedBaselineDatasetId, selectWorkspaceDataset, workspaceDatasetId]);
 
   const {
     baselineData: inlineBaselineData,
@@ -1867,6 +1951,28 @@ export default function DataIngestionPage() {
                 setPreviewRefreshKey((prev) => prev + 1);
               }}
             />
+
+            <Card className="border-border/60">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Database className="h-4 w-4" />
+                  Dataset Catalog
+                </CardTitle>
+                <CardDescription>
+                  Export, delete, validate, register metadata, and inspect lineage from one modal.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <SideFact label="Saved results" value={sourceFilteredDatasets.length} />
+                  <SideFact label="Matching source" value={filteredDatasets.length} />
+                </div>
+                <Button className="w-full justify-start" onClick={() => setIsCatalogOpen(true)}>
+                  <Database className="mr-2 h-4 w-4" />
+                  Open catalog
+                </Button>
+              </CardContent>
+            </Card>
 
             <Card className="border-border/60">
               <CardHeader>

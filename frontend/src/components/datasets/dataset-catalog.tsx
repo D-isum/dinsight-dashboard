@@ -61,6 +61,10 @@ import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import type { DinsightDatasetSource } from '@/lib/dataset-normalizers';
 import { usePlotTheme } from '@/lib/plot-theme';
+import {
+  publishDashboardActivity,
+  useDashboardWorkspace,
+} from '@/context/dashboard-workspace-context';
 import { cn } from '@/utils/cn';
 
 // Catalog browses the dataset metadata + lineage + validation that
@@ -96,6 +100,7 @@ export interface DatasetCatalogProps {
 export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
   const { currentOrg } = useAuth();
   const plotTheme = usePlotTheme();
+  const { selectDataset: selectWorkspaceDataset } = useDashboardWorkspace();
   const isModal = variant === 'modal';
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -173,6 +178,14 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       setPendingDeleteDatasetId(null);
       setDeleteFeedback(`Dataset #${datasetId} deleted.`);
       setSelectedDatasetId((current) => (current === datasetId ? null : current));
+      publishDashboardActivity({
+        type: 'catalog',
+        title: `Deleted dataset #${datasetId}`,
+        description: 'Catalog deletion completed and related dataset caches were refreshed.',
+        datasetId,
+        href: '/dashboard/data?catalog=open',
+        status: 'success',
+      });
       queryClient.invalidateQueries({ queryKey: ['datasets'] });
       queryClient.invalidateQueries({ queryKey: ['available-dinsight-ids'] });
       queryClient.invalidateQueries({ queryKey: ['catalog'] });
@@ -241,6 +254,14 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
       setExportFeedback(`Dataset #${datasetId} export started.`);
+      publishDashboardActivity({
+        type: 'catalog',
+        title: `Exported dataset #${datasetId}`,
+        description: `CSV export started: ${filename}.`,
+        datasetId,
+        href: '/dashboard/data?catalog=open',
+        status: 'success',
+      });
     } catch (error: any) {
       let message = 'Unable to export the selected processed dataset.';
       const payload = error?.response?.data;
@@ -562,6 +583,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       onClick={() => {
                         setPreviewDatasetId(item.dataset_id);
                         setSelectedDatasetId(item.dataset_id);
+                        selectWorkspaceDataset(item.dataset_id);
                       }}
                     >
                       <TableCell className="min-w-0">
@@ -750,7 +772,10 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setSelectedDatasetId(previewDatasetId)}
+                    onClick={() => {
+                      setSelectedDatasetId(previewDatasetId);
+                      selectWorkspaceDataset(previewDatasetId);
+                    }}
                   >
                     <BarChart3 className="mr-2 h-4 w-4" />
                     Details
