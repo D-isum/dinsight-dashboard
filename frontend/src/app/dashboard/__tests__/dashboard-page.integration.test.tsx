@@ -8,6 +8,18 @@ vi.mock('@/context/dashboard-workspace-context', () => ({
     selectedDatasetId: 14,
     selectDataset: () => undefined,
     selectSource: () => undefined,
+    activities: [
+      {
+        id: 'activity-1',
+        type: 'streaming',
+        title: 'Monitor batch completed',
+        description: 'Streaming simulator uploaded the latest batch.',
+        datasetId: 14,
+        timestamp: new Date().toISOString(),
+        href: '/dashboard/live',
+        status: 'success',
+      },
+    ],
     setMachineHealthSnapshot: () => undefined,
   }),
 }));
@@ -123,11 +135,15 @@ describe('Dashboard page integration', () => {
     render(<DashboardPage />);
 
     expect(screen.getByText('Operations command center')).toBeInTheDocument();
-    expect(screen.getByText('Deteriorating')).toBeInTheDocument();
-    expect(screen.getByText(/Anomaly rate \(%\)/i)).toBeInTheDocument();
-    expect(screen.getByText(/Wear Trend Preview \(G0→Gi\)/)).toBeInTheDocument();
+    expect(screen.getAllByText('Deteriorating').length).toBeGreaterThan(0);
+    expect(screen.getByText('Action queue')).toBeInTheDocument();
+    expect(screen.getByText('Asset priority')).toBeInTheDocument();
+    expect(screen.getAllByText('Readiness').length).toBeGreaterThan(0);
+    expect(screen.getByText('Live signal')).toBeInTheDocument();
+    expect(screen.getByText('Recent operations')).toBeInTheDocument();
+    expect(screen.getByText('Streaming detail')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Live Monitor/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /Open Insights/i }).length).toBeGreaterThan(0);
-    expect(screen.getByRole('link', { name: /Catalog/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /Health Insights/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('link', { name: /Open catalog/i }).length).toBeGreaterThan(0);
   });
 });

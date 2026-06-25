@@ -74,7 +74,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
         </div>
 
         {/* Search / command bar */}
-        <div className="mx-4 hidden max-w-xl flex-1 md:flex">
+        <div className="mx-4 hidden max-w-sm flex-1 md:flex 2xl:max-w-xl">
           <button
             type="button"
             onClick={() => setIsCommandOpen(true)}
@@ -93,13 +93,13 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
           </button>
         </div>
 
-        <div className="hidden min-w-0 items-center gap-2 xl:flex">
+        <div className="hidden min-w-0 items-center gap-2 xl:flex 2xl:gap-3">
           <DatasetSourceSelect
             groups={groups}
             selectedSourceKey={selectedSourceKey}
             onChange={selectSource}
             disabled={isLoadingDatasets}
-            className="h-10 max-w-[13rem] rounded-lg border border-border bg-background px-2 text-xs text-fg"
+            className="h-10 w-[11.5rem] rounded-lg border border-border bg-background px-2 text-xs text-fg 2xl:w-[13rem]"
           />
           <select
             value={selectedDatasetId != null ? String(selectedDatasetId) : ''}
@@ -107,7 +107,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
               selectDataset(event.target.value ? Number(event.target.value) : null)
             }
             disabled={isLoadingDatasets || filteredDatasets.length === 0}
-            className="h-10 max-w-[14rem] rounded-lg border border-border bg-background px-2 text-xs text-fg disabled:opacity-60"
+            className="h-10 w-[11.5rem] rounded-lg border border-border bg-background px-2 text-xs text-fg disabled:opacity-60 2xl:w-[14rem]"
             title="Global dataset context"
           >
             <option value="">{isLoadingDatasets ? 'Loading datasets...' : 'Select dataset'}</option>
@@ -158,7 +158,7 @@ export function Header({ onMenuClick, isSidebarOpen }: HeaderProps) {
                     </div>
                     <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-success border-2 border-white dark:border-canvas rounded-full" />
                   </div>
-                  <div className="hidden md:flex flex-col text-left">
+                  <div className="hidden flex-col text-left 2xl:flex">
                     <span className="text-sm font-medium text-fg">{user?.full_name || 'User'}</span>
                     <span className="text-xs text-fg-muted">
                       {user?.role
