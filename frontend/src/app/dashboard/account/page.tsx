@@ -315,10 +315,13 @@ function AccountSecurityView() {
   // predating the OIDC column.
   const authProvider = (user as { auth_provider?: string } | null)?.auth_provider ?? 'password';
   const licenseOriginalExpiresAt = licenseInfo?.original_expires_at ?? licenseInfo?.expires_at;
-  const licenseEffectiveExpiresAt = licenseInfo?.effective_expires_at ?? licenseInfo?.expires_at;
-  const licenseEffectiveDaysUntilExpiry =
-    licenseInfo?.effective_days_until_expiry ?? licenseInfo?.days_until_expiry;
   const isDevLicenseExtensionActive = licenseInfo?.dev_extension_active === true;
+  const licenseDisplayExpiresAt = isDevLicenseExtensionActive
+    ? (licenseInfo?.effective_expires_at ?? licenseOriginalExpiresAt)
+    : licenseOriginalExpiresAt;
+  const licenseDisplayDaysUntilExpiry = isDevLicenseExtensionActive
+    ? (licenseInfo?.effective_days_until_expiry ?? licenseInfo?.days_until_expiry)
+    : licenseInfo?.days_until_expiry;
 
   return (
     <div className="space-y-6">
@@ -657,8 +660,8 @@ function AccountSecurityView() {
                             ? new Date(licenseOriginalExpiresAt).toLocaleDateString()
                             : 'an unknown date'}
                           . Dev access is extended until{' '}
-                          {licenseEffectiveExpiresAt
-                            ? new Date(licenseEffectiveExpiresAt).toLocaleDateString()
+                          {licenseDisplayExpiresAt
+                            ? new Date(licenseDisplayExpiresAt).toLocaleDateString()
                             : 'an unknown date'}
                           . Keep this flag disabled in production.
                         </p>
@@ -712,16 +715,16 @@ function AccountSecurityView() {
                         Expires
                       </Label>
                       <p className="mt-1 text-fg">
-                        {licenseEffectiveExpiresAt
-                          ? new Date(licenseEffectiveExpiresAt).toLocaleDateString(undefined, {
+                        {licenseDisplayExpiresAt
+                          ? new Date(licenseDisplayExpiresAt).toLocaleDateString(undefined, {
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric',
                             })
                           : '—'}{' '}
                         <span className="text-fg-muted">
-                          ({licenseEffectiveDaysUntilExpiry} day
-                          {licenseEffectiveDaysUntilExpiry === 1 ? '' : 's'} from now)
+                          ({licenseDisplayDaysUntilExpiry} day
+                          {licenseDisplayDaysUntilExpiry === 1 ? '' : 's'} from now)
                         </span>
                       </p>
                       {isDevLicenseExtensionActive && licenseOriginalExpiresAt && (

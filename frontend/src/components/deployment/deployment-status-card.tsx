@@ -7,13 +7,26 @@ import { useDeploymentStatus } from '@/hooks/useDeploymentStatus';
 
 export function DeploymentStatusCard({ compact = false }: { compact?: boolean }) {
   const { runtime, license, isLoadingLicense, licenseError } = useDeploymentStatus();
-  const effectiveExpiresAt = license?.effectiveExpiresAt ?? license?.expiresAt ?? null;
+  const signedExpiresAt = license?.originalExpiresAt ?? license?.expiresAt ?? null;
+  const activeExpiresAt =
+    license?.devExtensionActive === true
+      ? (license.effectiveExpiresAt ?? signedExpiresAt)
+      : signedExpiresAt;
+  const signedExpired =
+    signedExpiresAt != null && Number.isFinite(Date.parse(signedExpiresAt))
+      ? Date.parse(signedExpiresAt) <= Date.now()
+      : false;
   const expired =
-    effectiveExpiresAt != null && Number.isFinite(Date.parse(effectiveExpiresAt))
-      ? Date.parse(effectiveExpiresAt) <= Date.now()
+    activeExpiresAt != null && Number.isFinite(Date.parse(activeExpiresAt))
+      ? Date.parse(activeExpiresAt) <= Date.now()
       : false;
   const licenseValid = license?.isValid === true && !expired;
   const devExtensionActive = license?.devExtensionActive === true;
+  const showInactiveExtensionWarning =
+    !licenseValid &&
+    signedExpired &&
+    !devExtensionActive &&
+    runtime.devLicenseExtensionDays != null;
   const statusLabel = isLoadingLicense
     ? 'Checking license'
     : licenseError
@@ -59,7 +72,7 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
             <div>
               Expires:{' '}
               <span className="font-medium text-fg">
-                {effectiveExpiresAt ? new Date(effectiveExpiresAt).toLocaleDateString() : 'Unknown'}
+                {activeExpiresAt ? new Date(activeExpiresAt).toLocaleDateString() : 'Unknown'}
               </span>
             </div>
             <div>
@@ -84,11 +97,11 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
               ? new Date(license.originalExpiresAt).toLocaleDateString()
               : 'unknown'}
             ; effective access until{' '}
-            {effectiveExpiresAt ? new Date(effectiveExpiresAt).toLocaleDateString() : 'unknown'}.
-            Disable before production.
+            {activeExpiresAt ? new Date(activeExpiresAt).toLocaleDateString() : 'unknown'}. Disable
+            before production.
           </div>
         ) : (
-          runtime.devLicenseExtensionDays != null && (
+          showInactiveExtensionWarning && (
             <div className="mt-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning-text">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               Dev license extension advertised for {runtime.devLicenseExtensionDays} day(s), but the
