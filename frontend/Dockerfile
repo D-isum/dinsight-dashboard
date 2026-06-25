@@ -7,7 +7,7 @@
 # Stage 3 (runtime): gcr.io/distroless/nodejs22-debian12 — minimal Node
 #                    runtime, ~150 MB final image, runs as nonroot UID 65532.
 #
-# NEXT_PUBLIC_API_URL is BAKED INTO the client bundle at build time
+# NEXT_PUBLIC_* values are BAKED INTO the client bundle at build time
 # (Next.js inlines NEXT_PUBLIC_* vars). Default is `/api/v1`, which makes
 # the FE call its own origin and assumes a reverse proxy (e.g. Caddy)
 # routes /api/* to the BE container. Override via build-arg for split-
@@ -36,7 +36,11 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 ARG NEXT_PUBLIC_API_URL=/api/v1
+ARG NEXT_PUBLIC_DEPLOYMENT_LABEL=
+ARG NEXT_PUBLIC_LICENSE_DEV_EXTENSION_DAYS=
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_DEPLOYMENT_LABEL=${NEXT_PUBLIC_DEPLOYMENT_LABEL}
+ENV NEXT_PUBLIC_LICENSE_DEV_EXTENSION_DAYS=${NEXT_PUBLIC_LICENSE_DEV_EXTENSION_DAYS}
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN pnpm run build

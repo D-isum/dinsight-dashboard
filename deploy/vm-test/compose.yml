@@ -72,6 +72,7 @@ services:
       DB_NAME: ${POSTGRES_DB:-dinsight}
       DB_SSLMODE: disable
       SERVER_PORT: "8080"
+      APP_ENV: ${APP_ENV:-development}
       # Same-origin via Caddy means the FE never sends a cross-origin
       # request, but the BE's CORS middleware still requires the Origin
       # to be allow-listed. Set ALLOWED_ORIGINS to the public URL.
@@ -100,6 +101,8 @@ services:
       INGESTION_POLL_INTERVAL: "${INGESTION_POLL_INTERVAL:-5m}"
       LICENSE_PATH: /app/license.lic
       DEVICES_PATH: /app/runtime/devices.json
+      LICENSE_DEV_EXTENSION_ENABLED: "${LICENSE_DEV_EXTENSION_ENABLED:-false}"
+      LICENSE_DEV_EXTENSION_DAYS: "${LICENSE_DEV_EXTENSION_DAYS:-0}"
     volumes:
       # License + runtime artifacts live in the BE source tree.
       # - license.lic is operator-supplied per VM, read-only.
@@ -127,6 +130,8 @@ services:
         # Same-origin: the FE calls /api/v1/* and Caddy routes those
         # to the api service. No cross-origin, no CORS dance.
         NEXT_PUBLIC_API_URL: /api/v1
+        NEXT_PUBLIC_DEPLOYMENT_LABEL: ${NEXT_PUBLIC_DEPLOYMENT_LABEL:-Shared dev VM}
+        NEXT_PUBLIC_LICENSE_DEV_EXTENSION_DAYS: ${NEXT_PUBLIC_LICENSE_DEV_EXTENSION_DAYS:-}
     image: dinsight-frontend:${IMAGE_TAG:-vm-test}
     environment:
       NODE_ENV: production
