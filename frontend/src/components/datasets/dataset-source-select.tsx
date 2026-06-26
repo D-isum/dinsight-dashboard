@@ -1,4 +1,7 @@
+'use client';
+
 import type { DatasetSourceGroup } from '@/lib/dataset-source-groups';
+import { useI18n } from '@/i18n/client';
 
 interface DatasetSourceSelectProps {
   groups: DatasetSourceGroup[];
@@ -15,6 +18,8 @@ export function DatasetSourceSelect({
   disabled,
   className,
 }: DatasetSourceSelectProps) {
+  const { t, formatNumber } = useI18n();
+
   return (
     <select
       value={selectedSourceKey ?? ''}
@@ -24,14 +29,14 @@ export function DatasetSourceSelect({
         className ??
         'w-full rounded-md border border-input bg-background px-3 py-2 text-sm disabled:opacity-60'
       }
-      title="Select device or dataset source"
+      title={t('header.selectSource')}
     >
       <option value="" disabled>
-        {groups.length === 0 ? 'No dataset sources found' : 'Select device / source'}
+        {groups.length === 0 ? t('header.noDatasetSources') : t('header.selectSource')}
       </option>
       {groups.map((group) => (
         <option key={group.key} value={group.key}>
-          {group.label} ({group.datasets.length})
+          {group.label} ({formatNumber(group.datasets.length)})
         </option>
       ))}
     </select>

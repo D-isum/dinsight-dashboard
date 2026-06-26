@@ -33,6 +33,7 @@ import { MetadataHoverControls } from '@/components/metadata-hover-controls';
 import { useMetadataHover } from '@/hooks/useMetadataHover';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useMachineHealthStatus } from '@/hooks/useMachineHealthStatus';
+import { useI18n } from '@/i18n/client';
 import { api } from '@/lib/api-client';
 import type { CoordinateSeries } from '@/lib/dataset-normalizers';
 import {
@@ -541,6 +542,7 @@ const buildDensityHeatmapData = (xValues: number[], yValues: number[], bins = 44
 
 export default function LiveMonitorPage() {
   const { user } = useAuth();
+  const { t, formatNumber, formatTime } = useI18n();
   const {
     selectedDatasetId: workspaceDatasetId,
     refetchDatasets,
@@ -599,6 +601,34 @@ export default function LiveMonitorPage() {
   const renderMaxPoints = LIVE_RENDER_DENSITY[renderDensity].maxPoints;
   const activeSelectionConfig = SELECTION_MODE_CONFIG[selectionMode];
   const activeBrushType = activeSelectionConfig.brushType;
+  const statusText = (status: StreamingStatus['status'] | undefined) =>
+    status === 'completed'
+      ? t('common.completed')
+      : status === 'streaming'
+        ? t('dashboard.streaming')
+        : t('dashboard.notStarted');
+  const healthStateText = (state: 'OK' | 'Deteriorating' | 'Failing') =>
+    state === 'OK'
+      ? t('health.ok')
+      : state === 'Deteriorating'
+        ? t('health.deteriorating')
+        : t('health.failing');
+  const selectionModeLabel = (mode: SelectionMode) =>
+    mode === 'rectangle'
+      ? t('live.rectangle')
+      : mode === 'lasso'
+        ? t('live.lasso')
+        : mode === 'circle'
+          ? t('live.circle')
+          : t('live.oval');
+  const selectionDrawAction = (mode: SelectionMode) =>
+    mode === 'circle'
+      ? t('live.latestShapeCircle')
+      : mode === 'oval'
+        ? t('live.latestShapeOval')
+        : mode === 'lasso'
+          ? t('live.latestShapeLasso')
+          : t('live.latestShapeRectangle');
   boundariesRef.current = boundaries;
 
   const {
@@ -1913,10 +1943,10 @@ export default function LiveMonitorPage() {
                 <div className="min-w-0">
                   <CardTitle className="flex items-center gap-2 text-base">
                     <Activity className="h-5 w-5" />
-                    Live Controls
+                    {t('live.controls')}
                   </CardTitle>
                   <CardDescription className="mt-1">
-                    Streaming controls, normal-area boundaries, and hover metadata.
+                    {t('live.controlsDescription')}
                   </CardDescription>
                 </div>
                 <Button
@@ -1924,10 +1954,10 @@ export default function LiveMonitorPage() {
                   size="sm"
                   onClick={() => setIsControlsCollapsed(true)}
                   className="shrink-0 gap-2"
-                  aria-label="Hide live controls"
+                  aria-label={t('live.hideControls')}
                 >
                   <PanelLeftClose className="h-4 w-4" />
-                  Hide
+                  {t('live.hideControls')}
                 </Button>
               </div>
             </CardHeader>
@@ -1935,32 +1965,34 @@ export default function LiveMonitorPage() {
               <div className={cn('rounded-lg border p-3 text-sm', stateTone[machineStatus.state])}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-semibold uppercase">Machine state</p>
-                    <p className="mt-1 text-2xl font-bold leading-none">{machineStatus.state}</p>
+                    <p className="text-xs font-semibold uppercase">{t('live.machineState')}</p>
+                    <p className="mt-1 text-2xl font-bold leading-none">
+                      {healthStateText(machineStatus.state)}
+                    </p>
                     <p className="mt-2 text-xs">{machineStatus.recommendation}</p>
                   </div>
                   <Badge variant={statusLabel === 'streaming' ? 'success' : 'outline'}>
-                    {statusLabel === 'not_started' ? 'Not started' : statusLabel}
+                    {statusText(statusLabel)}
                   </Badge>
                 </div>
                 <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                   <div>
-                    <p className="opacity-75">Abnormal</p>
+                    <p className="opacity-75">{t('live.abnormal')}</p>
                     <p className="font-semibold">
                       {anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : '—'}
                     </p>
                   </div>
                   <div>
-                    <p className="opacity-75">Monitor</p>
-                    <p className="font-semibold">{monitoringCount.toLocaleString()}</p>
+                    <p className="opacity-75">{t('live.monitor')}</p>
+                    <p className="font-semibold">{formatNumber(monitoringCount)}</p>
                   </div>
                   <div>
-                    <p className="opacity-75">Baseline</p>
-                    <p className="font-semibold">{baselineCount.toLocaleString()}</p>
+                    <p className="opacity-75">{t('common.baseline')}</p>
+                    <p className="font-semibold">{formatNumber(baselineCount)}</p>
                   </div>
                 </div>
                 <div className="mt-3 rounded-md border border-current/20 bg-white/25 p-2 dark:bg-black/10">
-                  <p className="text-xs font-semibold uppercase">Why</p>
+                  <p className="text-xs font-semibold uppercase">{t('live.why')}</p>
                   <ul className="mt-1 space-y-1 text-xs">
                     {machineStatus.reasons.map((reason) => (
                       <li key={reason}>{reason}</li>
@@ -1971,17 +2003,17 @@ export default function LiveMonitorPage() {
 
               <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
                 <p className="text-xs font-semibold uppercase text-muted-foreground">
-                  Active dataset
+                  {t('live.activeDataset')}
                 </p>
                 <p className="mt-1 text-lg font-semibold text-fg">
-                  {selectedId ? `#${selectedId}` : 'None selected'}
+                  {selectedId ? `#${selectedId}` : t('live.noneSelected')}
                 </p>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                 <Button onClick={startStreaming} disabled={!selectedId || isStreaming}>
                   <Play className="mr-2 h-4 w-4" />
-                  Start stream
+                  {t('live.startStream')}
                 </Button>
                 <Button
                   variant="outline"
@@ -1992,18 +2024,18 @@ export default function LiveMonitorPage() {
                   {isStreaming ? (
                     <>
                       <Pause className="mr-2 h-4 w-4" />
-                      Pause stream
+                      {t('live.pauseStream')}
                     </>
                   ) : (
                     <>
                       <Play className="mr-2 h-4 w-4" />
-                      Resume stream
+                      {t('live.resumeStream')}
                     </>
                   )}
                 </Button>
                 <Button variant="outline" onClick={stopStreaming} disabled={!selectedId}>
                   <Square className="mr-2 h-4 w-4" />
-                  Stop stream
+                  {t('live.stopStream')}
                 </Button>
                 <Button
                   variant="outline"
@@ -2011,12 +2043,12 @@ export default function LiveMonitorPage() {
                   disabled={!selectedId}
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
-                  Reset stream state
+                  {t('live.resetStreamState')}
                 </Button>
               </div>
 
               <div className="space-y-2 rounded-md border border-input p-3">
-                <p className="text-sm font-medium">Streaming speed</p>
+                <p className="text-sm font-medium">{t('live.streamingSpeed')}</p>
                 <div className="grid grid-cols-3 gap-2">
                   {(['0.5x', '1x', '2x'] as const).map((speed) => (
                     <Button
@@ -2030,12 +2062,12 @@ export default function LiveMonitorPage() {
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Refresh every {isStreaming ? refreshIntervalMs / 1000 : 10}s
+                  {t('live.refreshEvery', { seconds: isStreaming ? refreshIntervalMs / 1000 : 10 })}
                 </p>
               </div>
 
               <div className="flex items-center justify-between rounded-md border border-input px-3 py-2">
-                <span className="text-sm">Auto refresh</span>
+                <span className="text-sm">{t('live.autoRefresh')}</span>
                 <button
                   type="button"
                   onClick={() => setAutoRefresh((prev) => !prev)}
@@ -2044,7 +2076,7 @@ export default function LiveMonitorPage() {
                     autoRefresh ? 'bg-accent' : 'bg-surface-muted'
                   )}
                   aria-pressed={autoRefresh}
-                  aria-label="Toggle auto refresh"
+                  aria-label={t('live.toggleAutoRefresh')}
                 >
                   <span
                     className={cn(
@@ -2057,11 +2089,11 @@ export default function LiveMonitorPage() {
 
               <div className="space-y-3 rounded-md border border-input p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Plot focus</p>
+                  <p className="text-sm font-medium">{t('live.plotFocus')}</p>
                   <Badge variant={monitorView === 'recent' ? 'info' : 'outline'}>
                     {monitorView === 'recent'
-                      ? `Recent ${LIVE_RECENT_WINDOW_POINTS}`
-                      : 'All points'}
+                      ? t('live.recentCount', { count: LIVE_RECENT_WINDOW_POINTS })
+                      : t('live.allPoints')}
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
@@ -2070,14 +2102,14 @@ export default function LiveMonitorPage() {
                     variant={monitorView === 'all' ? 'default' : 'outline'}
                     onClick={() => setMonitorView('all')}
                   >
-                    All points
+                    {t('live.allPoints')}
                   </Button>
                   <Button
                     size="sm"
                     variant={monitorView === 'recent' ? 'default' : 'outline'}
                     onClick={() => setMonitorView('recent')}
                   >
-                    Recent
+                    {t('live.recent')}
                   </Button>
                 </div>
                 <label className="flex items-center gap-2 text-sm">
@@ -2086,7 +2118,7 @@ export default function LiveMonitorPage() {
                     checked={followLatest}
                     onChange={(event) => setFollowLatest(event.target.checked)}
                   />
-                  Follow latest range
+                  {t('live.followLatestRange')}
                 </label>
                 <label className="flex items-center gap-2 text-sm">
                   <input
@@ -2094,13 +2126,13 @@ export default function LiveMonitorPage() {
                     checked={showTrajectoryLine}
                     onChange={(event) => setShowTrajectoryLine(event.target.checked)}
                   />
-                  Show faint trajectory line
+                  {t('live.showTrajectoryLine')}
                 </label>
               </div>
 
               <div className="space-y-2 rounded-md border border-input p-3">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium">Render density</p>
+                  <p className="text-sm font-medium">{t('live.renderDensity')}</p>
                   <Badge variant="outline">{LIVE_RENDER_DENSITY[renderDensity].description}</Badge>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -2123,12 +2155,12 @@ export default function LiveMonitorPage() {
 
               <Button variant="outline" onClick={refreshNow} className="w-full">
                 <RefreshCw className="mr-2 h-4 w-4" />
-                Refresh now
+                {t('live.refreshNow')}
               </Button>
 
               <div className="rounded-lg border border-input p-3 text-sm space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Status</span>
+                  <span className="text-muted-foreground">{t('common.status')}</span>
                   <Badge
                     variant="outline"
                     className={cn(
@@ -2137,31 +2169,33 @@ export default function LiveMonitorPage() {
                       statusLabel === 'not_started' && 'border-strong text-fg'
                     )}
                   >
-                    {statusLabel === 'completed'
-                      ? 'Completed'
-                      : statusLabel === 'streaming'
-                        ? 'Streaming'
-                        : 'Not started'}
+                    {statusText(statusLabel)}
                   </Badge>
                 </div>
                 <Progress value={streamingStatus?.progress_percentage ?? 0} className="w-full" />
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Streamed</p>
-                    <p className="font-semibold">{streamingStatus?.streamed_points ?? 0}</p>
+                    <p className="text-muted-foreground">{t('live.streamed')}</p>
+                    <p className="font-semibold">
+                      {formatNumber(streamingStatus?.streamed_points ?? 0)}
+                    </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Total</p>
-                    <p className="font-semibold">{streamingStatus?.total_points ?? 0}</p>
+                    <p className="text-muted-foreground">{t('live.total')}</p>
+                    <p className="font-semibold">
+                      {formatNumber(streamingStatus?.total_points ?? 0)}
+                    </p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Batch size</p>
+                    <p className="text-muted-foreground">{t('dashboard.batchSize')}</p>
                     <p className="font-semibold">{streamingStatus?.batch_size ?? '-'}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Delay</p>
+                    <p className="text-muted-foreground">
+                      {t('dashboard.delay', { value: '' }).trim()}
+                    </p>
                     <p className="font-semibold">
                       {streamingStatus ? `${streamingStatus.delay_seconds}s` : '-'}
                     </p>
@@ -2169,43 +2203,41 @@ export default function LiveMonitorPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Glow points</p>
+                    <p className="text-muted-foreground">{t('dashboard.glowPoints')}</p>
                     <p className="font-semibold">{latestGlowCount}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Trail points</p>
+                    <p className="text-muted-foreground">{t('dashboard.trailPoints')}</p>
                     <p className="font-semibold">{trailPoints}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Connection</p>
+                    <p className="text-muted-foreground">{t('live.connection')}</p>
                     <p className="font-semibold">
                       {streamingStatusError
-                        ? 'Retrying'
+                        ? t('live.retrying')
                         : isFetchingStatus
-                          ? 'Refreshing'
+                          ? t('live.refreshing')
                           : autoRefresh
-                            ? 'Live'
-                            : 'Manual'}
+                            ? t('live.live')
+                            : t('common.manual')}
                     </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Last update</p>
-                    <p className="font-semibold">
-                      {lastStatusAt ? new Date(lastStatusAt).toLocaleTimeString() : '-'}
-                    </p>
+                    <p className="text-muted-foreground">{t('live.lastUpdate')}</p>
+                    <p className="font-semibold">{lastStatusAt ? formatTime(lastStatusAt) : '-'}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Sample cap</p>
-                    <p className="font-semibold">{renderMaxPoints.toLocaleString()}</p>
+                    <p className="text-muted-foreground">{t('live.sampleCap')}</p>
+                    <p className="font-semibold">{formatNumber(renderMaxPoints)}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Status refresh</p>
+                    <p className="text-muted-foreground">{t('live.statusRefresh')}</p>
                     <p className="font-semibold">
-                      {autoRefresh ? `${refreshIntervalMs / 1000}s` : 'Paused'}
+                      {autoRefresh ? `${refreshIntervalMs / 1000}s` : t('live.paused')}
                     </p>
                   </div>
                 </div>
@@ -2223,7 +2255,7 @@ export default function LiveMonitorPage() {
                 }
                 className="w-full"
               >
-                {isAnalyzing ? 'Checking status...' : 'Run anomaly check'}
+                {isAnalyzing ? t('live.checkingStatus') : t('live.runAnomalyCheck')}
               </Button>
 
               <Button
@@ -2235,20 +2267,22 @@ export default function LiveMonitorPage() {
                 }}
               >
                 <MousePointerClick className="mr-2 h-4 w-4" aria-hidden="true" />
-                {manualSelectionEnabled ? 'Stop drawing normal areas' : 'Draw normal areas'}
+                {manualSelectionEnabled
+                  ? t('live.stopDrawingNormalAreas')
+                  : t('live.drawNormalAreas')}
               </Button>
 
               {manualSelectionEnabled && (
                 <div className="space-y-3 rounded-lg border border-input p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium">Normal-area shape</p>
+                      <p className="text-sm font-medium">{t('live.normalAreaShape')}</p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {activeSelectionConfig.drawAction}
+                        {selectionDrawAction(selectionMode)}
                       </p>
                     </div>
                     <Badge variant="info" className="shrink-0">
-                      {activeSelectionConfig.label}
+                      {selectionModeLabel(selectionMode)}
                     </Badge>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -2266,7 +2300,7 @@ export default function LiveMonitorPage() {
                           title={config.helper}
                         >
                           <ShapeIcon className="h-4 w-4" aria-hidden="true" />
-                          {config.label}
+                          {selectionModeLabel(mode)}
                         </Button>
                       );
                     })}
@@ -2286,7 +2320,7 @@ export default function LiveMonitorPage() {
                       checked={enableMultipleSelections}
                       onChange={(event) => setEnableMultipleSelections(event.target.checked)}
                     />
-                    Enable multiple normal areas
+                    {t('live.multipleAreas')}
                   </label>
 
                   <div className="flex gap-2">
@@ -2297,7 +2331,7 @@ export default function LiveMonitorPage() {
                       disabled={boundaries.length === 0}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Clear areas
+                      {t('live.clearAreas')}
                     </Button>
                     <span className="self-center text-xs text-muted-foreground">
                       {boundaries.length} area(s)
@@ -2312,13 +2346,15 @@ export default function LiveMonitorPage() {
                 onClick={() => setShowAdvanced((prev) => !prev)}
               >
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
-                {showAdvanced ? 'Hide advanced' : 'Show advanced'}
+                {showAdvanced ? t('live.hideAdvanced') : t('live.showAdvanced')}
               </Button>
 
               {showAdvanced && (
                 <div className="space-y-3 rounded-lg border border-input p-3">
                   <div className="space-y-2">
-                    <label className="text-xs font-medium">Point size: {pointSize}</label>
+                    <label className="text-xs font-medium">
+                      {t('live.pointSize', { size: pointSize })}
+                    </label>
                     <input
                       type="range"
                       min={4}
@@ -2335,7 +2371,7 @@ export default function LiveMonitorPage() {
                       checked={showContours}
                       onChange={(event) => setShowContours(event.target.checked)}
                     />
-                    Show baseline contours
+                    {t('live.showBaselineContours')}
                   </label>
                 </div>
               )}
@@ -2353,9 +2389,14 @@ export default function LiveMonitorPage() {
 
               {manualClassification && (
                 <div className="rounded-lg border border-input p-3 text-sm">
-                  <p className="font-medium">Manual classification</p>
-                  <p>Normal: {manualClassification.normalIndices.length}</p>
-                  <p>Anomaly: {manualClassification.anomalyIndices.length}</p>
+                  <p className="font-medium">{t('live.manualClassification')}</p>
+                  <p>
+                    {t('common.normal')}: {formatNumber(manualClassification.normalIndices.length)}
+                  </p>
+                  <p>
+                    {t('common.anomaly')}:{' '}
+                    {formatNumber(manualClassification.anomalyIndices.length)}
+                  </p>
                 </div>
               )}
             </CardContent>
@@ -2366,10 +2407,8 @@ export default function LiveMonitorPage() {
           {isControlsCollapsed && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-fg">Live controls hidden</p>
-                <p className="text-xs text-fg-muted">
-                  The coordinate map is using the full available width.
-                </p>
+                <p className="text-sm font-medium text-fg">{t('live.liveControlsHidden')}</p>
+                <p className="text-xs text-fg-muted">{t('live.liveControlsHiddenDescription')}</p>
               </div>
               <Button
                 variant="outline"
@@ -2378,7 +2417,7 @@ export default function LiveMonitorPage() {
                 className="gap-2"
               >
                 <PanelLeftOpen className="h-4 w-4" />
-                Show controls
+                {t('live.showControls')}
               </Button>
             </div>
           )}
@@ -2387,12 +2426,9 @@ export default function LiveMonitorPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <ShieldAlert className="h-5 w-5" />
-                Machine Live View
+                {t('live.machineLiveView')}
               </CardTitle>
-              <CardDescription>
-                Baseline vs monitoring trajectory with live-point highlighting and boundary-based
-                normal areas.
-              </CardDescription>
+              <CardDescription>{t('live.machineLiveDescription')}</CardDescription>
             </CardHeader>
             <CardContent>
               {(baselineError || monitoringError) && (
@@ -2404,19 +2440,22 @@ export default function LiveMonitorPage() {
 
               {manualSelectionEnabled && boundaries.length > 0 && (
                 <div className="mb-4 space-y-2 rounded-lg border border-input p-3">
-                  <p className="text-sm font-medium">Normal operating areas</p>
+                  <p className="text-sm font-medium">{t('live.normalOperatingAreas')}</p>
                   <div className="space-y-2">
                     {boundaries.map((boundary, index) => (
                       <div key={boundary.id} className="flex items-center justify-between text-sm">
                         <span>
-                          Area {index + 1}: {boundary.type}
+                          {t('live.areaLabel', {
+                            index: index + 1,
+                            shape: selectionModeLabel(boundary.type),
+                          })}
                         </span>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => removeBoundary(boundary.id)}
                         >
-                          Remove
+                          {t('live.remove')}
                         </Button>
                       </div>
                     ))}
@@ -2425,26 +2464,34 @@ export default function LiveMonitorPage() {
               )}
 
               <ChartFrame
-                title="Coordinate map"
+                title={t('live.coordinateMap')}
                 description={
                   followLatest
                     ? 'Range follows the latest monitoring segment while the page and plot stay mounted.'
-                    : 'Baseline, monitoring, recent trail, and latest stream points in one view.'
+                    : t('live.coordinateMapDescription')
                 }
                 stats={
                   <>
-                    <ChartStat label="Dataset" value={selectedId ? `#${selectedId}` : '—'} />
-                    <ChartStat label="View" value={monitorView === 'recent' ? 'Recent' : 'All'} />
                     <ChartStat
-                      label="Streamed"
-                      value={`${monitoringCount.toLocaleString()} / ${
-                        streamingStatus?.total_points?.toLocaleString() ?? '—'
+                      label={t('common.dataset')}
+                      value={selectedId ? `#${selectedId}` : '—'}
+                    />
+                    <ChartStat
+                      label={t('live.view')}
+                      value={monitorView === 'recent' ? t('live.recent') : t('common.all')}
+                    />
+                    <ChartStat
+                      label={t('live.streamed')}
+                      value={`${formatNumber(monitoringCount)} / ${
+                        streamingStatus?.total_points != null
+                          ? formatNumber(streamingStatus.total_points)
+                          : '—'
                       }`}
                       tone="info"
                     />
-                    <ChartStat label="Sample cap" value={renderMaxPoints.toLocaleString()} />
+                    <ChartStat label={t('live.sampleCap')} value={formatNumber(renderMaxPoints)} />
                     <ChartStat
-                      label="Abnormal"
+                      label={t('live.abnormal')}
                       value={anomalyPercentage != null ? `${anomalyPercentage.toFixed(1)}%` : '—'}
                       tone={
                         anomalyPercentage == null
@@ -2460,9 +2507,9 @@ export default function LiveMonitorPage() {
                 }
                 actions={
                   <>
-                    <ChartSwatch color={plotTheme.baseline} label="Baseline" />
-                    <ChartSwatch color={plotTheme.monitoring} label="Monitoring" />
-                    <ChartSwatch color={plotTheme.latest} label="Latest" />
+                    <ChartSwatch color={plotTheme.baseline} label={t('common.baseline')} />
+                    <ChartSwatch color={plotTheme.monitoring} label={t('common.monitoring')} />
+                    <ChartSwatch color={plotTheme.latest} label={t('common.latest')} />
                   </>
                 }
                 bodyClassName="p-2"
@@ -2470,8 +2517,8 @@ export default function LiveMonitorPage() {
                 {isLoadingBaseline || (selectedId && isLoadingMonitoring) ? (
                   <WorkflowState
                     icon={<RefreshCw className="h-5 w-5 animate-spin" aria-hidden="true" />}
-                    title="Loading monitor view"
-                    description="Fetching baseline coordinates, monitoring coordinates, and metadata for the selected dataset."
+                    title={t('live.loadingMonitorView')}
+                    description={t('live.loadingMonitorDescription')}
                     className="h-[clamp(560px,74vh,800px)]"
                   />
                 ) : liveEChartOption ? (

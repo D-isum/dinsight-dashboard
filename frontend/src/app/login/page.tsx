@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useMemo, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -8,6 +8,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Eye, EyeOff, Loader2, AlertCircle, KeyRound } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
+import { LanguageSwitcher } from '@/components/i18n/language-switcher';
+import { useI18n } from '@/i18n/client';
 import { api } from '@/lib/api-client';
 import { cn } from '@/utils/cn';
 
@@ -23,6 +25,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
+  const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +38,15 @@ function LoginForm() {
 
   const registered = searchParams.get('registered') === 'true';
   const returnUrl = searchParams.get('returnUrl');
+  const localizedLoginSchema = useMemo(
+    () =>
+      z.object({
+        email: z.string().email(t('auth.emailInvalid')),
+        password: z.string().min(1, t('auth.passwordRequired')),
+        remember_me: z.boolean(),
+      }),
+    [t]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -62,7 +74,7 @@ function LoginForm() {
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+    resolver: zodResolver(localizedLoginSchema),
     defaultValues: {
       email: '',
       password: '',
@@ -81,14 +93,18 @@ function LoginForm() {
         remember_me: data.remember_me,
       });
     } catch (err: any) {
-      setError(err.message || 'Invalid email or password');
+      setError(err.message || t('auth.invalidCredentials'));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex">
+    <div className="relative min-h-screen flex">
+      <div className="absolute right-4 top-4 z-10">
+        <LanguageSwitcher />
+      </div>
+
       {/* Left side - Login Form */}
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
@@ -99,16 +115,14 @@ function LoginForm() {
                 <span className="text-accent-contrast text-2xl font-bold">D</span>
               </div>
             </div>
-            <h2 className="text-3xl font-bold text-fg">Welcome back</h2>
-            <p className="mt-2 text-sm text-fg-muted">Sign in to your D'Insight account</p>
+            <h2 className="text-3xl font-bold text-fg">{t('auth.welcomeBack')}</h2>
+            <p className="mt-2 text-sm text-fg-muted">{t('auth.signInSubtitle')}</p>
           </div>
 
           {/* Success message for new registration */}
           {registered && (
             <div className="bg-success-bg border border-success-border text-success-text px-4 py-3 rounded-lg">
-              <p className="text-sm">
-                Registration successful! Please sign in with your credentials.
-              </p>
+              <p className="text-sm">{t('auth.registrationSuccessful')}</p>
             </div>
           )}
 
@@ -126,7 +140,7 @@ function LoginForm() {
               {/* Email Field */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-fg">
-                  Email Address
+                  {t('auth.emailAddress')}
                 </label>
                 <input
                   {...register('email')}
@@ -138,7 +152,7 @@ function LoginForm() {
                     'transition-colors duration-200',
                     errors.email ? 'border-danger-border text-danger-text ' : 'border-strong'
                   )}
-                  placeholder="you@example.com"
+                  placeholder={t('auth.emailPlaceholder')}
                 />
                 {errors.email && (
                   <p className="mt-1 text-sm text-danger-text">{errors.email.message}</p>
@@ -148,7 +162,7 @@ function LoginForm() {
               {/* Password Field */}
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-fg">
-                  Password
+                  {t('auth.password')}
                 </label>
                 <div className="mt-1 relative">
                   <input
@@ -161,7 +175,7 @@ function LoginForm() {
                       'transition-colors duration-200',
                       errors.password ? 'border-danger-border text-danger-text ' : 'border-strong'
                     )}
-                    placeholder="Enter your password"
+                    placeholder={t('auth.passwordPlaceholder')}
                   />
                   <button
                     type="button"
@@ -191,13 +205,13 @@ function LoginForm() {
                   className="h-4 w-4 text-accent focus:ring-focus border-strong rounded"
                 />
                 <label htmlFor="remember-me" className="ml-2 block text-sm text-fg">
-                  Remember me
+                  {t('auth.rememberMe')}
                 </label>
               </div>
 
               <div className="text-sm">
                 <Link href="/forgot-password" className="font-medium text-accent hover:text-accent">
-                  Forgot password?
+                  {t('auth.forgotPassword')}
                 </Link>
               </div>
             </div>
@@ -218,10 +232,10 @@ function LoginForm() {
                 {isLoading ? (
                   <>
                     <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                    Signing in...
+                    {t('auth.signingIn')}
                   </>
                 ) : (
-                  'Sign In'
+                  t('auth.signIn')
                 )}
               </button>
             </div>
@@ -238,7 +252,7 @@ function LoginForm() {
                     <div className="w-full border-t border-border" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-canvas px-2 text-fg-subtle">or</span>
+                    <span className="bg-canvas px-2 text-fg-subtle">{t('auth.or')}</span>
                   </div>
                 </div>
                 <a
@@ -251,7 +265,7 @@ function LoginForm() {
                   )}
                 >
                   <KeyRound className="h-4 w-4 mr-2 text-fg-muted" aria-hidden="true" />
-                  Continue with {ssoLabel}
+                  {t('auth.continueWith', { label: ssoLabel })}
                 </a>
               </div>
             )}
@@ -259,9 +273,9 @@ function LoginForm() {
             {/* Sign up link */}
             <div className="text-center">
               <p className="text-sm text-fg-muted">
-                Don't have an account?{' '}
+                {t('auth.noAccount')}{' '}
                 <Link href="/register" className="font-medium text-accent hover:text-accent">
-                  Sign up
+                  {t('auth.signUp')}
                 </Link>
               </p>
             </div>
@@ -273,28 +287,27 @@ function LoginForm() {
       <div className="hidden lg:flex lg:flex-1 bg-surface-muted border-l border-border">
         <div className="flex-1 flex items-center justify-center p-12">
           <div className="max-w-md text-fg">
-            <h2 className="text-2xl font-semibold mb-2">Sign in to continue monitoring</h2>
-            <p className="text-sm mb-8 text-fg-muted">
-              D'Insight watches your equipment for early signs of deterioration so the team can act
-              before failures escalate.
-            </p>
+            <h2 className="text-2xl font-semibold mb-2">{t('auth.continueMonitoringTitle')}</h2>
+            <p className="text-sm mb-8 text-fg-muted">{t('auth.continueMonitoringDescription')}</p>
             <dl className="space-y-5">
               <div>
-                <dt className="text-sm font-semibold text-fg">Live machine state</dt>
+                <dt className="text-sm font-semibold text-fg">{t('auth.liveMachineState')}</dt>
                 <dd className="mt-1 text-sm text-fg-muted">
-                  OK, Deteriorating, or Failing — at a glance, on every screen.
+                  {t('auth.liveMachineStateDefinition')}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-semibold text-fg">Baseline-aware anomaly detection</dt>
+                <dt className="text-sm font-semibold text-fg">
+                  {t('auth.baselineAwareDetection')}
+                </dt>
                 <dd className="mt-1 text-sm text-fg-muted">
-                  Surfaces drift from healthy behaviour the moment it starts.
+                  {t('auth.baselineAwareDetectionDefinition')}
                 </dd>
               </div>
               <div>
-                <dt className="text-sm font-semibold text-fg">Deterioration trend</dt>
+                <dt className="text-sm font-semibold text-fg">{t('auth.deteriorationTrend')}</dt>
                 <dd className="mt-1 text-sm text-fg-muted">
-                  Quantifies wear over time so maintenance can be scheduled, not reactive.
+                  {t('auth.deteriorationTrendDefinition')}
                 </dd>
               </div>
             </dl>
@@ -305,9 +318,14 @@ function LoginForm() {
   );
 }
 
+function LoginLoading() {
+  const { t } = useI18n();
+  return <div>{t('common.loading')}...</div>;
+}
+
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<LoginLoading />}>
       <LoginForm />
     </Suspense>
   );

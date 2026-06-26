@@ -23,6 +23,7 @@ import {
 } from '@/context/dashboard-workspace-context';
 import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 import { mainNavItems } from '@/lib/nav-config';
+import { useI18n } from '@/i18n/client';
 
 interface CommandPaletteProps {
   open: boolean;
@@ -90,6 +91,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   const pathname = usePathname();
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
+  const { t, formatNumber, formatDate } = useI18n();
   const {
     datasets,
     filteredDatasets,
@@ -157,21 +159,21 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         const Icon = item.icon;
         return {
           id: `nav:${item.href}`,
-          title: item.label,
-          description: item.description,
+          title: item.labelKey ? t(item.labelKey) : item.label,
+          description: item.descriptionKey ? t(item.descriptionKey) : item.description,
           icon: <Icon className="h-4 w-4" aria-hidden="true" />,
           action: () => router.push(item.href),
         } satisfies PaletteCommand;
       }),
       {
         id: 'catalog',
-        title: 'Open dataset catalog',
-        description: 'Export, delete, validate, and inspect processed datasets.',
+        title: t('command.openDatasetCatalog'),
+        description: t('command.openDatasetCatalogDescription'),
         icon: <FolderSearch className="h-4 w-4" aria-hidden="true" />,
         action: openCatalog,
       },
     ],
-    [openCatalog, router]
+    [openCatalog, router, t]
   );
 
   const queryText = normalize(query);
@@ -217,8 +219,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     () => [
       {
         id: 'save-view',
-        title: 'Save current view',
-        description: 'Remember this page, source, and dataset context.',
+        title: t('command.saveCurrentView'),
+        description: t('command.saveCurrentViewDescription'),
         icon: <BookmarkPlus className="h-4 w-4" aria-hidden="true" />,
         action: () => {
           saveCurrentView();
@@ -226,15 +228,15 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       },
       {
         id: 'refresh',
-        title: 'Refresh dataset context',
-        description: 'Reload available datasets without leaving the page.',
+        title: t('command.refreshDatasetContext'),
+        description: t('command.refreshDatasetContextDescription'),
         icon: <RefreshCw className="h-4 w-4" aria-hidden="true" />,
         action: async () => {
           await refetchDatasets();
           logActivity({
             type: 'system',
-            title: 'Dataset context refreshed',
-            description: 'The available dataset list was reloaded.',
+            title: t('command.datasetContextRefreshed'),
+            description: t('command.datasetContextRefreshedDescription'),
             status: 'info',
           });
         },
@@ -242,19 +244,19 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       {
         id: 'open-catalog',
         title: selectedDatasetId
-          ? `Open catalog for dataset #${selectedDatasetId}`
-          : 'Open dataset catalog',
-        description: 'Use catalog for export, deletion, metadata, lineage, and validation.',
+          ? t('command.openCatalogForDataset', { id: selectedDatasetId })
+          : t('command.openDatasetCatalog'),
+        description: t('command.openCatalogDescription'),
         icon: <Database className="h-4 w-4" aria-hidden="true" />,
         action: openCatalog,
       },
       {
         id: 'run-wear-trend',
-        title: 'Run wear trend analysis',
+        title: t('command.runWearTrend'),
         description:
           pathname === '/dashboard/insights'
-            ? 'Run the configured Health Insights analysis.'
-            : 'Open Health Insights, then run the configured analysis.',
+            ? t('command.runWearTrendHereDescription')
+            : t('command.runWearTrendElsewhereDescription'),
         icon: <Activity className="h-4 w-4" aria-hidden="true" />,
         action: () => {
           if (pathname !== '/dashboard/insights') {
@@ -272,6 +274,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       router,
       saveCurrentView,
       selectedDatasetId,
+      t,
     ]
   );
 
@@ -291,7 +294,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       className="fixed inset-0 z-[80] bg-black/30 p-3 backdrop-blur-sm sm:p-6"
       role="dialog"
       aria-modal="true"
-      aria-label="Command palette"
+      aria-label={t('command.palette')}
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) close();
       }}
@@ -303,27 +306,33 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             ref={inputRef}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search pages, datasets, saved views, or actions..."
+            placeholder={t('header.searchPlaceholder')}
             className="h-10 border-0 bg-transparent px-0 shadow-none focus-visible:ring-0"
           />
-          <Button variant="ghost" size="icon" onClick={close} aria-label="Close command palette">
+          <Button variant="ghost" size="icon" onClick={close} aria-label={t('command.close')}>
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-2 text-xs text-fg-muted">
-          <Badge variant="outline">Ctrl/Cmd K</Badge>
+          <Badge variant="outline">{t('header.searchShortcut')}</Badge>
           <span>
-            Context:{' '}
+            {t('command.context')}:{' '}
             <strong className="text-fg">
-              {selectedDatasetId ? `Dataset #${selectedDatasetId}` : 'No dataset selected'}
+              {selectedDatasetId
+                ? t('dashboard.selectedDataset', { id: selectedDatasetId })
+                : t('command.noDatasetSelected')}
             </strong>
           </span>
-          {selectedSourceKey && <span className="truncate">Source {selectedSourceKey}</span>}
+          {selectedSourceKey && (
+            <span className="truncate">
+              {t('common.source')} {selectedSourceKey}
+            </span>
+          )}
         </div>
 
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 py-4">
-          <CommandSection title="Actions" hidden={visibleActionCommands.length === 0}>
+          <CommandSection title={t('command.actions')} hidden={visibleActionCommands.length === 0}>
             {visibleActionCommands.map((command) => (
               <CommandRow
                 key={command.id}
@@ -335,7 +344,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             ))}
           </CommandSection>
 
-          <CommandSection title="Navigate" hidden={visibleNavCommands.length === 0}>
+          <CommandSection title={t('command.navigate')} hidden={visibleNavCommands.length === 0}>
             {visibleNavCommands.map((command) => (
               <CommandRow
                 key={command.id}
@@ -347,7 +356,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             ))}
           </CommandSection>
 
-          <CommandSection title="Dataset Sources" hidden={sourceMatches.length === 0}>
+          <CommandSection title={t('command.datasetSources')} hidden={sourceMatches.length === 0}>
             {sourceMatches.map((group) => (
               <CommandRow
                 key={group.key}
@@ -356,9 +365,11 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   title: group.label,
                   description:
                     group.datasets.length === 1
-                      ? '1 dataset in this source'
-                      : `${group.datasets.length.toLocaleString()} datasets in this source`,
-                  badge: selectedSourceKey === group.key ? 'Active' : undefined,
+                      ? t('command.oneDatasetInSource')
+                      : t('command.manyDatasetsInSource', {
+                          count: formatNumber(group.datasets.length),
+                        }),
+                  badge: selectedSourceKey === group.key ? t('common.active') : undefined,
                   icon: <Database className="h-4 w-4" aria-hidden="true" />,
                   action: () => runAndClose(() => selectSource(group.key)),
                 }}
@@ -366,7 +377,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             ))}
           </CommandSection>
 
-          <CommandSection title="Datasets" hidden={datasetMatches.length === 0}>
+          <CommandSection title={t('command.datasets')} hidden={datasetMatches.length === 0}>
             {datasetMatches.map((dataset) => (
               <CommandRow
                 key={dataset.dinsight_id}
@@ -375,11 +386,16 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                   title: formatDatasetOptionLabel(dataset),
                   description:
                     dataset.records != null
-                      ? `${dataset.records.toLocaleString()} records`
+                      ? t('command.records', { count: formatNumber(dataset.records) })
                       : dataset.source.createdAt
-                        ? `Created ${new Date(dataset.source.createdAt).toLocaleString()}`
-                        : 'Processed dataset',
-                  badge: selectedDatasetId === dataset.dinsight_id ? 'Active' : undefined,
+                        ? t('command.created', {
+                            date: formatDate(dataset.source.createdAt, {
+                              dateStyle: 'medium',
+                              timeStyle: 'short',
+                            }),
+                          })
+                        : t('command.processedDataset'),
+                  badge: selectedDatasetId === dataset.dinsight_id ? t('common.active') : undefined,
                   icon: <Sparkles className="h-4 w-4" aria-hidden="true" />,
                   action: () => runAndClose(() => selectDataset(dataset.dinsight_id)),
                 }}
@@ -387,16 +403,17 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             ))}
           </CommandSection>
 
-          <CommandSection title="Saved Views" hidden={savedViewMatches.length === 0}>
+          <CommandSection title={t('command.savedViews')} hidden={savedViewMatches.length === 0}>
             {savedViewMatches.map((view) => (
               <CommandRow
                 key={view.id}
                 command={{
                   id: `view:${view.id}`,
                   title: view.name,
-                  description: `${view.href} - saved ${new Date(
-                    view.createdAt
-                  ).toLocaleDateString()}`,
+                  description: t('command.savedDate', {
+                    href: view.href,
+                    date: formatDate(view.createdAt),
+                  }),
                   badge: view.datasetId ? `#${view.datasetId}` : undefined,
                   icon: <ExternalLink className="h-4 w-4" aria-hidden="true" />,
                   action: () =>
@@ -417,10 +434,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             savedViewMatches.length === 0 && (
               <div className="rounded-lg border border-dashed border-border px-4 py-10 text-center">
                 <Search className="mx-auto h-8 w-8 text-fg-subtle" aria-hidden="true" />
-                <p className="mt-2 text-sm font-medium text-fg">No command found</p>
-                <p className="mt-1 text-xs text-fg-muted">
-                  Try a page name, dataset ID, source name, or action like catalog.
-                </p>
+                <p className="mt-2 text-sm font-medium text-fg">{t('command.noCommandFound')}</p>
+                <p className="mt-1 text-xs text-fg-muted">{t('command.noCommandHint')}</p>
               </div>
             )}
         </div>

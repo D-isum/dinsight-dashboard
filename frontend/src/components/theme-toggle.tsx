@@ -10,9 +10,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useI18n } from '@/i18n/client';
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const [mounted, setMounted] = React.useState(false);
 
   React.useEffect(() => {
@@ -41,23 +43,23 @@ export function ThemeToggle() {
         >
           <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
           <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-          <span className="sr-only">Toggle theme</span>
+          <span className="sr-only">{t('theme.toggle')}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="right" className="w-36">
         <DropdownMenuItem onClick={() => setTheme('light')} className="flex items-center gap-2">
           <Sun className="h-4 w-4" />
-          <span>Light</span>
+          <span>{t('theme.light')}</span>
           {theme === 'light' && <span className="ml-auto text-accent">✓</span>}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme('dark')} className="flex items-center gap-2">
           <Moon className="h-4 w-4" />
-          <span>Dark</span>
+          <span>{t('theme.dark')}</span>
           {theme === 'dark' && <span className="ml-auto text-accent">✓</span>}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme('system')} className="flex items-center gap-2">
           <Monitor className="h-4 w-4" />
-          <span>System</span>
+          <span>{t('theme.system')}</span>
           {theme === 'system' && <span className="ml-auto text-accent">✓</span>}
         </DropdownMenuItem>
       </DropdownMenuContent>

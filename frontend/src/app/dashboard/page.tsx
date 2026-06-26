@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Activity,
   ArrowRight,
@@ -27,12 +27,15 @@ import {
   useDashboardWorkspace,
 } from '@/context/dashboard-workspace-context';
 import { useDashboardOverview } from '@/hooks/useDashboardOverview';
+import { useI18n } from '@/i18n/client';
 import { buildSparklinePath } from '@/lib/dashboard-overview';
 import type { DinsightDatasetSummary } from '@/lib/dataset-normalizers';
 import { cn } from '@/utils/cn';
 
 type HealthState = 'OK' | 'Deteriorating' | 'Failing';
 type Tone = 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+type Primitive = string | number | boolean | null | undefined;
+type Translate = (key: string, values?: Record<string, Primitive>) => string;
 
 const stateTone: Record<HealthState, string> = {
   OK: 'border-success-border bg-success-bg text-success-text',
@@ -62,57 +65,61 @@ const toneBadge: Record<Tone, 'success' | 'warning' | 'danger' | 'info' | 'neutr
   neutral: 'neutral',
 };
 
-const formatNumber = (value: number | null | undefined) =>
-  typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : 'N/A';
-
-const formatPercent = (value: number | null | undefined, digits = 1) =>
-  typeof value === 'number' && Number.isFinite(value) ? `${value.toFixed(digits)}%` : 'N/A';
-
-const formatRelativeTime = (value: string | number | Date | null | undefined) => {
-  if (value == null) return 'No recent signal';
+const formatRelativeTime = (value: string | number | Date | null | undefined, t: Translate) => {
+  if (value == null) return t('health.noRecentSignal');
   const timestamp =
     value instanceof Date ? value.getTime() : typeof value === 'number' ? value : Date.parse(value);
-  if (!Number.isFinite(timestamp)) return 'Unknown time';
+  if (!Number.isFinite(timestamp)) return t('health.unknownTime');
 
   const diff = Date.now() - timestamp;
   const minute = 60_000;
   const hour = minute * 60;
   const day = hour * 24;
-  if (diff < minute) return 'Just now';
-  if (diff < hour) return `${Math.floor(diff / minute)}m ago`;
-  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
-  return `${Math.floor(diff / day)}d ago`;
+  if (diff < minute) return t('health.justNow');
+  if (diff < hour) return t('health.minutesAgo', { count: Math.floor(diff / minute) });
+  if (diff < day) return t('health.hoursAgo', { count: Math.floor(diff / hour) });
+  return t('health.daysAgo', { count: Math.floor(diff / day) });
 };
 
-const formatSourceKind = (dataset: DinsightDatasetSummary | null | undefined) => {
-  if (!dataset) return 'No source';
-  if (dataset.source.source === 'auto') return 'IoT Hub stream';
-  if (dataset.source.source === 'manual') return 'Manual upload';
-  return 'Unknown source';
+const formatSourceKind = (dataset: DinsightDatasetSummary | null | undefined, t: Translate) => {
+  if (!dataset) return t('dashboard.noSource');
+  if (dataset.source.source === 'auto') return t('dashboard.iotHubStream');
+  if (dataset.source.source === 'manual') return t('dashboard.manualUpload');
+  return t('dashboard.unknownSource');
 };
 
-const getDatasetLabel = (dataset: DinsightDatasetSummary | null | undefined) => {
-  if (!dataset) return 'No processed data selected';
+const getDatasetLabel = (dataset: DinsightDatasetSummary | null | undefined, t: Translate) => {
+  if (!dataset) return t('dashboard.noProcessedDataSelected');
   return (
     dataset.source.originalFileName ??
     dataset.source.deviceName ??
     dataset.source.deviceSlug ??
     dataset.source.iotHubDeviceId ??
-    `Dataset #${dataset.dinsight_id}`
+    t('dashboard.selectedDataset', { id: dataset.dinsight_id })
   );
 };
 
-function Sparkline({ values, stroke }: { values: Array<number | null>; stroke: string }) {
+function Sparkline({
+  values,
+  stroke,
+  ariaLabel,
+  emptyLabel,
+}: {
+  values: Array<number | null>;
+  stroke: string;
+  ariaLabel: string;
+  emptyLabel: string;
+}) {
   const path = useMemo(() => buildSparklinePath(values, 320, 64), [values]);
 
   return (
-    <svg viewBox="0 0 320 64" className="h-16 w-full" role="img" aria-label="Trend sparkline">
+    <svg viewBox="0 0 320 64" className="h-16 w-full" role="img" aria-label={ariaLabel}>
       <path d="M0 63 L320 63" stroke="currentColor" className="text-border/70" strokeWidth="1" />
       {path ? (
         <path d={path} fill="none" stroke={stroke} strokeWidth="2.4" strokeLinecap="round" />
       ) : (
         <text x="8" y="36" fill="currentColor" className="text-muted-foreground text-xs">
-          Waiting for samples
+          {emptyLabel}
         </text>
       )}
     </svg>
@@ -181,12 +188,14 @@ function ActionQueue({
     icon: ReactNode;
   }>;
 }) {
+  const { t } = useI18n();
+
   return (
     <Card className="self-start">
       <SectionTitle
         icon={<ListChecks className="h-5 w-5" />}
-        title="Next steps"
-        description="Tasks for the selected dataset."
+        title={t('dashboard.nextSteps')}
+        description={t('dashboard.nextStepsDescription')}
       />
       <CardContent className="space-y-3 p-4 pt-0">
         {actions.map((action) => (
@@ -227,13 +236,22 @@ function ReadinessRow({
   tone: Tone;
   href?: string;
 }) {
+  const { t } = useI18n();
+  const badgeLabel =
+    tone === 'success'
+      ? t('common.ready')
+      : tone === 'warning'
+        ? t('common.warning')
+        : tone === 'danger'
+          ? t('common.danger')
+          : tone;
   const content = (
     <div className="flex min-w-0 items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 transition-colors hover:bg-surface-hover">
       <div className="min-w-0">
         <div className="truncate text-sm font-medium text-fg">{label}</div>
         <div className="truncate text-xs text-fg-muted">{value}</div>
       </div>
-      <Badge variant={toneBadge[tone]}>{tone === 'success' ? 'Ready' : tone}</Badge>
+      <Badge variant={toneBadge[tone]}>{badgeLabel}</Badge>
     </div>
   );
 
@@ -262,17 +280,23 @@ function PriorityQueue({
     isActive: boolean;
   }>;
 }) {
+  const { t, formatNumber } = useI18n();
+  const formatNumberValue = (value: number | null | undefined) =>
+    typeof value === 'number' && Number.isFinite(value)
+      ? formatNumber(value)
+      : t('common.notAvailable');
+
   return (
     <Card>
       <SectionTitle
         icon={<Gauge className="h-5 w-5" />}
-        title="Dataset queue"
-        description="Selected dataset first, followed by recent saved results."
+        title={t('dashboard.datasetQueue')}
+        description={t('dashboard.datasetQueueDescription')}
       />
       <CardContent className="space-y-2 p-4 pt-0">
         {items.length === 0 ? (
           <div className="rounded-md border border-dashed border-border p-4 text-sm text-fg-muted">
-            No processed datasets yet.
+            {t('dashboard.noProcessedDatasets')}
           </div>
         ) : (
           items.map((item) => (
@@ -286,17 +310,24 @@ function PriorityQueue({
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-fg">Dataset #{item.id}</span>
-                    {item.isActive && <Badge variant="accent">Selected</Badge>}
+                    <span className="font-semibold text-fg">
+                      {t('dashboard.selectedDataset', { id: item.id })}
+                    </span>
+                    {item.isActive && <Badge variant="accent">{t('common.selected')}</Badge>}
                     <Badge variant={toneBadge[item.tone]}>{item.status}</Badge>
                   </div>
                   <div className="mt-1 truncate text-sm text-fg-muted">{item.label}</div>
                   <div className="mt-1 text-xs text-fg-muted">
-                    {item.source} · {formatNumber(item.records)} points
+                    {t('dashboard.pointsDetail', {
+                      source: item.source,
+                      points: formatNumberValue(item.records),
+                    })}
                   </div>
                 </div>
                 <div className="min-w-[112px] text-right">
-                  <div className="text-xs font-medium uppercase text-fg-muted">Priority</div>
+                  <div className="text-xs font-medium uppercase text-fg-muted">
+                    {t('dashboard.priority')}
+                  </div>
                   <div className="mt-1 text-lg font-semibold text-fg">{item.score}</div>
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-muted">
                     <div
@@ -322,7 +353,7 @@ function PriorityQueue({
           <Button asChild variant="outline" className="mt-2 w-full">
             <Link href="/dashboard/data?catalog=open">
               <Database className="mr-2 h-4 w-4" />
-              Open catalog
+              {t('dashboard.openCatalog')}
             </Link>
           </Button>
         )}
@@ -332,6 +363,7 @@ function PriorityQueue({
 }
 
 function ActivityRow({ activity }: { activity: DashboardActivity }) {
+  const { t } = useI18n();
   const tone: Tone =
     activity.status === 'danger'
       ? 'danger'
@@ -349,8 +381,10 @@ function ActivityRow({ activity }: { activity: DashboardActivity }) {
           <div className="mt-0.5 truncate text-xs text-fg-muted">{activity.description}</div>
         )}
         <div className="mt-1 text-xs text-fg-muted">
-          {formatRelativeTime(activity.timestamp)}
-          {activity.datasetId ? ` · Dataset #${activity.datasetId}` : ''}
+          {formatRelativeTime(activity.timestamp, t)}
+          {activity.datasetId
+            ? ` · ${t('dashboard.selectedDataset', { id: activity.datasetId })}`
+            : ''}
         </div>
       </div>
     </div>
@@ -389,6 +423,39 @@ export default function DashboardPage() {
     refetchAll,
   } = useDashboardOverview();
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { t, formatNumber } = useI18n();
+  const formatNumberValue = useCallback(
+    (value: number | null | undefined) =>
+      typeof value === 'number' && Number.isFinite(value)
+        ? formatNumber(value)
+        : t('common.notAvailable'),
+    [formatNumber, t]
+  );
+  const formatPercentValue = useCallback(
+    (value: number | null | undefined, digits = 1) =>
+      typeof value === 'number' && Number.isFinite(value)
+        ? `${value.toFixed(digits)}%`
+        : t('common.notAvailable'),
+    [t]
+  );
+  const formatHealthState = useCallback(
+    (state: HealthState) =>
+      state === 'OK'
+        ? t('health.ok')
+        : state === 'Deteriorating'
+          ? t('health.deteriorating')
+          : t('health.failing'),
+    [t]
+  );
+  const formatWearDirection = useCallback(
+    (direction: string) =>
+      direction === 'up'
+        ? t('health.up')
+        : direction === 'down'
+          ? t('health.down')
+          : t('health.stable'),
+    [t]
+  );
 
   const machineReasons = useMemo(
     () =>
@@ -432,27 +499,27 @@ export default function DashboardPage() {
   const lastTimelinePoint = history[history.length - 1]?.timestamp ?? null;
   const streamStatusLabel =
     streamingStatus?.status === 'streaming'
-      ? 'Streaming'
+      ? t('dashboard.streaming')
       : streamingStatus?.status === 'completed'
-        ? 'Completed'
-        : 'Not started';
-  const sourceLabel = getDatasetLabel(selectedDataset);
-  const sourceKindLabel = formatSourceKind(selectedDataset);
+        ? t('common.completed')
+        : t('dashboard.notStarted');
+  const sourceLabel = getDatasetLabel(selectedDataset, t);
+  const sourceKindLabel = formatSourceKind(selectedDataset, t);
   const anomalySeries = history.map((point) => point.anomalyPercentage);
   const wearSeries = history.map((point) => point.wearScore);
   const readinessItems = useMemo(
     () => [
       {
-        label: 'Dataset selected',
+        label: t('dashboard.datasetSelected'),
         value: selectedLiveDatasetId
-          ? `Dataset #${selectedLiveDatasetId}`
-          : 'Use the header picker',
+          ? t('dashboard.selectedDataset', { id: selectedLiveDatasetId })
+          : t('dashboard.useHeaderPicker'),
         tone: selectedLiveDatasetId ? ('success' as Tone) : ('danger' as Tone),
         href: '/dashboard/data?catalog=open',
       },
       {
-        label: 'Source attribution',
-        value: selectedDataset ? sourceKindLabel : 'No source selected',
+        label: t('dashboard.sourceAttribution'),
+        value: selectedDataset ? sourceKindLabel : t('dashboard.noSourceSelected'),
         tone:
           selectedDataset && selectedDataset.source.source !== 'unknown'
             ? ('success' as Tone)
@@ -460,17 +527,20 @@ export default function DashboardPage() {
         href: '/dashboard/data?catalog=open',
       },
       {
-        label: 'Live stream',
-        value: `${streamStatusLabel} · ${formatNumber(streamingStatus?.streamed_points)} points`,
+        label: t('dashboard.liveStream'),
+        value: t('dashboard.streamedStatus', {
+          status: streamStatusLabel,
+          points: formatNumberValue(streamingStatus?.streamed_points),
+        }),
         tone: hasStreamingData ? ('success' as Tone) : ('warning' as Tone),
         href: '/dashboard/live',
       },
       {
-        label: 'Anomaly signal',
+        label: t('dashboard.anomalySignal'),
         value:
           realtimeAnomaly && realtimeAnomaly.totalPoints > 0
-            ? `${formatPercent(realtimeAnomaly.anomalyPercentage)} from ${formatNumber(realtimeAnomaly.totalPoints)} points`
-            : 'Waiting for live/model signal',
+            ? `${formatPercentValue(realtimeAnomaly.anomalyPercentage)} / ${formatNumberValue(realtimeAnomaly.totalPoints)} ${t('common.points')}`
+            : t('dashboard.waitingForSignal'),
         tone:
           realtimeAnomaly && realtimeAnomaly.totalPoints > 0
             ? ('success' as Tone)
@@ -478,22 +548,24 @@ export default function DashboardPage() {
         href: '/dashboard/live',
       },
       {
-        label: 'Wear baseline',
+        label: t('dashboard.wearBaseline'),
         value: hasWearConfig
           ? appliedWearConfig?.baselineRange
             ? `${appliedWearConfig.baselineRange.start} → ${appliedWearConfig.baselineRange.end}`
-            : `${appliedWearConfig?.baselineClusterValues?.length ?? 0} selected interval(s)`
-          : 'Configure in Health Insights',
+            : t('dashboard.selectedIntervals', {
+                count: appliedWearConfig?.baselineClusterValues?.length ?? 0,
+              })
+          : t('dashboard.configureInInsights'),
         tone: hasWearConfig ? ('success' as Tone) : ('warning' as Tone),
         href: '/dashboard/insights',
       },
       {
-        label: 'Wear result',
+        label: t('dashboard.wearResult'),
         value: wearSnapshot
-          ? `${wearSnapshot.score.toFixed(3)} · ${wearDirection}`
+          ? `${wearSnapshot.score.toFixed(3)} · ${formatWearDirection(wearDirection)}`
           : wearError
-            ? 'Calculation failed'
-            : 'No deterioration result',
+            ? t('dashboard.calculationFailed')
+            : t('dashboard.noDeteriorationResult'),
         tone: wearError
           ? ('danger' as Tone)
           : wearSnapshot
@@ -505,6 +577,9 @@ export default function DashboardPage() {
     [
       appliedWearConfig?.baselineClusterValues?.length,
       appliedWearConfig?.baselineRange,
+      formatNumberValue,
+      formatPercentValue,
+      formatWearDirection,
       hasStreamingData,
       hasWearConfig,
       realtimeAnomaly,
@@ -513,6 +588,7 @@ export default function DashboardPage() {
       sourceKindLabel,
       streamStatusLabel,
       streamingStatus?.streamed_points,
+      t,
       wearDirection,
       wearError,
       wearSnapshot,
@@ -552,12 +628,16 @@ export default function DashboardPage() {
           : unknownSource
             ? 'warning'
             : 'neutral';
-        const status = isActive ? machineStatus.state : unknownSource ? 'Needs source' : 'Standby';
+        const status = isActive
+          ? formatHealthState(machineStatus.state)
+          : unknownSource
+            ? t('dashboard.needsSource')
+            : t('dashboard.standby');
 
         return {
           id: dataset.dinsight_id,
-          label: getDatasetLabel(dataset),
-          source: formatSourceKind(dataset),
+          label: getDatasetLabel(dataset, t),
+          source: formatSourceKind(dataset, t),
           records: dataset.records ?? null,
           score,
           tone,
@@ -569,11 +649,13 @@ export default function DashboardPage() {
       .slice(0, 4);
   }, [
     datasets,
+    formatHealthState,
     hasCriticalAlerts,
     latestAnomalyPercentage,
     latestDatasetId,
     machineStatus.state,
     selectedLiveDatasetId,
+    t,
   ]);
 
   const actions = useMemo(() => {
@@ -588,10 +670,10 @@ export default function DashboardPage() {
 
     if (!hasDatasets) {
       nextActions.push({
-        title: 'Create the first processed dataset',
-        detail: 'Upload split files or a combined CSV before live monitoring or insights can run.',
+        title: t('dashboard.createFirstDataset'),
+        detail: t('dashboard.createFirstDatasetDetail'),
         href: '/dashboard/data',
-        label: 'Open data',
+        label: t('dashboard.openData'),
         tone: 'info',
         icon: <Upload className="h-5 w-5" />,
       });
@@ -599,10 +681,10 @@ export default function DashboardPage() {
 
     if (hasDatasets && !hasSelectedDataset) {
       nextActions.push({
-        title: 'Choose an active dataset',
-        detail: 'Use the header picker to set the dataset for every page.',
+        title: t('dashboard.chooseActiveDataset'),
+        detail: t('dashboard.chooseActiveDatasetDetail'),
         href: '/dashboard/data?catalog=open',
-        label: 'Review catalog',
+        label: t('dashboard.reviewCatalog'),
         tone: 'warning',
         icon: <Database className="h-5 w-5" />,
       });
@@ -610,10 +692,10 @@ export default function DashboardPage() {
 
     if (hasCriticalAlerts || machineStatus.state === 'Failing') {
       nextActions.push({
-        title: 'Investigate abnormal behavior',
-        detail: 'Open the live monitor and validate recent red points, boundaries, and metadata.',
+        title: t('dashboard.investigateAbnormal'),
+        detail: t('dashboard.investigateAbnormalDetail'),
         href: '/dashboard/live',
-        label: 'Open live',
+        label: t('dashboard.openLive'),
         tone: 'danger',
         icon: <ShieldAlert className="h-5 w-5" />,
       });
@@ -621,10 +703,10 @@ export default function DashboardPage() {
 
     if (hasDatasets && !hasWearConfig) {
       nextActions.push({
-        title: 'Set the healthy baseline',
-        detail: 'Configure the timestamp/interval baseline so deterioration scores are meaningful.',
+        title: t('dashboard.setHealthyBaseline'),
+        detail: t('dashboard.setHealthyBaselineDetail'),
         href: '/dashboard/insights',
-        label: 'Configure',
+        label: t('common.configure'),
         tone: 'warning',
         icon: <Settings2 className="h-5 w-5" />,
       });
@@ -632,10 +714,10 @@ export default function DashboardPage() {
 
     if (hasDatasets && hasWearConfig && !wearSnapshot) {
       nextActions.push({
-        title: 'Run deterioration analysis',
-        detail: 'Generate distance-from-baseline results for the selected dataset.',
+        title: t('dashboard.runDeterioration'),
+        detail: t('dashboard.runDeteriorationDetail'),
         href: '/dashboard/insights',
-        label: 'Run insights',
+        label: t('dashboard.runInsights'),
         tone: wearError ? 'danger' : 'info',
         icon: <Gauge className="h-5 w-5" />,
       });
@@ -643,10 +725,10 @@ export default function DashboardPage() {
 
     if (hasDatasets && !hasStreamingData) {
       nextActions.push({
-        title: 'Start live verification',
-        detail: 'Stream monitoring points to confirm current machine movement.',
+        title: t('dashboard.startLiveVerification'),
+        detail: t('dashboard.startLiveVerificationDetail'),
         href: '/dashboard/live',
-        label: 'Open live',
+        label: t('dashboard.openLive'),
         tone: 'info',
         icon: <Radio className="h-5 w-5" />,
       });
@@ -654,18 +736,18 @@ export default function DashboardPage() {
 
     if (nextActions.length === 0) {
       nextActions.push({
-        title: 'Review the current result',
-        detail: 'Compare live movement and deterioration trend before the next operating decision.',
+        title: t('dashboard.reviewCurrentResult'),
+        detail: t('dashboard.reviewCurrentResultDetail'),
         href: '/dashboard/insights',
-        label: 'Open insights',
+        label: t('dashboard.openInsights'),
         tone: machineStatus.state === 'OK' ? 'success' : 'warning',
         icon: <Eye className="h-5 w-5" />,
       });
       nextActions.push({
-        title: 'Review data files',
-        detail: 'Export or delete files from the catalog when a run is complete.',
+        title: t('dashboard.reviewDataFiles'),
+        detail: t('dashboard.reviewDataFilesDetail'),
         href: '/dashboard/data?catalog=open',
-        label: 'Open catalog',
+        label: t('dashboard.openCatalog'),
         tone: 'neutral',
         icon: <Database className="h-5 w-5" />,
       });
@@ -678,10 +760,10 @@ export default function DashboardPage() {
 
     if (hasDatasets && nextActions.length < 3 && !hasInsightsAction) {
       nextActions.push({
-        title: 'Review deterioration trend',
-        detail: 'Check baseline-relative movement, thresholds, and interval transitions.',
+        title: t('dashboard.reviewDeteriorationTrend'),
+        detail: t('dashboard.reviewDeteriorationTrendDetail'),
         href: '/dashboard/insights',
-        label: 'Open insights',
+        label: t('dashboard.openInsights'),
         tone: machineStatus.state === 'OK' ? 'info' : 'warning',
         icon: <Gauge className="h-5 w-5" />,
       });
@@ -689,10 +771,10 @@ export default function DashboardPage() {
 
     if (hasDatasets && nextActions.length < 3 && !hasCatalogAction) {
       nextActions.push({
-        title: 'Review data files',
-        detail: 'Export, inspect, or delete files for this dataset ID.',
+        title: t('dashboard.reviewDataFiles'),
+        detail: t('dashboard.reviewDataFilesForIdDetail'),
         href: '/dashboard/data?catalog=open',
-        label: 'Open catalog',
+        label: t('dashboard.openCatalog'),
         tone: 'neutral',
         icon: <Database className="h-5 w-5" />,
       });
@@ -706,6 +788,7 @@ export default function DashboardPage() {
     hasStreamingData,
     hasWearConfig,
     machineStatus.state,
+    t,
     wearError,
     wearSnapshot,
   ]);
@@ -717,7 +800,7 @@ export default function DashboardPage() {
       fallback.push({
         id: 'selected-dataset',
         type: 'dataset',
-        title: `Dataset #${selectedLiveDatasetId} selected`,
+        title: t('dashboard.datasetSelected'),
         description: sourceLabel,
         datasetId: selectedLiveDatasetId,
         timestamp: new Date().toISOString(),
@@ -729,8 +812,11 @@ export default function DashboardPage() {
       fallback.push({
         id: 'live-sync',
         type: 'streaming',
-        title: 'Live signal updated',
-        description: `${streamStatusLabel} · ${formatNumber(streamingStatus?.streamed_points)} streamed points`,
+        title: t('dashboard.liveSignalUpdated'),
+        description: t('dashboard.streamedStatus', {
+          status: streamStatusLabel,
+          points: formatNumberValue(streamingStatus?.streamed_points),
+        }),
         datasetId: selectedLiveDatasetId ?? undefined,
         timestamp: new Date(lastTimelinePoint).toISOString(),
         href: '/dashboard/live',
@@ -744,6 +830,8 @@ export default function DashboardPage() {
     selectedLiveDatasetId,
     sourceLabel,
     streamStatusLabel,
+    formatNumberValue,
+    t,
     streamingStatus?.streamed_points,
   ]);
 
@@ -757,14 +845,18 @@ export default function DashboardPage() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-xs font-semibold uppercase">
                     <Activity className="h-4 w-4" />
-                    Machine status
+                    {t('dashboard.machineStatus')}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-3">
                     <h1 className="text-3xl font-semibold tracking-normal">
-                      {machineStatus.state}
+                      {formatHealthState(machineStatus.state)}
                     </h1>
                     <Badge variant={stateBadgeVariant[machineStatus.state]}>
-                      Dataset #{selectedLiveDatasetId ?? latestDatasetId ?? 'N/A'}
+                      {(selectedLiveDatasetId ?? latestDatasetId)
+                        ? t('dashboard.selectedDataset', {
+                            id: selectedLiveDatasetId ?? latestDatasetId ?? '',
+                          })
+                        : t('common.notAvailable')}
                     </Badge>
                   </div>
                   <p className="mt-2 max-w-3xl text-sm opacity-90">
@@ -777,27 +869,31 @@ export default function DashboardPage() {
                   disabled={isRefreshing}
                 >
                   <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
-                  Refresh
+                  {t('common.refresh')}
                 </Button>
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(250px,1.55fr)_repeat(3,minmax(130px,1fr))]">
                 <SummaryMetric
-                  label="Source"
+                  label={t('dashboard.source')}
                   value={sourceLabel}
                   detail={sourceKindLabel}
                   valueClassName="line-clamp-2 text-base"
                 />
                 <SummaryMetric
-                  label="Stream"
+                  label={t('dashboard.stream')}
                   value={streamStatusLabel}
-                  detail={`${formatNumber(streamingStatus?.streamed_points)}/${formatNumber(streamingStatus?.total_points)} points`}
+                  detail={`${formatNumberValue(streamingStatus?.streamed_points)}/${formatNumberValue(streamingStatus?.total_points)} ${t('common.points')}`}
                   tone={hasStreamingData ? 'success' : 'warning'}
                 />
                 <SummaryMetric
-                  label="Anomaly"
-                  value={formatPercent(latestAnomalyPercentage)}
-                  detail={anomalySource === 'manual-boundary' ? 'Manual boundary' : 'Model signal'}
+                  label={t('dashboard.anomaly')}
+                  value={formatPercentValue(latestAnomalyPercentage)}
+                  detail={
+                    anomalySource === 'manual-boundary'
+                      ? t('dashboard.manualBoundary')
+                      : t('dashboard.modelSignal')
+                  }
                   tone={
                     latestAnomalyPercentage == null
                       ? 'neutral'
@@ -809,9 +905,12 @@ export default function DashboardPage() {
                   }
                 />
                 <SummaryMetric
-                  label="Readiness"
+                  label={t('dashboard.readiness')}
                   value={`${readinessScore}%`}
-                  detail={`${readinessItems.filter((item) => item.tone === 'success').length}/${readinessItems.length} checks ready`}
+                  detail={t('dashboard.checksReady', {
+                    ready: readinessItems.filter((item) => item.tone === 'success').length,
+                    total: readinessItems.length,
+                  })}
                   tone={
                     readinessScore >= 80 ? 'success' : readinessScore >= 50 ? 'warning' : 'danger'
                   }
@@ -820,7 +919,9 @@ export default function DashboardPage() {
 
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
                 <div className="rounded-md border border-current/20 bg-white/30 p-3 text-sm dark:bg-black/10">
-                  <div className="text-xs font-semibold uppercase">State drivers</div>
+                  <div className="text-xs font-semibold uppercase">
+                    {t('dashboard.stateDrivers')}
+                  </div>
                   <div className="mt-2 grid gap-2">
                     {machineReasons.map((reason) => (
                       <div key={reason} className="rounded-md border border-current/15 px-3 py-2">
@@ -830,14 +931,14 @@ export default function DashboardPage() {
                   </div>
                 </div>
                 <div className="rounded-md border border-current/20 bg-white/30 p-3 text-sm dark:bg-black/10">
-                  <div className="text-xs font-semibold uppercase">Last signal</div>
+                  <div className="text-xs font-semibold uppercase">{t('dashboard.lastSignal')}</div>
                   <div className="mt-2 text-lg font-semibold">
                     {lastTimelinePoint != null
-                      ? formatRelativeTime(new Date(lastTimelinePoint))
-                      : 'No live sync'}
+                      ? formatRelativeTime(new Date(lastTimelinePoint), t)
+                      : t('dashboard.noLiveSync')}
                   </div>
                   <div className="mt-1 text-xs opacity-80">
-                    Dashboard cadence: {Math.round(liveRefreshMs / 1000)}s
+                    {t('dashboard.dashboardCadence', { seconds: Math.round(liveRefreshMs / 1000) })}
                   </div>
                 </div>
               </div>
@@ -849,36 +950,53 @@ export default function DashboardPage() {
           <Card>
             <SectionTitle
               icon={<Waves className="h-5 w-5" />}
-              title="Live signal"
-              description="Compact trend preview for the selected dataset."
+              title={t('dashboard.liveSignal')}
+              description={t('dashboard.liveSignalDescription')}
             />
             <CardContent className="grid gap-4 p-4 pt-0 lg:grid-cols-2">
               <div className="rounded-md border border-border bg-surface px-3 py-3">
                 <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-medium uppercase text-fg-muted">Anomaly rate</span>
+                  <span className="font-medium uppercase text-fg-muted">
+                    {t('dashboard.anomalyRate')}
+                  </span>
                   <span className="font-semibold text-fg">
-                    {formatPercent(latestAnomalyPercentage)}
+                    {formatPercentValue(latestAnomalyPercentage)}
                   </span>
                 </div>
-                <Sparkline values={anomalySeries} stroke="#dc2626" />
+                <Sparkline
+                  values={anomalySeries}
+                  stroke="#dc2626"
+                  ariaLabel={t('dashboard.trendSparkline')}
+                  emptyLabel={t('dashboard.waitingForSamples')}
+                />
                 <div className="mt-2 text-xs text-fg-muted">
                   {realtimeAnomaly
-                    ? `${formatNumber(realtimeAnomaly.anomalyCount)} abnormal of ${formatNumber(realtimeAnomaly.totalPoints)} points`
-                    : 'No anomaly sample available'}
+                    ? t('dashboard.abnormalOfPoints', {
+                        abnormal: formatNumberValue(realtimeAnomaly.anomalyCount),
+                        total: formatNumberValue(realtimeAnomaly.totalPoints),
+                      })
+                    : t('dashboard.noAnomalySample')}
                 </div>
               </div>
               <div className="rounded-md border border-border bg-surface px-3 py-3">
                 <div className="mb-1 flex items-center justify-between gap-3 text-xs">
-                  <span className="font-medium uppercase text-fg-muted">Wear score</span>
+                  <span className="font-medium uppercase text-fg-muted">
+                    {t('dashboard.wearScore')}
+                  </span>
                   <span className="font-semibold text-fg">
-                    {wearSnapshot ? wearSnapshot.score.toFixed(3) : 'N/A'}
+                    {wearSnapshot ? wearSnapshot.score.toFixed(3) : t('common.notAvailable')}
                   </span>
                 </div>
-                <Sparkline values={wearSeries} stroke="#7c3aed" />
+                <Sparkline
+                  values={wearSeries}
+                  stroke="#7c3aed"
+                  ariaLabel={t('dashboard.trendSparkline')}
+                  emptyLabel={t('dashboard.waitingForSamples')}
+                />
                 <div className="mt-2 text-xs text-fg-muted">
                   {wearSnapshot
-                    ? `${wearSnapshot.metadataColumn || wearColumn || 'metadata'} · ${wearDirection}`
-                    : wearError || 'No wear score available'}
+                    ? `${wearSnapshot.metadataColumn || wearColumn || t('dashboard.metadata')} · ${formatWearDirection(wearDirection)}`
+                    : wearError || t('dashboard.noWearScore')}
                 </div>
               </div>
             </CardContent>
@@ -887,31 +1005,37 @@ export default function DashboardPage() {
           <Card>
             <SectionTitle
               icon={<Radio className="h-5 w-5" />}
-              title="Stream settings"
-              description="Current stream settings reported by the API."
+              title={t('dashboard.streamSettings')}
+              description={t('dashboard.streamSettingsDescription')}
             />
             <CardContent className="grid gap-3 p-4 pt-0 sm:grid-cols-2 lg:grid-cols-4">
               <SummaryMetric
-                label="Progress"
-                value={formatPercent(streamingStatus?.progress_percentage)}
-                detail={`${formatNumber(streamingStatus?.streamed_points)} streamed points`}
+                label={t('dashboard.progress')}
+                value={formatPercentValue(streamingStatus?.progress_percentage)}
+                detail={t('dashboard.streamedPoints', {
+                  count: formatNumberValue(streamingStatus?.streamed_points),
+                })}
                 tone={hasStreamingData ? 'success' : 'neutral'}
               />
               <SummaryMetric
-                label="Batch size"
-                value={formatNumber(streamingStatus?.batch_size)}
-                detail={`Delay ${streamingStatus ? `${streamingStatus.delay_seconds}s` : 'N/A'}`}
+                label={t('dashboard.batchSize')}
+                value={formatNumberValue(streamingStatus?.batch_size)}
+                detail={t('dashboard.delay', {
+                  value: streamingStatus
+                    ? `${streamingStatus.delay_seconds}s`
+                    : t('common.notAvailable'),
+                })}
               />
               <SummaryMetric
-                label="Glow points"
-                value={formatNumber(streamingStatus?.latest_glow_count)}
-                detail="Latest highlighted stream points"
+                label={t('dashboard.glowPoints')}
+                value={formatNumberValue(streamingStatus?.latest_glow_count)}
+                detail={t('dashboard.glowPointsDescription')}
                 tone="info"
               />
               <SummaryMetric
-                label="Trail points"
-                value={formatNumber(streamingStatus?.trail_points)}
-                detail="Recent trajectory history"
+                label={t('dashboard.trailPoints')}
+                value={formatNumberValue(streamingStatus?.trail_points)}
+                detail={t('dashboard.trailPointsDescription')}
                 tone="info"
               />
             </CardContent>
@@ -924,8 +1048,8 @@ export default function DashboardPage() {
           <Card>
             <SectionTitle
               icon={<CheckCircle2 className="h-5 w-5" />}
-              title="Checks"
-              description="Inputs available for this dataset."
+              title={t('dashboard.checks')}
+              description={t('dashboard.checksDescription')}
             />
             <CardContent className="space-y-2 p-4 pt-0">
               {readinessItems.map((item) => (
@@ -943,13 +1067,13 @@ export default function DashboardPage() {
           <Card>
             <SectionTitle
               icon={<History className="h-5 w-5" />}
-              title="Recent activity"
-              description="Uploads, streams, and analysis runs."
+              title={t('dashboard.recentActivity')}
+              description={t('dashboard.recentActivityDescription')}
             />
             <CardContent className="space-y-2 p-4 pt-0">
               {recentOperations.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border p-4 text-sm text-fg-muted">
-                  No recent activity.
+                  {t('dashboard.noRecentActivity')}
                 </div>
               ) : (
                 recentOperations.map((activity) => (

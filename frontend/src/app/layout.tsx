@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { Providers } from '@/components/providers';
+import { LOCALE_COOKIE, resolveLocale } from '@/i18n/config';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -11,11 +13,14 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const cookieStore = await cookies();
+  const initialLocale = resolveLocale(cookieStore.get(LOCALE_COOKIE)?.value);
+
   return (
-    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
+    <html lang={initialLocale} suppressHydrationWarning data-scroll-behavior="smooth">
       <body className="antialiased">
-        <Providers>{children}</Providers>
+        <Providers initialLocale={initialLocale}>{children}</Providers>
       </body>
     </html>
   );

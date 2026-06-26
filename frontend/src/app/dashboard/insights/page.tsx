@@ -24,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ChartFrame, ChartStat, ChartSwatch } from '@/components/charts/chart-frame';
 import { WorkflowState } from '@/components/ui/workflow-state';
 import { useActiveStreamingDataset } from '@/hooks/useActiveStreamingDataset';
+import { useI18n } from '@/i18n/client';
 import { api } from '@/lib/api-client';
 import {
   axisRangeRevisionPart,
@@ -355,6 +356,7 @@ const formatIntervalTick = (value: string) => {
 
 export default function HealthInsightsPage() {
   const { user } = useAuth();
+  const { t, formatNumber, formatTime } = useI18n();
   const {
     selectedDatasetId: datasetId,
     filteredDatasetIds,
@@ -1223,6 +1225,12 @@ export default function HealthInsightsPage() {
       latestMonitoringIndex != null && latestMonitoringIndex >= 0
         ? sorted[latestMonitoringIndex]
         : null;
+    const baselineSeriesName = t('common.baseline');
+    const monitoringSeriesName = t('common.monitoring');
+    const baselineRollingSeriesName = t('insights.baselineRolling');
+    const monitoringRollingSeriesName = t('insights.monitoringRolling');
+    const warningSeriesName = `${t('insights.warningThreshold')} (${warningThreshold.toFixed(3)})`;
+    const dangerSeriesName = `${t('insights.dangerThreshold')} (${dangerThreshold.toFixed(3)})`;
 
     const toPoint = (
       interval: DeteriorationInterval,
@@ -1287,19 +1295,25 @@ export default function HealthInsightsPage() {
         return '';
       }
 
-      if (/threshold/i.test(item.seriesName ?? '')) {
-        return `<b>${item.seriesName}</b><br/>Distance: ${Number(value[1]).toFixed(4)}`;
+      if (
+        item.seriesName === warningSeriesName ||
+        item.seriesName === dangerSeriesName ||
+        /threshold/i.test(item.seriesName ?? '')
+      ) {
+        return `<b>${item.seriesName}</b><br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
       }
 
       if (
+        item.seriesName === baselineRollingSeriesName ||
+        item.seriesName === monitoringRollingSeriesName ||
         item.seriesName === 'Baseline rolling mean' ||
         item.seriesName === 'Monitoring rolling mean'
       ) {
-        return `<b>${item.seriesName}</b><br/>Interval: ${value[3] ?? value[2]}<br/>Distance: ${Number(value[1]).toFixed(4)}`;
+        return `<b>${item.seriesName}</b><br/>Interval: ${value[3] ?? value[2]}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
       }
 
-      const pointCount = value[3] != null ? `<br/>${Number(value[3]).toLocaleString()} pts` : '';
-      return `<b>${item.seriesName}</b><br/>Interval: ${value[2] ?? formatAxisLabel(value[0])}${pointCount}<br/>Distance: ${Number(value[1]).toFixed(4)}`;
+      const pointCount = value[3] != null ? `<br/>${formatNumber(Number(value[3]))} pts` : '';
+      return `<b>${item.seriesName}</b><br/>Interval: ${value[2] ?? formatAxisLabel(value[0])}${pointCount}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
     };
 
     const option: EChartsOption = {
@@ -1347,7 +1361,7 @@ export default function HealthInsightsPage() {
       ],
       xAxis: {
         type: 'value',
-        name: `${wearResult.metadata_column} (Interval Order)`,
+        name: `${wearResult.metadata_column} (${t('insights.intervalMovement')})`,
         nameLocation: 'middle',
         nameGap: 46,
         min: xAxisRange?.[0],
@@ -1357,7 +1371,7 @@ export default function HealthInsightsPage() {
       },
       yAxis: {
         type: 'value',
-        name: 'Distance from healthy baseline',
+        name: t('insights.distanceFromBaseline'),
         nameLocation: 'middle',
         nameGap: 56,
         min: yAxisRange?.[0],
@@ -1368,7 +1382,7 @@ export default function HealthInsightsPage() {
       series: [
         {
           type: 'line',
-          name: 'Baseline',
+          name: baselineSeriesName,
           data: sorted
             .filter((interval) => interval.dataset_type === 'baseline')
             .map((interval) => toPoint(interval, 'Baseline')),
@@ -1384,9 +1398,9 @@ export default function HealthInsightsPage() {
         },
         {
           type: 'line',
-          name: 'Baseline rolling mean',
+          name: baselineRollingSeriesName,
           data: baselineRollingSeries
-            .map((value, index) => toLinePoint(index, value, 'Baseline rolling mean'))
+            .map((value, index) => toLinePoint(index, value, baselineRollingSeriesName))
             .filter(Boolean),
           showSymbol: false,
           lineStyle: { color: plotTheme.baselineRolling, width: 4 },
@@ -1394,7 +1408,7 @@ export default function HealthInsightsPage() {
         },
         {
           type: 'line',
-          name: `Warning threshold (${warningThreshold.toFixed(3)})`,
+          name: warningSeriesName,
           data: [
             [xAxisRange?.[0] ?? xValues[0] ?? 0, warningThreshold],
             [xAxisRange?.[1] ?? xValues.at(-1) ?? 1, warningThreshold],
@@ -1404,7 +1418,7 @@ export default function HealthInsightsPage() {
         },
         {
           type: 'line',
-          name: `Danger threshold (${dangerThreshold.toFixed(3)})`,
+          name: dangerSeriesName,
           data: [
             [xAxisRange?.[0] ?? xValues[0] ?? 0, dangerThreshold],
             [xAxisRange?.[1] ?? xValues.at(-1) ?? 1, dangerThreshold],
@@ -1414,7 +1428,7 @@ export default function HealthInsightsPage() {
         },
         {
           type: 'line',
-          name: 'Monitoring history',
+          name: t('common.monitoring'),
           data: sorted
             .filter(
               (interval, index) =>
@@ -1432,7 +1446,7 @@ export default function HealthInsightsPage() {
         },
         {
           type: 'line',
-          name: 'Monitoring recent',
+          name: `${t('common.monitoring')} ${t('live.recent')}`,
           data: sorted
             .filter(
               (interval, index) =>
@@ -1450,9 +1464,9 @@ export default function HealthInsightsPage() {
         },
         {
           type: 'line',
-          name: 'Monitoring rolling mean',
+          name: monitoringRollingSeriesName,
           data: monitoringRollingSeries
-            .map((value, index) => toLinePoint(index, value, 'Monitoring rolling mean'))
+            .map((value, index) => toLinePoint(index, value, monitoringRollingSeriesName))
             .filter(Boolean),
           showSymbol: false,
           lineStyle: { color: plotTheme.monitoringRolling, width: 4 },
@@ -1462,7 +1476,7 @@ export default function HealthInsightsPage() {
           ? [
               {
                 type: 'scatter',
-                name: 'Latest interval',
+                name: t('common.latest'),
                 data: [toPoint(latestInterval, 'Monitoring')],
                 symbolSize: 14,
                 itemStyle: {
@@ -1478,7 +1492,10 @@ export default function HealthInsightsPage() {
           ? [
               {
                 type: 'scatter',
-                name: crossingTone === 'danger' ? 'Danger crossing' : 'Warning crossing',
+                name:
+                  crossingTone === 'danger'
+                    ? `${t('common.danger')} crossing`
+                    : `${t('common.warning')} crossing`,
                 data: [toPoint(crossingInterval, 'Monitoring')],
                 symbol: 'diamond',
                 symbolSize: 14,
@@ -1505,7 +1522,7 @@ export default function HealthInsightsPage() {
     };
 
     return { option };
-  }, [distanceSummary, plotTheme, shouldRenderWearPlots, wearResult]);
+  }, [distanceSummary, formatNumber, plotTheme, shouldRenderWearPlots, t, wearResult]);
 
   const transitionPlot = useMemo(() => {
     if (!shouldRenderWearPlots) {
@@ -1951,9 +1968,9 @@ export default function HealthInsightsPage() {
             <CardHeader className="border-b border-border/70 pb-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <CardTitle className="text-base">Analysis controls</CardTitle>
+                  <CardTitle className="text-base">{t('insights.controls')}</CardTitle>
                   <CardDescription className="mt-1">
-                    Baseline selection, thresholds, and analysis actions.
+                    {t('insights.controlsDescription')}
                   </CardDescription>
                 </div>
                 <Button
@@ -1961,10 +1978,10 @@ export default function HealthInsightsPage() {
                   size="sm"
                   onClick={() => setIsControlsCollapsed(true)}
                   className="shrink-0 gap-2"
-                  aria-label="Hide controls"
+                  aria-label={t('live.hideControls')}
                 >
                   <PanelLeftClose className="h-4 w-4" />
-                  Hide
+                  {t('live.hideControls')}
                 </Button>
               </div>
             </CardHeader>
@@ -1973,14 +1990,14 @@ export default function HealthInsightsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="text-xs font-semibold uppercase text-muted-foreground">
-                      Active dataset
+                      {t('insights.activeDataset')}
                     </p>
                     <p className="mt-1 text-xl font-semibold text-fg">
-                      {datasetId ? `#${datasetId}` : 'None'}
+                      {datasetId ? `#${datasetId}` : t('common.none')}
                     </p>
                   </div>
                   <Badge variant={canRunWearTrend ? 'secondary' : 'outline'}>
-                    {canRunWearTrend ? 'Ready' : 'Configure'}
+                    {canRunWearTrend ? t('common.ready') : t('common.configure')}
                   </Badge>
                 </div>
                 <p
@@ -1995,19 +2012,23 @@ export default function HealthInsightsPage() {
                   {selectedDataset?.source.originalFileName ??
                     selectedDataset?.source.deviceName ??
                     selectedDataset?.source.deviceSlug ??
-                    'No dataset source selected'}
+                    t('dashboard.noSourceSelected')}
                 </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
-                    <p className="text-muted-foreground">Matching datasets</p>
+                    <p className="text-muted-foreground">{t('insights.matchingDatasets')}</p>
                     <p className="font-semibold">
-                      {isLoadingDatasets ? 'Loading' : filteredDatasets.length.toLocaleString()}
+                      {isLoadingDatasets
+                        ? t('common.loading')
+                        : formatNumber(filteredDatasets.length)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Stream</p>
+                    <p className="text-muted-foreground">{t('common.stream')}</p>
                     <p className="font-semibold">
-                      {activeStreamingDatasetId === datasetId ? 'Active' : 'Idle'}
+                      {activeStreamingDatasetId === datasetId
+                        ? t('common.active')
+                        : t('insights.idle')}
                     </p>
                   </div>
                 </div>
@@ -2017,13 +2038,17 @@ export default function HealthInsightsPage() {
                     hasAppliedWearTrendRun &&
                     appliedIncludeMonitoring)) && (
                   <div className="flex flex-wrap gap-2">
-                    {hasPendingChanges && <Badge variant="outline">Selection changed</Badge>}
+                    {hasPendingChanges && (
+                      <Badge variant="outline">{t('insights.selectionChanged')}</Badge>
+                    )}
                     {streamingStatus?.is_active &&
                       hasAppliedWearTrendRun &&
-                      appliedIncludeMonitoring && <Badge variant="outline">Live updating</Badge>}
+                      appliedIncludeMonitoring && (
+                        <Badge variant="outline">{t('insights.liveUpdating')}</Badge>
+                      )}
                     {lastWearTrendRunAt && (
                       <Badge variant="outline">
-                        Last run {new Date(lastWearTrendRunAt).toLocaleTimeString()}
+                        {t('insights.lastRun', { time: formatTime(lastWearTrendRunAt) })}
                       </Badge>
                     )}
                   </div>
@@ -2031,14 +2056,14 @@ export default function HealthInsightsPage() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Wear trend column</label>
+                <label className="text-sm font-medium">{t('insights.wearTrendColumn')}</label>
                 <select
                   value={metadataColumn}
                   onChange={(event) => setMetadataColumn(event.target.value)}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   disabled={!metadataColumnsQuery.data || metadataColumnsQuery.data.length === 0}
                 >
-                  <option value="">Select wear trend column</option>
+                  <option value="">{t('insights.selectWearTrendColumn')}</option>
                   {(metadataColumnsQuery.data ?? []).map((column) => (
                     <option key={column} value={column}>
                       {column}
@@ -2051,14 +2076,14 @@ export default function HealthInsightsPage() {
                     checked={includeMonitoring}
                     onChange={(event) => setIncludeMonitoring(event.target.checked)}
                   />
-                  Include monitoring intervals
+                  {t('insights.includeMonitoring')}
                 </label>
               </div>
 
               <div className="space-y-2 rounded-lg border border-input p-3">
-                <p className="text-sm font-medium">Baseline cluster selection (normal behavior)</p>
+                <p className="text-sm font-medium">{t('insights.baselineClusterSelection')}</p>
                 <p className="text-xs text-muted-foreground">
-                  Select intervals that represent healthy baseline behavior.
+                  {t('insights.baselineClusterDescription')}
                 </p>
 
                 <div className="relative">
@@ -2067,20 +2092,22 @@ export default function HealthInsightsPage() {
                     value={clusterFilterText}
                     onChange={(event) => setClusterFilterText(event.target.value)}
                     className="pl-8"
-                    placeholder="Filter baseline intervals"
+                    placeholder={t('insights.filterBaselineIntervals')}
                   />
                 </div>
 
                 <div className="max-h-60 space-y-2 overflow-y-auto rounded-md border border-input p-2">
                   {!metadataColumn ? (
                     <p className="text-xs text-muted-foreground">
-                      Select wear trend column to load baseline intervals.
+                      {t('insights.selectColumnFirst')}
                     </p>
                   ) : isFetchingWearTrend && baselineIntervalValues.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Loading baseline intervals...</p>
+                    <p className="text-xs text-muted-foreground">
+                      {t('insights.loadingBaselineIntervals')}
+                    </p>
                   ) : filteredBaselineIntervalValues.length === 0 ? (
                     <p className="text-xs text-muted-foreground">
-                      No baseline intervals found for this selection.
+                      {t('insights.noBaselineIntervals')}
                     </p>
                   ) : (
                     pagedBaselineIntervalValues.map((value) => (
@@ -2114,7 +2141,7 @@ export default function HealthInsightsPage() {
                         onClick={() => setClusterPage((page) => Math.max(1, page - 1))}
                         disabled={currentClusterPage <= 1}
                       >
-                        Prev
+                        {t('common.back')}
                       </Button>
                       <Button
                         variant="outline"
@@ -2124,7 +2151,7 @@ export default function HealthInsightsPage() {
                         }
                         disabled={currentClusterPage >= clusterTotalPages}
                       >
-                        Next
+                        {t('common.next')}
                       </Button>
                     </div>
                   </div>
@@ -2132,16 +2159,16 @@ export default function HealthInsightsPage() {
 
                 <div className="grid grid-cols-2 gap-2">
                   <Button variant="outline" size="sm" onClick={selectFilteredClusters}>
-                    Select filtered
+                    {t('insights.selectFiltered')}
                   </Button>
                   <Button variant="outline" size="sm" onClick={selectAllClusters}>
-                    Select all
+                    {t('insights.selectAll')}
                   </Button>
                   <Button variant="outline" size="sm" onClick={clearAllClusters}>
-                    Clear
+                    {t('insights.clear')}
                   </Button>
                   <Button variant="outline" size="sm" onClick={resetClusterSelection}>
-                    Reset
+                    {t('insights.reset')}
                   </Button>
                 </div>
 
@@ -2152,7 +2179,7 @@ export default function HealthInsightsPage() {
                       setRangeStart(event.target.value);
                       setHasUserAdjustedCluster(true);
                     }}
-                    placeholder="Range start"
+                    placeholder={t('insights.rangeStart')}
                   />
                   <Input
                     value={rangeEnd}
@@ -2160,35 +2187,36 @@ export default function HealthInsightsPage() {
                       setRangeEnd(event.target.value);
                       setHasUserAdjustedCluster(true);
                     }}
-                    placeholder="Range end"
+                    placeholder={t('insights.rangeEnd')}
                   />
                 </div>
 
                 <p className="text-xs text-muted-foreground">
                   {isFetchingWearTrend && baselineIntervalValues.length === 0
-                    ? 'Loading baseline intervals...'
-                    : `${Math.min(
-                        selectedClusterValues.length,
-                        baselineIntervalValues.length
-                      )} of ${baselineIntervalValues.length} baseline intervals selected.`}
+                    ? t('insights.loadingBaselineIntervals')
+                    : t('insights.selectedBaselineIntervals', {
+                        selected: Math.min(
+                          selectedClusterValues.length,
+                          baselineIntervalValues.length
+                        ),
+                        total: baselineIntervalValues.length,
+                      })}
                 </p>
                 {hasPartialClusterRange && (
-                  <p className="text-xs text-warning-text">
-                    Enter both range start and range end to use cluster range filtering.
-                  </p>
+                  <p className="text-xs text-warning-text">{t('insights.completeRange')}</p>
                 )}
               </div>
 
               <div className="space-y-3 rounded-lg border border-input p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-medium">Threshold model</p>
+                    <p className="text-sm font-medium">{t('insights.thresholdModel')}</p>
                     <p className="text-xs text-muted-foreground">
                       Controls when monitoring distance becomes warning or danger.
                     </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={resetDistanceThresholdConfig}>
-                    Reset
+                    {t('insights.reset')}
                   </Button>
                 </div>
 
@@ -2335,16 +2363,16 @@ export default function HealthInsightsPage() {
               </div>
 
               <div className="space-y-2 rounded-lg border border-border bg-surface p-3">
-                <p className="text-sm font-medium">Apply analysis</p>
+                <p className="text-sm font-medium">{t('insights.applyAnalysis')}</p>
                 <div className="grid gap-2">
                   <Button onClick={applyWearTrendSelection} disabled={!canRunWearTrend}>
                     {isFetchingWearTrend ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Running wear trend
+                        {t('insights.runningWearTrend')}
                       </>
                     ) : (
-                      'Run wear trend'
+                      t('insights.runWearTrend')
                     )}
                   </Button>
                   <Button
@@ -2356,7 +2384,7 @@ export default function HealthInsightsPage() {
                     Revert to last run
                   </Button>
                   <Button variant="outline" onClick={resetCurrentConfiguration}>
-                    Reset current setup
+                    {t('insights.resetCurrentSetup')}
                   </Button>
                 </div>
               </div>
@@ -2368,10 +2396,8 @@ export default function HealthInsightsPage() {
           {isControlsCollapsed && (
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-surface px-3 py-2">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-fg">Controls hidden</p>
-                <p className="text-xs text-fg-muted">
-                  The plot workspace is using the full available width.
-                </p>
+                <p className="text-sm font-medium text-fg">{t('insights.controlsHidden')}</p>
+                <p className="text-xs text-fg-muted">{t('insights.controlsHiddenDescription')}</p>
               </div>
               <Button
                 variant="outline"
@@ -2380,7 +2406,7 @@ export default function HealthInsightsPage() {
                 className="gap-2"
               >
                 <PanelLeftOpen className="h-4 w-4" />
-                Show controls
+                {t('insights.showControls')}
               </Button>
             </div>
           )}
@@ -2389,35 +2415,23 @@ export default function HealthInsightsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <TrendingDown className="h-5 w-5" />
-                Wear Trend (Deterioration)
+                {t('insights.wearTrend')}
               </CardTitle>
-              <CardDescription>
-                Baseline and monitoring interval distances to baseline centroid, plus transitions.
-              </CardDescription>
+              <CardDescription>{t('insights.wearTrendDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {!metadataColumn ? (
-                <p className="text-sm text-muted-foreground">
-                  Select a wear trend column to load baseline intervals and charts.
-                </p>
+                <p className="text-sm text-muted-foreground">{t('insights.selectColumnToLoad')}</p>
               ) : !isClusterSelectionReady || (isFetchingWearTrend && !wearResult) ? (
-                <p className="text-sm text-muted-foreground">
-                  Loading baseline interval options for the selected wear trend column...
-                </p>
+                <p className="text-sm text-muted-foreground">{t('insights.loadingOptions')}</p>
               ) : !isBaselineSelectionApplied ? (
                 <p className="text-sm text-muted-foreground">
-                  Select baseline cluster values (for example, use Select all or pick specific
-                  intervals) or enter a baseline range to render wear trend plots.
+                  {t('insights.selectBaselinePrompt')}
                 </p>
               ) : !hasAppliedWearTrendRun ? (
-                <p className="text-sm text-muted-foreground">
-                  Click <strong>Run wear trend</strong> to render plots using your selected baseline
-                  cluster configuration.
-                </p>
+                <p className="text-sm text-muted-foreground">{t('insights.runPrompt')}</p>
               ) : !isSelectionAppliedToQuery ? (
-                <p className="text-sm text-muted-foreground">
-                  Baseline selection changed. Click <strong>Run wear trend</strong> to update plots.
-                </p>
+                <p className="text-sm text-muted-foreground">{t('insights.rerunPrompt')}</p>
               ) : wearError ? (
                 <p className="text-sm text-danger-text">{wearError}</p>
               ) : wearResult ? (
@@ -2429,13 +2443,15 @@ export default function HealthInsightsPage() {
                   )}
                   <div className="rounded-lg border border-input p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-sm font-medium">Summary metrics</p>
+                      <p className="text-sm font-medium">{t('insights.summaryMetrics')}</p>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setShowWearSummaryMetrics((prev) => !prev)}
                       >
-                        {showWearSummaryMetrics ? 'Hide summary metrics' : 'Show summary metrics'}
+                        {showWearSummaryMetrics
+                          ? t('insights.hideSummaryMetrics')
+                          : t('insights.showSummaryMetrics')}
                       </Button>
                     </div>
                     {showWearSummaryMetrics && (
@@ -2443,7 +2459,7 @@ export default function HealthInsightsPage() {
                         <div className="grid gap-4 sm:grid-cols-4">
                           <div className="rounded-lg border border-input p-3">
                             <p className="text-xs text-muted-foreground">
-                              Average distance from baseline
+                              {t('insights.averageDistance')}
                             </p>
                             <p className="text-xl font-semibold">
                               {wearResult.distances.g0_to_gi_mean.toFixed(3)}
@@ -2451,20 +2467,24 @@ export default function HealthInsightsPage() {
                           </div>
                           <div className="rounded-lg border border-input p-3">
                             <p className="text-xs text-muted-foreground">
-                              Average interval movement
+                              {t('insights.averageMovement')}
                             </p>
                             <p className="text-xl font-semibold">
                               {wearResult.distances.gi_to_gi_plus_1_mean.toFixed(3)}
                             </p>
                           </div>
                           <div className="rounded-lg border border-input p-3">
-                            <p className="text-xs text-muted-foreground">Baseline points</p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('data.baselinePoints')}
+                            </p>
                             <p className="text-xl font-semibold">
                               {wearResult.stats.baseline_point_count}
                             </p>
                           </div>
                           <div className="rounded-lg border border-input p-3">
-                            <p className="text-xs text-muted-foreground">Monitoring points</p>
+                            <p className="text-xs text-muted-foreground">
+                              {t('data.monitoringPoints')}
+                            </p>
                             <p className="text-xl font-semibold">
                               {wearResult.stats.monitoring_point_count}
                             </p>
@@ -2474,7 +2494,7 @@ export default function HealthInsightsPage() {
                         <div className="grid gap-4 sm:grid-cols-3">
                           <div className="rounded-lg border border-input p-3">
                             <p className="text-xs text-muted-foreground">
-                              Baseline average distance
+                              {t('insights.baselineAverageDistance')}
                             </p>
                             <p className="text-xl font-semibold">
                               {g0ToGiMeans.baseline != null ? g0ToGiMeans.baseline.toFixed(3) : '—'}
@@ -2482,7 +2502,7 @@ export default function HealthInsightsPage() {
                           </div>
                           <div className="rounded-lg border border-input p-3">
                             <p className="text-xs text-muted-foreground">
-                              Monitoring average distance
+                              {t('insights.monitoringAverageDistance')}
                             </p>
                             <p className="text-xl font-semibold">
                               {g0ToGiMeans.monitoring != null
@@ -2492,7 +2512,7 @@ export default function HealthInsightsPage() {
                           </div>
                           <div className="rounded-lg border border-input p-3">
                             <p className="text-xs text-muted-foreground">
-                              Delta (monitoring-baseline)
+                              {t('insights.deltaMonitoringBaseline')}
                             </p>
                             <p className="text-xl font-semibold">
                               {g0ToGiMeans.delta != null ? g0ToGiMeans.delta.toFixed(3) : '—'}
@@ -2511,12 +2531,15 @@ export default function HealthInsightsPage() {
                     className="space-y-4"
                   >
                     <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="distance">Distance from baseline</TabsTrigger>
-                      <TabsTrigger value="transitions">Interval movement</TabsTrigger>
+                      <TabsTrigger value="distance">
+                        {t('insights.distanceFromBaseline')}
+                      </TabsTrigger>
+                      <TabsTrigger value="transitions">
+                        {t('insights.intervalMovement')}
+                      </TabsTrigger>
                     </TabsList>
                     <p className="text-xs text-muted-foreground">
-                      Use mouse wheel or trackpad to zoom, drag to pan, and click autoscale/home in
-                      the chart toolbar to reset view.
+                      {t('insights.chartInstructions')}
                     </p>
 
                     <TabsContent value="distance" className="mt-0 space-y-3">
@@ -2527,7 +2550,7 @@ export default function HealthInsightsPage() {
                           onClick={() => setShowDistanceGuide((prev) => !prev)}
                         >
                           <span className="font-medium text-foreground">
-                            How to read this chart
+                            {t('insights.howToRead')}
                           </span>
                           {showDistanceGuide ? (
                             <ChevronUp className="h-4 w-4" />
@@ -2549,12 +2572,12 @@ export default function HealthInsightsPage() {
 
                       {distanceEChart ? (
                         <ChartFrame
-                          title="Distance from baseline"
+                          title={t('insights.distanceFromBaseline')}
                           description={`Monitoring movement from the selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
                           stats={
                             <>
                               <ChartStat
-                                label="Latest"
+                                label={t('insights.latest')}
                                 value={
                                   latestMonitoringInterval
                                     ? latestMonitoringInterval.distance_from_g0.toFixed(3)
@@ -2564,7 +2587,7 @@ export default function HealthInsightsPage() {
                                 tone={latestMonitoringTone}
                               />
                               <ChartStat
-                                label="Baseline mean"
+                                label={t('insights.baselineMean')}
                                 value={
                                   distanceSummary.baseline != null
                                     ? distanceSummary.baseline.toFixed(3)
@@ -2574,7 +2597,7 @@ export default function HealthInsightsPage() {
                                 tone="baseline"
                               />
                               <ChartStat
-                                label="Monitoring mean"
+                                label={t('insights.monitoringMean')}
                                 value={
                                   distanceSummary.monitoring != null
                                     ? distanceSummary.monitoring.toFixed(3)
@@ -2584,7 +2607,7 @@ export default function HealthInsightsPage() {
                                 tone="monitoring"
                               />
                               <ChartStat
-                                label="Delta"
+                                label={t('insights.delta')}
                                 value={
                                   distanceSummary.delta != null
                                     ? distanceSummary.delta.toFixed(3)
@@ -2601,13 +2624,13 @@ export default function HealthInsightsPage() {
                                 }
                               />
                               <ChartStat
-                                label="Warning"
+                                label={t('common.warning')}
                                 value={distanceSummary.warningThreshold.toFixed(3)}
                                 description={warningThresholdDescription}
                                 tone="warning"
                               />
                               <ChartStat
-                                label="Danger"
+                                label={t('common.danger')}
                                 value={distanceSummary.dangerThreshold.toFixed(3)}
                                 description={dangerThresholdDescription}
                                 tone="danger"
@@ -2616,18 +2639,30 @@ export default function HealthInsightsPage() {
                           }
                           actions={
                             <>
-                              <ChartSwatch color={plotTheme.baseline} label="Baseline" />
-                              <ChartSwatch color={plotTheme.monitoring} label="Monitoring" />
+                              <ChartSwatch
+                                color={plotTheme.baseline}
+                                label={t('common.baseline')}
+                              />
+                              <ChartSwatch
+                                color={plotTheme.monitoring}
+                                label={t('common.monitoring')}
+                              />
                               <ChartSwatch
                                 color={plotTheme.baselineRolling}
-                                label="Baseline rolling"
+                                label={t('insights.baselineRolling')}
                               />
                               <ChartSwatch
                                 color={plotTheme.monitoringRolling}
-                                label="Monitoring rolling"
+                                label={t('insights.monitoringRolling')}
                               />
-                              <ChartSwatch color={plotTheme.warning} label="Warning threshold" />
-                              <ChartSwatch color={plotTheme.danger} label="Danger threshold" />
+                              <ChartSwatch
+                                color={plotTheme.warning}
+                                label={t('insights.warningThreshold')}
+                              />
+                              <ChartSwatch
+                                color={plotTheme.danger}
+                                label={t('insights.dangerThreshold')}
+                              />
                             </>
                           }
                           bodyClassName="p-2"
@@ -2639,15 +2674,14 @@ export default function HealthInsightsPage() {
                             />
                           </div>
                           <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
-                            Zoom, restore, and image export are available in the chart toolbar; use
-                            the bottom/right sliders or mouse wheel to inspect dense ranges.
+                            {t('insights.chartToolbarHint')}
                           </p>
                         </ChartFrame>
                       ) : (
                         <WorkflowState
                           icon={<TrendingDown className="h-5 w-5" aria-hidden="true" />}
-                          title="Distance plot is not ready"
-                          description="Select a dataset, choose the wear trend column, mark healthy baseline intervals, then run wear trend analysis."
+                          title={t('insights.distancePlotNotReady')}
+                          description={t('insights.distancePlotNotReadyDescription')}
                           action={
                             <Button
                               variant="outline"
@@ -2655,7 +2689,7 @@ export default function HealthInsightsPage() {
                               onClick={applyWearTrendSelection}
                               disabled={!canRunWearTrend}
                             >
-                              Run wear trend
+                              {t('insights.runWearTrend')}
                             </Button>
                           }
                         />
@@ -2668,7 +2702,9 @@ export default function HealthInsightsPage() {
                             size="sm"
                             onClick={() => setShowIntervalTable((prev) => !prev)}
                           >
-                            {showIntervalTable ? 'Hide' : 'Show'} interval summary
+                            {showIntervalTable
+                              ? t('insights.hideIntervalSummary')
+                              : t('insights.showIntervalSummary')}
                           </Button>
                           <Button
                             variant="outline"

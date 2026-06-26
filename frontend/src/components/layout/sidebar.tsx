@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { OrgSwitcher } from '@/components/layout/org-switcher';
 import { mainNavItems, bottomNavItems } from '@/lib/nav-config';
 import { can } from '@/lib/permissions';
+import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
 interface SidebarProps {
@@ -18,6 +19,7 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, currentOrgRole } = useAuth();
+  const { t } = useI18n();
 
   const isActiveLink = (href: string) => {
     if (href === '/dashboard') {
@@ -78,7 +80,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               </div>
               <div className="flex flex-col">
                 <span className="font-semibold text-xl text-accent">D'Insight</span>
-                <span className="text-xs text-fg-muted">Analytics Platform</span>
+                <span className="text-xs text-fg-muted">{t('app.productSubtitle')}</span>
               </div>
             </Link>
             <Button
@@ -88,7 +90,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               onClick={onClose}
             >
               <X className="h-5 w-5" />
-              <span className="sr-only">Close sidebar</span>
+              <span className="sr-only">{t('header.closeSidebar')}</span>
             </Button>
           </div>
 
@@ -103,11 +105,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             {/* Main navigation */}
             <div className="space-y-1">
               <h3 className="px-3 mb-2 text-xs font-semibold text-fg-subtle uppercase tracking-wider">
-                Main Menu
+                {t('nav.mainMenu')}
               </h3>
               {mainNavItems.filter(hasPermission).map((item) => {
                 const isActive = isActiveLink(item.href);
                 const Icon = item.icon;
+                const label = item.labelKey ? t(item.labelKey) : item.label;
+                const description = item.descriptionKey ? t(item.descriptionKey) : item.description;
 
                 return (
                   <Link
@@ -120,7 +124,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         ? 'bg-surface-selected dark:bg-surface-selected text-accent dark:text-accent border-l-4 border-strong'
                         : 'text-fg hover:bg-surface-hover/50 hover:text-fg border-l-4 border-transparent'
                     )}
-                    title={item.description}
+                    title={description}
                   >
                     <div
                       className={cn(
@@ -132,7 +136,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     >
                       <Icon className="h-4 w-4" />
                     </div>
-                    <span className="flex-1">{item.label}</span>
+                    <span className="flex-1">{label}</span>
                     {item.badge && (
                       <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full bg-danger text-accent-contrast">
                         {item.badge}
@@ -149,19 +153,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <div className="mt-6">
               <div className="rounded-lg bg-surface-muted/50 border border-border p-4">
                 <h4 className="text-xs font-semibold text-fg-muted uppercase tracking-wider mb-2">
-                  System Status
+                  {t('nav.systemStatus')}
                 </h4>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-fg-muted">API Status</span>
+                    <span className="text-xs text-fg-muted">{t('common.apiStatus')}</span>
                     <span className="flex items-center text-xs">
                       <span className="h-2 w-2 bg-success rounded-full mr-1"></span>
-                      <span className="text-success-text font-medium">Online</span>
+                      <span className="text-success-text font-medium">{t('common.online')}</span>
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-fg-muted">Processing</span>
-                    <span className="text-xs font-medium text-fg">Ready</span>
+                    <span className="text-xs text-fg-muted">{t('common.processing')}</span>
+                    <span className="text-xs font-medium text-fg">{t('common.ready')}</span>
                   </div>
                 </div>
               </div>
@@ -174,6 +178,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {bottomNavItems.filter(hasPermission).map((item) => {
                 const isActive = isActiveLink(item.href);
                 const Icon = item.icon;
+                const label = item.labelKey ? t(item.labelKey) : item.label;
+                const description = item.descriptionKey ? t(item.descriptionKey) : item.description;
 
                 return (
                   <Link
@@ -186,10 +192,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         ? 'bg-surface-selected dark:bg-surface-selected text-accent dark:text-accent border-l-4 border-strong'
                         : 'text-fg hover:bg-surface-hover/50 border-l-4 border-transparent'
                     )}
-                    title={item.description}
+                    title={description}
                   >
                     <Icon className="mr-3 h-4 w-4" />
-                    {item.label}
+                    {label}
                   </Link>
                 );
               })}
@@ -211,10 +217,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-fg truncate">
-                    {user?.full_name || 'User'}
+                    {user?.full_name || t('common.user')}
                   </p>
                   <p className="text-xs text-fg-muted truncate">
-                    {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'}
+                    {user?.role
+                      ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
+                      : t('common.user')}
                   </p>
                 </div>
               </div>

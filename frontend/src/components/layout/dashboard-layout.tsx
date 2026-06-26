@@ -11,6 +11,7 @@ import { DashboardWorkspaceProvider } from '@/context/dashboard-workspace-contex
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/i18n/client';
 import { api, LicenseIssue, LICENSE_ISSUE_EVENT } from '@/lib/api-client';
 
 interface DashboardLayoutProps {
@@ -38,7 +39,9 @@ const issueFromLicenseInfo = (info: LicenseInfo | null | undefined): LicenseIssu
 };
 
 function LicenseLockout({ issue }: { issue: LicenseIssue }) {
+  const { t, formatDate } = useI18n();
   const isExpired = issue.code === 'LICENSE_EXPIRED';
+  const message = isExpired ? t('license.expiredMessage') : t('license.invalidMessage');
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-3xl items-center">
@@ -46,23 +49,22 @@ function LicenseLockout({ issue }: { issue: LicenseIssue }) {
         <Alert variant="danger">
           <AlertTriangle aria-hidden="true" />
           <AlertTitle>
-            {isExpired ? 'Deployment license expired' : 'License issue detected'}
+            {isExpired ? t('license.deploymentExpired') : t('license.issueDetected')}
           </AlertTitle>
           <AlertDescription>
             <p>
-              {issue.message} Your sign-in is still active, but licensed analysis and monitoring
-              routes are locked until an administrator installs a renewed license.
+              {message} {t('license.lockoutExplanation')}
             </p>
           </AlertDescription>
         </Alert>
 
         <div className="mt-5 grid gap-3 rounded-lg border border-border bg-surface-muted p-4 text-sm text-fg-muted">
           <div>
-            <span className="font-medium text-fg">Issue code:</span> {issue.code}
+            <span className="font-medium text-fg">{t('license.issueCode')}:</span> {issue.code}
           </div>
           <div>
-            <span className="font-medium text-fg">Detected:</span>{' '}
-            {new Date(issue.detectedAt).toLocaleString(undefined, {
+            <span className="font-medium text-fg">{t('license.detected')}:</span>{' '}
+            {formatDate(issue.detectedAt, {
               dateStyle: 'medium',
               timeStyle: 'short',
             })}
@@ -73,12 +75,12 @@ function LicenseLockout({ issue }: { issue: LicenseIssue }) {
           <Button asChild>
             <Link href="/dashboard/account?section=license">
               <ScrollText className="mr-2 h-4 w-4" aria-hidden="true" />
-              View license details
+              {t('license.viewDetails')}
             </Link>
           </Button>
           <Button variant="outline" onClick={() => window.location.reload()}>
             <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
-            Retry
+            {t('common.retry')}
           </Button>
         </div>
       </div>
@@ -90,6 +92,7 @@ function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [licenseIssue, setLicenseIssue] = useState<LicenseIssue | null>(null);
   const { isLoading } = useAuth();
+  const { t } = useI18n();
   const pathname = usePathname();
   const showingAccountSettings = pathname === '/dashboard/account';
 
@@ -163,10 +166,12 @@ function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
               {licenseIssue && showingAccountSettings && (
                 <Alert variant="danger" className="mb-4">
                   <AlertTriangle aria-hidden="true" />
-                  <AlertTitle>Deployment license requires attention</AlertTitle>
+                  <AlertTitle>{t('license.requiresAttention')}</AlertTitle>
                   <AlertDescription>
-                    {licenseIssue.message} Licensed analysis and monitoring routes are locked until
-                    an administrator installs a renewed license.
+                    {licenseIssue.code === 'LICENSE_EXPIRED'
+                      ? t('license.expiredMessage')
+                      : t('license.invalidMessage')}{' '}
+                    {t('license.lockedUntilRenewed')}
                   </AlertDescription>
                 </Alert>
               )}

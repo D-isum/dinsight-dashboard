@@ -3,6 +3,7 @@ import { type Action } from '@/lib/permissions';
 
 export interface NavItem {
   label: string;
+  labelKey?: string;
   href: string;
   icon: LucideIcon;
   badge?: number;
@@ -17,6 +18,7 @@ export interface NavItem {
   // table — a grep across both codebases finds every gate.
   requiredAction?: Action;
   description?: string;
+  descriptionKey?: string;
 }
 
 // Top-level sidebar IA. Five entries only. Account, security,
@@ -29,47 +31,69 @@ export interface NavItem {
 export const mainNavItems: NavItem[] = [
   {
     label: 'Machine Status',
+    labelKey: 'nav.machineStatus',
     href: '/dashboard',
     icon: Home,
     requiresAuth: true,
     description: 'Current machine condition and next actions',
+    descriptionKey: 'nav.machineStatusDescription',
   },
   {
     label: 'Data Ingestion',
+    labelKey: 'nav.dataIngestion',
     href: '/dashboard/data',
     icon: Database,
     requiresAuth: true,
     description: 'Upload baseline and monitoring datasets',
+    descriptionKey: 'nav.dataIngestionDescription',
   },
   {
     label: 'Live Monitor',
+    labelKey: 'nav.liveMonitor',
     href: '/dashboard/live',
     icon: Monitor,
     requiresAuth: true,
     description: 'Observe live and near-real-time machine behavior',
+    descriptionKey: 'nav.liveMonitorDescription',
   },
   {
     label: 'Health Insights',
+    labelKey: 'nav.healthInsights',
     href: '/dashboard/insights',
     icon: ShieldAlert,
     requiresAuth: true,
     description: 'Anomaly and wear trend interpretation',
+    descriptionKey: 'nav.healthInsightsDescription',
   },
   {
     label: 'Settings',
+    labelKey: 'nav.settings',
     href: '/dashboard/account',
     icon: UserCog,
     requiresAuth: true,
     description: 'Account, security, teams, devices, alerts, validation, license, and audit log.',
+    descriptionKey: 'nav.settingsDescription',
   },
 ];
 
 export const bottomNavItems: NavItem[] = [];
 
-export const userMenuItems = [{ label: 'Settings', href: '/dashboard/account' }];
+export const userMenuItems = [
+  { label: 'Settings', labelKey: 'nav.settings', href: '/dashboard/account' },
+];
 
 export const quickActions = [
-  { label: 'Upload Data', href: '/dashboard/data', icon: Database },
-  { label: 'Open Live Monitor', href: '/dashboard/live', icon: Monitor },
-  { label: 'View Insights', href: '/dashboard/insights', icon: ShieldAlert },
+  { label: 'Upload Data', labelKey: 'nav.uploadData', href: '/dashboard/data', icon: Database },
+  {
+    label: 'Open Live Monitor',
+    labelKey: 'nav.openLiveMonitor',
+    href: '/dashboard/live',
+    icon: Monitor,
+  },
+  {
+    label: 'View Insights',
+    labelKey: 'nav.viewInsights',
+    href: '/dashboard/insights',
+    icon: ShieldAlert,
+  },
 ];

@@ -17,9 +17,11 @@ import { useDashboardWorkspace } from '@/context/dashboard-workspace-context';
 import { usePlatformAdmin } from '@/components/auth/require-permission';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { LanguageSwitcher } from '@/components/i18n/language-switcher';
 import { ActivityTimeline } from '@/components/layout/activity-timeline';
 import { CommandPalette } from '@/components/layout/command-palette';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
+import { useI18n } from '@/i18n/client';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,6 +39,7 @@ interface HeaderProps {
 
 export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
+  const { t } = useI18n();
   const isPlatformAdmin = usePlatformAdmin();
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const {
@@ -61,7 +64,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
           onClick={onMenuClick}
         >
           <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
+          <span className="sr-only">{t('header.toggleMenu')}</span>
         </Button>
 
         {/* Compact brand anchor — sidebar is the canonical product mark on xl+ */}
@@ -84,11 +87,9 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             )}
           >
             <Search className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">
-              Search pages, datasets, saved views, or actions...
-            </span>
+            <span className="min-w-0 flex-1 truncate">{t('header.searchPlaceholder')}</span>
             <span className="hidden rounded-md border border-border bg-surface px-1.5 py-0.5 text-[11px] text-fg-subtle lg:inline-flex">
-              Ctrl/Cmd K
+              {t('header.searchShortcut')}
             </span>
           </button>
         </div>
@@ -101,10 +102,12 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             }
             disabled={isLoadingDatasets || filteredDatasets.length === 0}
             className="h-10 w-[10.5rem] rounded-lg border border-border bg-background px-2 text-xs text-fg disabled:opacity-60 lg:w-[12rem]"
-            title="Global dataset context"
-            aria-label="Global dataset context"
+            title={t('header.globalDatasetContext')}
+            aria-label={t('header.globalDatasetContext')}
           >
-            <option value="">{isLoadingDatasets ? 'Loading...' : 'Select dataset'}</option>
+            <option value="">
+              {isLoadingDatasets ? `${t('common.loading')}...` : t('common.selectDataset')}
+            </option>
             {filteredDatasets.map((dataset) => (
               <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
                 {formatDatasetOptionLabel(dataset)}
@@ -128,10 +131,12 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             }
             disabled={isLoadingDatasets || filteredDatasets.length === 0}
             className="h-10 w-[11.5rem] rounded-lg border border-border bg-background px-2 text-xs text-fg disabled:opacity-60 2xl:w-[14rem]"
-            title="Global dataset context"
-            aria-label="Global dataset context"
+            title={t('header.globalDatasetContext')}
+            aria-label={t('header.globalDatasetContext')}
           >
-            <option value="">{isLoadingDatasets ? 'Loading datasets...' : 'Select dataset'}</option>
+            <option value="">
+              {isLoadingDatasets ? t('common.loadingDatasets') : t('common.selectDataset')}
+            </option>
             {filteredDatasets.map((dataset) => (
               <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
                 {formatDatasetOptionLabel(dataset)}
@@ -152,8 +157,10 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             onClick={() => setIsCommandOpen(true)}
           >
             <Search className="h-5 w-5" />
-            <span className="sr-only">Search</span>
+            <span className="sr-only">{t('common.search')}</span>
           </Button>
+
+          <LanguageSwitcher compact />
 
           {/* Theme Toggle */}
           <ThemeToggle />
@@ -180,11 +187,13 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                     <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-success border-2 border-white dark:border-canvas rounded-full" />
                   </div>
                   <div className="hidden flex-col text-left 2xl:flex">
-                    <span className="text-sm font-medium text-fg">{user?.full_name || 'User'}</span>
+                    <span className="text-sm font-medium text-fg">
+                      {user?.full_name || t('common.user')}
+                    </span>
                     <span className="text-xs text-fg-muted">
                       {user?.role
                         ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-                        : 'Member'}
+                        : t('header.member')}
                     </span>
                   </div>
                   <ChevronDown className="h-4 w-4 text-fg-subtle" />
@@ -200,13 +209,13 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                 <Link href="/dashboard/account">
                   <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
                     <User className="mr-2 h-4 w-4" />
-                    <span>Account</span>
+                    <span>{t('common.account')}</span>
                   </DropdownMenuItem>
                 </Link>
                 <Link href="/dashboard/account?section=security">
                   <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>Security</span>
+                    <span>{t('common.security')}</span>
                   </DropdownMenuItem>
                 </Link>
               </div>
@@ -215,9 +224,9 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                   <Link href="/dashboard/admin">
                     <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
                       <ShieldAlert className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-400" />
-                      <span>D'Insight Admin</span>
+                      <span>{t('header.admin')}</span>
                       <span className="ml-auto text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                        staff
+                        {t('header.staff')}
                       </span>
                     </DropdownMenuItem>
                   </Link>
@@ -229,7 +238,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                   className="px-3 py-2 text-danger-text hover:bg-danger-bg transition-colors"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign Out</span>
+                  <span>{t('header.signOut')}</span>
                 </DropdownMenuItem>
               </div>
             </DropdownMenuContent>

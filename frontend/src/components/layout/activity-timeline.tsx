@@ -25,6 +25,7 @@ import {
   type DashboardActivity,
   useDashboardWorkspace,
 } from '@/context/dashboard-workspace-context';
+import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
 const activityIcon = (activity: DashboardActivity) => {
@@ -35,17 +36,20 @@ const activityIcon = (activity: DashboardActivity) => {
   return Activity;
 };
 
-const relativeTime = (iso: string) => {
+const relativeTime = (
+  iso: string,
+  t: (key: string, values?: Record<string, string | number | boolean | null | undefined>) => string
+) => {
   const value = Date.parse(iso);
-  if (!Number.isFinite(value)) return 'Unknown';
+  if (!Number.isFinite(value)) return t('health.unknownTime');
   const diff = Math.max(0, Date.now() - value);
   const minute = 60_000;
   const hour = minute * 60;
   const day = hour * 24;
-  if (diff < minute) return 'Just now';
-  if (diff < hour) return `${Math.floor(diff / minute)}m ago`;
-  if (diff < day) return `${Math.floor(diff / hour)}h ago`;
-  return `${Math.floor(diff / day)}d ago`;
+  if (diff < minute) return t('health.justNow');
+  if (diff < hour) return t('health.minutesAgo', { count: Math.floor(diff / minute) });
+  if (diff < day) return t('health.hoursAgo', { count: Math.floor(diff / hour) });
+  return t('health.daysAgo', { count: Math.floor(diff / day) });
 };
 
 const statusClass = (activity: DashboardActivity) =>
@@ -59,6 +63,7 @@ const statusClass = (activity: DashboardActivity) =>
   );
 
 function ActivityRow({ activity }: { activity: DashboardActivity }) {
+  const { t } = useI18n();
   const Icon = activityIcon(activity);
   const content = (
     <div className="flex w-full min-w-0 gap-3">
@@ -81,7 +86,7 @@ function ActivityRow({ activity }: { activity: DashboardActivity }) {
         )}
         <p className="mt-1 flex items-center gap-1 text-[11px] text-fg-subtle">
           <Clock className="h-3 w-3" aria-hidden="true" />
-          {relativeTime(activity.timestamp)}
+          {relativeTime(activity.timestamp, t)}
         </p>
       </div>
     </div>
@@ -100,6 +105,7 @@ function ActivityRow({ activity }: { activity: DashboardActivity }) {
 
 export function ActivityTimeline() {
   const router = useRouter();
+  const { t } = useI18n();
   const { activities, clearActivities } = useDashboardWorkspace();
   const latest = activities.slice(0, 8);
   const unreadCount = activities.length;
@@ -118,21 +124,19 @@ export function ActivityTimeline() {
               {Math.min(unreadCount, 9)}
             </span>
           )}
-          <span className="sr-only">Open activity timeline</span>
+          <span className="sr-only">{t('activity.openTimeline')}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="right" className="w-[min(24rem,calc(100vw-2rem))] rounded-lg p-0">
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div>
-            <h3 className="font-semibold text-fg">Activity</h3>
-            <p className="text-xs text-fg-muted">
-              Recent datasets, uploads, streams, and analysis.
-            </p>
+            <h3 className="font-semibold text-fg">{t('activity.title')}</h3>
+            <p className="text-xs text-fg-muted">{t('activity.description')}</p>
           </div>
           {activities.length > 0 && (
             <Button variant="ghost" size="sm" onClick={clearActivities} className="h-8 gap-1">
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-              Clear
+              {t('activity.clear')}
             </Button>
           )}
         </div>
@@ -143,10 +147,8 @@ export function ActivityTimeline() {
           ) : (
             <div className="px-4 py-8 text-center">
               <Activity className="mx-auto h-8 w-8 text-fg-subtle" aria-hidden="true" />
-              <p className="mt-2 text-sm font-medium text-fg">No activity yet</p>
-              <p className="mt-1 text-xs text-fg-muted">
-                Uploads, streaming status, saved views, and catalog actions will appear here.
-              </p>
+              <p className="mt-2 text-sm font-medium text-fg">{t('activity.noActivity')}</p>
+              <p className="mt-1 text-xs text-fg-muted">{t('activity.noActivityDescription')}</p>
             </div>
           )}
         </div>
@@ -156,7 +158,7 @@ export function ActivityTimeline() {
           onClick={() => router.push('/dashboard/data?catalog=open')}
           className="cursor-pointer px-4 py-3"
         >
-          Open dataset catalog
+          {t('command.openDatasetCatalog')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

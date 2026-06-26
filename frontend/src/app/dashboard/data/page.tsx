@@ -35,6 +35,7 @@ import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useUploadWorkflow } from '@/hooks/useUploadWorkflow';
+import { useI18n } from '@/i18n/client';
 import { api } from '@/lib/api-client';
 import {
   CombinedCsvSplitPreview,
@@ -103,6 +104,7 @@ export default function DataIngestionPage() {
   const searchParams = useSearchParams();
   const plotTheme = usePlotTheme();
   const queryClient = useQueryClient();
+  const { t, formatNumber } = useI18n();
   const { selectedDatasetId: workspaceDatasetId, selectDataset: selectWorkspaceDataset } =
     useDashboardWorkspace();
   const canCreateDatasetMetadata = usePermission(Actions.DatasetCreate);
@@ -972,13 +974,13 @@ export default function DataIngestionPage() {
             setConfigError(null);
           }
         }}
-        title="Update Configuration Set"
-        description="Adjust processing parameters, then save to apply on new uploads."
+        title={t('data.updateConfigurationSet')}
+        description={t('data.updateConfigurationSetDescription')}
       >
         <div className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Optimizer</label>
+              <label className="text-sm font-medium">{t('data.optimizer')}</label>
               <select
                 value={editedConfig?.optimizer ?? DEFAULT_CONFIG.optimizer}
                 onChange={(event) =>
@@ -998,7 +1000,7 @@ export default function DataIngestionPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Alpha</label>
+              <label className="text-sm font-medium">{t('data.alpha')}</label>
               <Input
                 type="number"
                 step="0.0001"
@@ -1017,7 +1019,7 @@ export default function DataIngestionPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Initial gamma</label>
+              <label className="text-sm font-medium">{t('data.initialGamma')}</label>
               <Input
                 type="number"
                 step="0.0000001"
@@ -1036,7 +1038,7 @@ export default function DataIngestionPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">End metadata column</label>
+              <label className="text-sm font-medium">{t('data.endMetadataColumn')}</label>
               <Input
                 value={editedConfig?.end_meta ?? DEFAULT_CONFIG.end_meta}
                 onChange={(event) =>
@@ -1053,7 +1055,7 @@ export default function DataIngestionPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Start feature column</label>
+              <label className="text-sm font-medium">{t('data.startFeatureColumn')}</label>
               <Input
                 value={editedConfig?.start_dim ?? DEFAULT_CONFIG.start_dim}
                 onChange={(event) =>
@@ -1070,7 +1072,7 @@ export default function DataIngestionPage() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">End feature column</label>
+              <label className="text-sm font-medium">{t('data.endFeatureColumn')}</label>
               <Input
                 value={editedConfig?.end_dim ?? DEFAULT_CONFIG.end_dim}
                 onChange={(event) =>
@@ -1094,14 +1096,14 @@ export default function DataIngestionPage() {
               {isSavingConfig ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
+                  {t('data.saving')}
                 </>
               ) : (
-                'Save configuration set'
+                t('data.saveConfigurationSet')
               )}
             </Button>
             <Button variant="outline" onClick={onRestoreDefaultConfig} disabled={isSavingConfig}>
-              Restore defaults
+              {t('data.restoreDefaults')}
             </Button>
             <Button
               variant="outline"
@@ -1111,7 +1113,7 @@ export default function DataIngestionPage() {
               }}
               disabled={isSavingConfig}
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
         </div>
@@ -1125,8 +1127,8 @@ export default function DataIngestionPage() {
             setPreviewRefreshKey((prev) => prev + 1);
           }
         }}
-        title="Results Visualization"
-        description="Visualize latest processed output or load a saved dataset from the database."
+        title={t('data.resultsVisualization')}
+        description={t('data.previewDescription')}
         contentClassName="w-[92vw] sm:max-w-[900px]"
       >
         <div className="space-y-4">
@@ -1137,7 +1139,7 @@ export default function DataIngestionPage() {
                 checked={previewMode === 'latest'}
                 onChange={() => setPreviewMode('latest')}
               />
-              Latest processed
+              {t('data.latestProcessed')}
             </label>
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -1145,7 +1147,7 @@ export default function DataIngestionPage() {
                 checked={previewMode === 'saved'}
                 onChange={() => setPreviewMode('saved')}
               />
-              Saved result
+              {t('data.savedResult')}
             </label>
             {previewMode === 'saved' && (
               <select
@@ -1159,7 +1161,7 @@ export default function DataIngestionPage() {
                 }}
                 className="rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
-                <option value="">Select saved dataset</option>
+                <option value="">{t('data.selectSavedDataset')}</option>
                 {sourceFilteredDatasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
                     {formatDatasetOptionLabel(dataset)}
@@ -1170,35 +1172,43 @@ export default function DataIngestionPage() {
           </div>
 
           <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
-            <span>Dataset ID: {previewDatasetId ?? 'None selected'}</span>
-            <span>Baseline points: {previewBaselineData?.dinsight_x.length ?? 0}</span>
-            <span>Monitoring points: {previewMonitoringData?.dinsight_x.length ?? 0}</span>
+            <span>
+              {t('data.datasetId')}: {previewDatasetId ?? t('data.noneSelected')}
+            </span>
+            <span>
+              {t('data.baselinePoints')}:{' '}
+              {formatNumber(previewBaselineData?.dinsight_x.length ?? 0)}
+            </span>
+            <span>
+              {t('data.monitoringPoints')}:{' '}
+              {formatNumber(previewMonitoringData?.dinsight_x.length ?? 0)}
+            </span>
           </div>
 
           {previewDatasetId == null ? (
-            <p className="text-sm text-muted-foreground">Select a dataset to visualize.</p>
+            <p className="text-sm text-muted-foreground">{t('data.selectDatasetToVisualize')}</p>
           ) : isPreviewLoadingBaseline || isPreviewLoadingMonitoring ? (
-            <p className="text-sm text-muted-foreground">Loading visualization...</p>
+            <p className="text-sm text-muted-foreground">{t('data.loadingVisualization')}</p>
           ) : previewBaselineError ? (
             <p className="text-sm text-danger-text">{previewBaselineError}</p>
           ) : previewPlot ? (
             <ChartFrame
-              title="Coordinate map"
-              description="Baseline and monitoring coordinates rendered with the same chart behavior used across the dashboard."
+              title={t('live.coordinateMap')}
+              description={t('data.coordinateMapDescription')}
               stats={
                 <>
                   <ChartStat
-                    label="Dataset"
+                    label={t('common.dataset')}
                     value={previewDatasetId ? `#${previewDatasetId}` : '—'}
                   />
                   <ChartStat
-                    label="Baseline"
-                    value={(previewBaselineData?.dinsight_x.length ?? 0).toLocaleString()}
+                    label={t('common.baseline')}
+                    value={formatNumber(previewBaselineData?.dinsight_x.length ?? 0)}
                     tone="info"
                   />
                   <ChartStat
-                    label="Monitoring"
-                    value={(previewMonitoringData?.dinsight_x.length ?? 0).toLocaleString()}
+                    label={t('common.monitoring')}
+                    value={formatNumber(previewMonitoringData?.dinsight_x.length ?? 0)}
                     tone={previewMonitoringData?.dinsight_x.length ? 'danger' : 'neutral'}
                   />
                 </>
@@ -1207,12 +1217,12 @@ export default function DataIngestionPage() {
                 <>
                   <Button asChild size="sm">
                     <Link href="/dashboard/live">
-                      Open in Live
+                      {t('data.openInLive')}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/dashboard/insights">Open in Insights</Link>
+                    <Link href="/dashboard/insights">{t('data.openInInsights')}</Link>
                   </Button>
                 </>
               }
@@ -1229,9 +1239,7 @@ export default function DataIngestionPage() {
               )}
             </ChartFrame>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No baseline visualization available for this dataset yet.
-            </p>
+            <p className="text-sm text-muted-foreground">{t('data.noBaselineVisualization')}</p>
           )}
         </div>
       </ConfigDialog>
@@ -1239,8 +1247,8 @@ export default function DataIngestionPage() {
       <ConfigDialog
         open={isCatalogOpen}
         onOpenChange={setIsCatalogOpen}
-        title="Dataset Catalog"
-        description="Browse processed datasets, export CSVs, register metadata, inspect lineage, run validation, and delete obsolete datasets."
+        title={t('data.datasetCatalog')}
+        description={t('data.catalogDescription')}
         contentClassName="w-[96vw] sm:max-w-[1320px]"
       >
         <DatasetCatalog variant="modal" />
@@ -1250,7 +1258,7 @@ export default function DataIngestionPage() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-fg">Data Ingestion</h1>
+              <h1 className="text-2xl font-semibold text-fg">{t('data.title')}</h1>
               <Badge
                 variant={
                   state.status === 'error'
@@ -1263,26 +1271,23 @@ export default function DataIngestionPage() {
                 }
               >
                 {state.status === 'idle'
-                  ? 'Idle'
+                  ? t('data.idle')
                   : state.status === 'completed'
-                    ? 'Complete'
+                    ? t('data.complete')
                     : state.status}
               </Badge>
             </div>
-            <p className="max-w-3xl text-sm text-fg-muted">
-              Configure processing, upload combined or split CSV files, and review saved D'Insight
-              results.
-            </p>
+            <p className="max-w-3xl text-sm text-fg-muted">{t('data.description')}</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => void refetch()}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
+              {t('common.refresh')}
             </Button>
             <Button variant="outline" onClick={() => setIsCatalogOpen(true)}>
               <Database className="mr-2 h-4 w-4" />
-              Catalog
+              {t('common.catalog')}
             </Button>
           </div>
         </div>
@@ -1290,7 +1295,7 @@ export default function DataIngestionPage() {
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricTile
             icon={<Settings2 className="h-4 w-4" />}
-            label="Configuration"
+            label={t('data.configuration')}
             value={config?.optimizer ?? DEFAULT_CONFIG.optimizer}
             detail={`${config?.start_dim ?? DEFAULT_CONFIG.start_dim} to ${
               config?.end_dim ?? DEFAULT_CONFIG.end_dim
@@ -1298,21 +1303,23 @@ export default function DataIngestionPage() {
           />
           <MetricTile
             icon={<Upload className="h-4 w-4" />}
-            label="Upload mode"
+            label={t('data.uploadMode')}
             value={state.step}
             detail={state.statusMessage || state.status}
           />
           <MetricTile
             icon={<Database className="h-4 w-4" />}
-            label="Selected baseline"
-            value={suggestedBaselineId ? `#${suggestedBaselineId}` : 'Not selected'}
-            detail={`${filteredDatasets.length.toLocaleString()} matching datasets`}
+            label={t('data.selectedBaseline')}
+            value={suggestedBaselineId ? `#${suggestedBaselineId}` : t('data.notSelected')}
+            detail={t('data.matchingDatasets', { count: formatNumber(filteredDatasets.length) })}
           />
           <MetricTile
             icon={<BarChart3 className="h-4 w-4" />}
-            label="Preview result"
-            value={previewDatasetId ? `#${previewDatasetId}` : 'None'}
-            detail={`${sourceFilteredDatasets.length.toLocaleString()} saved results`}
+            label={t('data.previewResult')}
+            value={previewDatasetId ? `#${previewDatasetId}` : t('common.none')}
+            detail={t('data.savedResults', {
+              count: formatNumber(sourceFilteredDatasets.length),
+            })}
           />
         </div>
 
@@ -1344,38 +1351,41 @@ export default function DataIngestionPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <Settings2 className="h-5 w-5" />
-                    Configuration Set
+                    {t('data.configurationSet')}
                   </CardTitle>
-                  <CardDescription>Processing parameters applied to new uploads.</CardDescription>
+                  <CardDescription>{t('data.configurationSetDescription')}</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={onEditConfig}>
-                  Update configuration
+                  {t('data.updateConfiguration')}
                 </Button>
               </CardHeader>
               <CardContent>
                 {isConfigLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading configuration set...</p>
+                  <p className="text-sm text-muted-foreground">{t('data.loadingConfiguration')}</p>
                 ) : (
                   <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
                     <ConfigValue
-                      label="Optimizer"
+                      label={t('data.optimizer')}
                       value={config?.optimizer ?? DEFAULT_CONFIG.optimizer}
                     />
-                    <ConfigValue label="Alpha" value={config?.alpha ?? DEFAULT_CONFIG.alpha} />
                     <ConfigValue
-                      label="Initial gamma"
+                      label={t('data.alpha')}
+                      value={config?.alpha ?? DEFAULT_CONFIG.alpha}
+                    />
+                    <ConfigValue
+                      label={t('data.initialGamma')}
                       value={config?.gamma0 ?? DEFAULT_CONFIG.gamma0}
                     />
                     <ConfigValue
-                      label="End metadata"
+                      label={t('data.endMetadata')}
                       value={config?.end_meta ?? DEFAULT_CONFIG.end_meta}
                     />
                     <ConfigValue
-                      label="Start feature"
+                      label={t('data.startFeature')}
                       value={config?.start_dim ?? DEFAULT_CONFIG.start_dim}
                     />
                     <ConfigValue
-                      label="End feature"
+                      label={t('data.endFeature')}
                       value={config?.end_dim ?? DEFAULT_CONFIG.end_dim}
                     />
                   </div>
@@ -1387,22 +1397,20 @@ export default function DataIngestionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <FileSpreadsheet className="h-5 w-5" />
-                  Upload Data
+                  {t('data.uploadData')}
                 </CardTitle>
-                <CardDescription>
-                  Choose the upload mode that matches the source file.
-                </CardDescription>
+                <CardDescription>{t('data.uploadDataDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="combined" className="space-y-4">
                   <TabsList className="grid h-auto w-full grid-cols-2 rounded-lg">
                     <TabsTrigger value="combined" className="gap-2 py-2">
                       <Scissors className="h-4 w-4" />
-                      Combined CSV
+                      {t('data.combinedCsv')}
                     </TabsTrigger>
                     <TabsTrigger value="two-file" className="gap-2 py-2">
                       <Upload className="h-4 w-4" />
-                      Baseline + Monitoring
+                      {t('data.baselineMonitoring')}
                     </TabsTrigger>
                   </TabsList>
 
@@ -1411,13 +1419,15 @@ export default function DataIngestionPage() {
                       <section className="space-y-4 rounded-lg border border-border bg-surface/50 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div>
-                            <h2 className="text-base font-semibold">Combined source file</h2>
+                            <h2 className="text-base font-semibold">
+                              {t('data.combinedSourceFile')}
+                            </h2>
                             <p className="text-xs text-muted-foreground">
-                              One CSV becomes baseline and monitoring uploads.
+                              {t('data.combinedSourceFileDescription')}
                             </p>
                           </div>
                           <Badge variant={combinedValidation?.valid ? 'success' : 'outline'}>
-                            {combinedValidation?.valid ? 'Ready' : 'CSV'}
+                            {combinedValidation?.valid ? t('data.ready') : t('data.csv')}
                           </Badge>
                         </div>
                         <Input
@@ -1432,22 +1442,22 @@ export default function DataIngestionPage() {
                           file={combinedFile}
                           validation={combinedValidation}
                           isValidating={validatingCombined}
-                          validatingLabel="Validating combined file..."
-                          successLabel="Combined file validation passed."
+                          validatingLabel={t('data.validatingCombined')}
+                          successLabel={t('data.combinedValidationPassed')}
                           headerLimit={8}
                         />
                       </section>
 
                       <section className="space-y-4 rounded-lg border border-border bg-surface/50 p-4">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                          <h2 className="text-base font-semibold">Split rules</h2>
+                          <h2 className="text-base font-semibold">{t('data.splitRules')}</h2>
                           <Badge variant="info">{combinedRangeType}</Badge>
                         </div>
 
                         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
                           <div className="grid gap-2">
                             <label className="text-sm font-medium" htmlFor="combined-split-column">
-                              Split column
+                              {t('data.splitColumn')}
                             </label>
                             <select
                               id="combined-split-column"
@@ -1459,7 +1469,7 @@ export default function DataIngestionPage() {
                               disabled={!combinedValidation?.headers.length || isActiveProcessing}
                               className="rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
-                              <option value="">Select column</option>
+                              <option value="">{t('data.selectColumn')}</option>
                               {combinedValidation?.headers.map((header) => (
                                 <option key={header} value={header}>
                                   {header}
@@ -1470,7 +1480,7 @@ export default function DataIngestionPage() {
 
                           <div className="grid gap-2">
                             <label className="text-sm font-medium" htmlFor="combined-range-type">
-                              Range type
+                              {t('data.rangeType')}
                             </label>
                             <select
                               id="combined-range-type"
@@ -1482,8 +1492,8 @@ export default function DataIngestionPage() {
                               disabled={isActiveProcessing}
                               className="rounded-md border border-input bg-background px-3 py-2 text-sm"
                             >
-                              <option value="datetime">Timestamp / date / time</option>
-                              <option value="number">Numeric / day index</option>
+                              <option value="datetime">{t('data.datetimeRange')}</option>
+                              <option value="number">{t('data.numberRange')}</option>
                             </select>
                           </div>
                         </div>
@@ -1491,7 +1501,7 @@ export default function DataIngestionPage() {
                         <div className="grid gap-3 sm:grid-cols-2">
                           <RangeInput
                             id="combined-baseline-start"
-                            label="Baseline start"
+                            label={t('data.baselineStart')}
                             value={combinedBaselineStart}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
@@ -1502,7 +1512,7 @@ export default function DataIngestionPage() {
                           />
                           <RangeInput
                             id="combined-baseline-end"
-                            label="Baseline stop"
+                            label={t('data.baselineStop')}
                             value={combinedBaselineEnd}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
@@ -1513,7 +1523,7 @@ export default function DataIngestionPage() {
                           />
                           <RangeInput
                             id="combined-monitoring-start"
-                            label="Monitoring start"
+                            label={t('data.monitoringStart')}
                             value={combinedMonitoringStart}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
@@ -1524,7 +1534,7 @@ export default function DataIngestionPage() {
                           />
                           <RangeInput
                             id="combined-monitoring-end"
-                            label="Monitoring stop"
+                            label={t('data.monitoringStop')}
                             value={combinedMonitoringEnd}
                             rangeType={combinedRangeType}
                             disabled={isActiveProcessing}
@@ -1561,7 +1571,7 @@ export default function DataIngestionPage() {
                             ) : (
                               <Eye className="mr-2 h-4 w-4" />
                             )}
-                            Preview split
+                            {t('data.previewSplit')}
                           </Button>
                           <Button
                             onClick={() => void onCombinedUpload()}
@@ -1573,10 +1583,10 @@ export default function DataIngestionPage() {
                             {isActiveProcessing ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Processing combined CSV...
+                                {t('data.processingCombined')}
                               </>
                             ) : (
-                              'Split and upload'
+                              t('data.splitAndUpload')
                             )}
                           </Button>
                         </div>
@@ -1595,14 +1605,14 @@ export default function DataIngestionPage() {
                               ) : (
                                 <Upload className="h-4 w-4" />
                               )}
-                              Baseline
+                              {t('data.baseline')}
                             </h2>
                             <p className="text-xs text-muted-foreground">
-                              Upload the baseline CSV first.
+                              {t('data.uploadBaselineFirst')}
                             </p>
                           </div>
                           <Badge variant={baselineReady ? 'success' : 'outline'}>
-                            {baselineReady ? 'Complete' : 'Step 1'}
+                            {baselineReady ? t('data.complete') : t('data.step1')}
                           </Badge>
                         </div>
 
@@ -1618,8 +1628,8 @@ export default function DataIngestionPage() {
                           file={baselineFile}
                           validation={baselineValidation}
                           isValidating={validatingBaseline}
-                          validatingLabel="Validating baseline file..."
-                          successLabel="Baseline file validation passed."
+                          validatingLabel={t('data.validatingBaseline')}
+                          successLabel={t('data.baselineValidationPassed')}
                         />
 
                         <div className="mt-auto border-t border-border pt-3">
@@ -1637,10 +1647,10 @@ export default function DataIngestionPage() {
                             {state.status === 'uploading' || state.status === 'processing' ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Processing baseline...
+                                {t('data.processingBaseline')}
                               </>
                             ) : (
-                              'Upload baseline CSV'
+                              t('data.uploadBaselineCsv')
                             )}
                           </Button>
                         </div>
@@ -1655,26 +1665,30 @@ export default function DataIngestionPage() {
                               ) : (
                                 <Upload className="h-4 w-4" />
                               )}
-                              Monitoring
+                              {t('data.monitoring')}
                             </h2>
                             <p className="text-xs text-muted-foreground">
-                              Compare monitoring data with a baseline target.
+                              {t('data.compareMonitoring')}
                             </p>
                           </div>
                           <Badge variant={monitoringComplete ? 'success' : 'outline'}>
-                            {monitoringComplete ? 'Complete' : 'Step 2'}
+                            {monitoringComplete ? t('data.complete') : t('data.step2')}
                           </Badge>
                         </div>
 
                         <div className="space-y-3 rounded-md border border-input bg-background/60 p-3">
                           <div className="flex items-center justify-between gap-3">
-                            <label className="text-sm font-medium">Baseline dataset</label>
+                            <label className="text-sm font-medium">
+                              {t('data.baselineDataset')}
+                            </label>
                             <Button
                               variant="outline"
                               size="sm"
                               onClick={() => setUseManualBaselineId((prev) => !prev)}
                             >
-                              {useManualBaselineId ? 'Use dataset selector' : 'Manual ID'}
+                              {useManualBaselineId
+                                ? t('data.useDatasetSelector')
+                                : t('data.manualId')}
                             </Button>
                           </div>
 
@@ -1682,14 +1696,14 @@ export default function DataIngestionPage() {
                             <Input
                               value={manualBaselineId}
                               onChange={(event) => setManualBaselineId(event.target.value)}
-                              placeholder="Enter baseline ID"
+                              placeholder={t('data.enterBaselineId')}
                             />
                           ) : (
                             <>
                               <Input
                                 value={datasetSearch}
                                 onChange={(event) => setDatasetSearch(event.target.value)}
-                                placeholder="Search by ID, device, or filename"
+                                placeholder={t('data.searchDatasetPlaceholder')}
                               />
                               <div className="grid grid-cols-2 gap-2">
                                 <DatasetSourceSelect
@@ -1704,11 +1718,11 @@ export default function DataIngestionPage() {
                                     setDatasetSort(event.target.value as typeof datasetSort)
                                   }
                                   className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                                  title="Sort order"
+                                  title={t('data.sortOrder')}
                                 >
-                                  <option value="newest">Newest first</option>
-                                  <option value="oldest">Oldest first</option>
-                                  <option value="id-asc">ID ascending</option>
+                                  <option value="newest">{t('data.newestFirst')}</option>
+                                  <option value="oldest">{t('data.oldestFirst')}</option>
+                                  <option value="id-asc">{t('data.idAscending')}</option>
                                 </select>
                               </div>
                               <select
@@ -1725,7 +1739,7 @@ export default function DataIngestionPage() {
                                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                                 size={Math.min(8, Math.max(3, filteredDatasets.length))}
                               >
-                                <option value="">Select dataset</option>
+                                <option value="">{t('common.selectDataset')}</option>
                                 {filteredDatasets.map((dataset) => (
                                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
                                     {formatDatasetOptionLabel(dataset)}
@@ -1740,7 +1754,8 @@ export default function DataIngestionPage() {
 
                           <div className="flex flex-wrap items-center justify-between gap-2">
                             <p className="text-xs text-muted-foreground">
-                              Effective baseline ID: {suggestedBaselineId ?? 'Not selected'}
+                              {t('data.effectiveBaselineId')}:{' '}
+                              {suggestedBaselineId ?? t('data.notSelected')}
                             </p>
                           </div>
                           {manualBaselineError && (
@@ -1764,8 +1779,8 @@ export default function DataIngestionPage() {
                           file={monitoringFile}
                           validation={monitoringValidation}
                           isValidating={validatingMonitoring}
-                          validatingLabel="Validating monitoring file..."
-                          successLabel="Monitoring file validation passed."
+                          validatingLabel={t('data.validatingMonitoring')}
+                          successLabel={t('data.monitoringValidationPassed')}
                         />
 
                         <div className="mt-auto border-t border-border pt-3">
@@ -1784,10 +1799,10 @@ export default function DataIngestionPage() {
                             (state.status === 'uploading' || state.status === 'processing') ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Processing monitoring...
+                                {t('data.processingMonitoring')}
                               </>
                             ) : (
-                              'Upload monitoring CSV'
+                              t('data.uploadMonitoringCsv')
                             )}
                           </Button>
                         </div>
@@ -1803,28 +1818,26 @@ export default function DataIngestionPage() {
                 <div>
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <BarChart3 className="h-5 w-5" />
-                    Results Visualization
+                    {t('data.resultsVisualization')}
                   </CardTitle>
-                  <CardDescription>
-                    Preview latest output or load a saved dataset from the database.
-                  </CardDescription>
+                  <CardDescription>{t('data.previewDescription')}</CardDescription>
                 </div>
                 <Badge variant={previewDatasetId ? 'info' : 'outline'}>
-                  {previewDatasetId ? `#${previewDatasetId}` : 'No dataset'}
+                  {previewDatasetId ? `#${previewDatasetId}` : t('command.noDatasetSelected')}
                 </Badge>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
                   <div className="grid gap-3 sm:grid-cols-3">
                     <ConfigValue
-                      label="Baseline points"
+                      label={t('data.baselinePoints')}
                       value={inlineBaselineData?.dinsight_x.length ?? 0}
                     />
                     <ConfigValue
-                      label="Monitoring points"
+                      label={t('data.monitoringPoints')}
                       value={inlineMonitoringData?.dinsight_x.length ?? 0}
                     />
-                    <ConfigValue label="Sample cap" value="20k" />
+                    <ConfigValue label={t('data.sampleCap')} value="20k" />
                   </div>
                   <div className="flex flex-wrap gap-2 md:justify-end">
                     <Button
@@ -1836,7 +1849,7 @@ export default function DataIngestionPage() {
                       variant="outline"
                     >
                       <Eye className="mr-2 h-4 w-4" />
-                      Latest
+                      {t('data.latest')}
                     </Button>
                     <Button
                       onClick={() => {
@@ -1847,28 +1860,28 @@ export default function DataIngestionPage() {
                       variant="outline"
                     >
                       <Database className="mr-2 h-4 w-4" />
-                      Saved
+                      {t('data.saved')}
                     </Button>
                   </div>
                 </div>
 
                 <ChartFrame
-                  title="Coordinate preview"
-                  description="Sampled result map for quick validation before opening the full viewer."
+                  title={t('data.coordinatePreview')}
+                  description={t('data.coordinatePreviewDescription')}
                   stats={
                     <>
                       <ChartStat
-                        label="Dataset"
+                        label={t('common.dataset')}
                         value={inlinePreviewDatasetId ? `#${inlinePreviewDatasetId}` : '—'}
                       />
                       <ChartStat
-                        label="Baseline"
-                        value={(inlineBaselineData?.dinsight_x.length ?? 0).toLocaleString()}
+                        label={t('common.baseline')}
+                        value={formatNumber(inlineBaselineData?.dinsight_x.length ?? 0)}
                         tone="info"
                       />
                       <ChartStat
-                        label="Monitoring"
-                        value={(inlineMonitoringData?.dinsight_x.length ?? 0).toLocaleString()}
+                        label={t('common.monitoring')}
+                        value={formatNumber(inlineMonitoringData?.dinsight_x.length ?? 0)}
                         tone={inlineMonitoringData?.dinsight_x.length ? 'danger' : 'neutral'}
                       />
                     </>
@@ -1877,16 +1890,19 @@ export default function DataIngestionPage() {
                 >
                   {!inlinePreviewDatasetId ? (
                     <EmptyState
-                      title="No processed result yet"
-                      description="Upload data or open the catalog to select an existing dataset."
+                      title={t('data.noProcessedResult')}
+                      description={t('data.noProcessedResultDescription')}
                     />
                   ) : isInlineLoadingBaseline || isInlineLoadingMonitoring ? (
                     <EmptyState
-                      title="Loading preview"
-                      description="Fetching sampled coordinates..."
+                      title={t('data.loadingPreview')}
+                      description={t('data.loadingPreviewDescription')}
                     />
                   ) : inlineBaselineError ? (
-                    <EmptyState title="Preview unavailable" description={inlineBaselineError} />
+                    <EmptyState
+                      title={t('data.previewUnavailable')}
+                      description={inlineBaselineError}
+                    />
                   ) : inlinePreviewPlot ? (
                     <div className="h-[250px]">
                       <EChartsCanvas
@@ -1897,8 +1913,8 @@ export default function DataIngestionPage() {
                     </div>
                   ) : (
                     <EmptyState
-                      title="No coordinates available"
-                      description="The selected dataset has no baseline visualization yet."
+                      title={t('data.noCoordinates')}
+                      description={t('data.noCoordinatesDescription')}
                     />
                   )}
                   {inlineMonitoringError && (
@@ -1914,29 +1930,29 @@ export default function DataIngestionPage() {
               <Card className="border-success-border bg-success-bg/40">
                 <CardHeader>
                   <CardTitle className="text-lg text-success-text">
-                    Ready for live monitoring
+                    {t('data.readyForLive')}
                   </CardTitle>
-                  <CardDescription>
-                    Baseline and monitoring uploads are complete and validated.
-                  </CardDescription>
+                  <CardDescription>{t('data.readyForLiveDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3 text-sm">
                   <p>
-                    Generated baseline ID:{' '}
-                    <strong>#{state.dinsightId ?? suggestedBaselineId ?? 'N/A'}</strong>
+                    {t('data.generatedBaselineId')}:{' '}
+                    <strong>
+                      #{state.dinsightId ?? suggestedBaselineId ?? t('common.notAvailable')}
+                    </strong>
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <Button asChild>
                       <Link href="/dashboard/live">
-                        Open live monitor
+                        {t('data.openLiveMonitor')}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
                     </Button>
                     <Button variant="outline" onClick={() => void refetch()}>
-                      Refresh datasets
+                      {t('data.refreshDatasets')}
                     </Button>
                     <Button variant="outline" onClick={resetWorkflow}>
-                      Reset flow
+                      {t('data.resetFlow')}
                     </Button>
                   </div>
                 </CardContent>
@@ -1947,16 +1963,25 @@ export default function DataIngestionPage() {
           <aside className="min-w-0 space-y-5 xl:sticky xl:top-5 xl:self-start">
             <Card className="border-border/60">
               <CardHeader>
-                <CardTitle className="text-base">Dataset Context</CardTitle>
+                <CardTitle className="text-base">{t('data.datasetContext')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <SideFact
-                  label="Effective baseline"
-                  value={suggestedBaselineId ?? 'Not selected'}
+                  label={t('data.effectiveBaseline')}
+                  value={suggestedBaselineId ?? t('data.notSelected')}
                 />
-                <SideFact label="Generated dataset ID" value={state.dinsightId ?? 'None'} />
-                <SideFact label="Saved results" value={sourceFilteredDatasets.length} />
-                <SideFact label="Matching targets" value={filteredDatasets.length} />
+                <SideFact
+                  label={t('data.generatedDatasetId')}
+                  value={state.dinsightId ?? t('common.none')}
+                />
+                <SideFact
+                  label={t('data.savedResult')}
+                  value={formatNumber(sourceFilteredDatasets.length)}
+                />
+                <SideFact
+                  label={t('data.matchingTargets')}
+                  value={formatNumber(filteredDatasets.length)}
+                />
                 {selectedDatasetMeta && <DatasetSourceCard dataset={selectedDatasetMeta} />}
               </CardContent>
             </Card>
@@ -1979,20 +2004,24 @@ export default function DataIngestionPage() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-base">
                   <Database className="h-4 w-4" />
-                  Dataset Catalog
+                  {t('data.datasetCatalog')}
                 </CardTitle>
-                <CardDescription>
-                  Export, delete, validate, register metadata, and inspect lineage from the catalog.
-                </CardDescription>
+                <CardDescription>{t('data.catalogDescription')}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="grid grid-cols-2 gap-2">
-                  <SideFact label="Saved results" value={sourceFilteredDatasets.length} />
-                  <SideFact label="Matching source" value={filteredDatasets.length} />
+                  <SideFact
+                    label={t('data.savedResult')}
+                    value={formatNumber(sourceFilteredDatasets.length)}
+                  />
+                  <SideFact
+                    label={t('data.matchingSource')}
+                    value={formatNumber(filteredDatasets.length)}
+                  />
                 </div>
                 <Button className="w-full justify-start" onClick={() => setIsCatalogOpen(true)}>
                   <Database className="mr-2 h-4 w-4" />
-                  Open catalog
+                  {t('dashboard.openCatalog')}
                 </Button>
               </CardContent>
             </Card>
@@ -2052,17 +2081,26 @@ function WorkflowStepper({
   isActiveProcessing: boolean;
   hasError: boolean;
 }) {
+  const { t } = useI18n();
   const steps = [
-    { label: 'Configure', complete: isConfigured, active: !baselineReady },
-    { label: 'Upload', complete: baselineReady, active: isActiveProcessing },
+    { label: t('common.configure'), complete: isConfigured, active: !baselineReady },
+    { label: t('common.upload'), complete: baselineReady, active: isActiveProcessing },
     {
-      label: 'Monitor',
+      label: t('common.monitoring'),
       complete: monitoringComplete,
       active: baselineReady && !monitoringComplete,
     },
-    { label: 'Catalog', complete: catalogReady, active: monitoringComplete && !catalogReady },
-    { label: 'Visualize', complete: hasVisualization, active: catalogReady && !hasVisualization },
-    { label: 'Live', complete: monitoringComplete, active: monitoringComplete },
+    {
+      label: t('common.catalog'),
+      complete: catalogReady,
+      active: monitoringComplete && !catalogReady,
+    },
+    {
+      label: t('data.resultsVisualization'),
+      complete: hasVisualization,
+      active: catalogReady && !hasVisualization,
+    },
+    { label: t('nav.liveMonitor'), complete: monitoringComplete, active: monitoringComplete },
   ];
 
   return (
@@ -2090,7 +2128,11 @@ function WorkflowStepper({
               <div className="min-w-0">
                 <div className="text-sm font-medium leading-tight text-fg">{step.label}</div>
                 <div className="text-[11px] text-muted-foreground">
-                  {step.complete ? 'Done' : step.active ? 'Current' : 'Pending'}
+                  {step.complete
+                    ? t('data.done')
+                    : step.active
+                      ? t('data.current')
+                      : t('data.pending')}
                 </div>
               </div>
             </div>
@@ -2102,45 +2144,50 @@ function WorkflowStepper({
 }
 
 function SplitPreviewPanel({ preview }: { preview: CombinedCsvSplitPreview }) {
+  const { t, formatNumber } = useI18n();
+
   return (
     <div className="space-y-3 rounded-md border border-border bg-background/60 p-3 text-xs">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="font-semibold text-fg">Split preview</span>
+        <span className="font-semibold text-fg">{t('data.splitPreview')}</span>
         <span className="text-muted-foreground">
-          {preview.totalRows.toLocaleString()} total rows
+          {t('data.totalRows', { count: formatNumber(preview.totalRows) })}
         </span>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        <ConfigValue label="Baseline rows" value={preview.baselineRows.toLocaleString()} />
-        <ConfigValue label="Monitoring rows" value={preview.monitoringRows.toLocaleString()} />
-        <ConfigValue label="Unmatched rows" value={preview.unmatchedRows.toLocaleString()} />
-        <ConfigValue label="Overlap rows" value={preview.overlapRows.toLocaleString()} />
+        <ConfigValue label={t('data.baselineRows')} value={formatNumber(preview.baselineRows)} />
+        <ConfigValue
+          label={t('data.monitoringRows')}
+          value={formatNumber(preview.monitoringRows)}
+        />
+        <ConfigValue label={t('data.unmatchedRows')} value={formatNumber(preview.unmatchedRows)} />
+        <ConfigValue label={t('data.overlapRows')} value={formatNumber(preview.overlapRows)} />
       </div>
       <div className="grid gap-2 text-muted-foreground sm:grid-cols-2">
         <div>
-          Column range:{' '}
+          {t('data.columnRange')}:{' '}
           <span className="font-medium text-fg">
-            {preview.minValue || 'N/A'} to {preview.maxValue || 'N/A'}
+            {preview.minValue || t('common.notAvailable')} to{' '}
+            {preview.maxValue || t('common.notAvailable')}
           </span>
         </div>
         <div>
-          File order:{' '}
+          {t('data.fileOrder')}:{' '}
           <span className="font-medium text-fg">
-            {preview.firstValue || 'N/A'} to {preview.lastValue || 'N/A'}
+            {preview.firstValue || t('common.notAvailable')} to{' '}
+            {preview.lastValue || t('common.notAvailable')}
           </span>
         </div>
       </div>
       {preview.overlapRows > 0 && (
         <p className="flex items-start gap-2 text-warning-text">
           <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          {preview.overlapRows.toLocaleString()} row(s) match both ranges. Upload will place
-          overlapping rows in the baseline split first.
+          {t('data.overlapWarning', { count: formatNumber(preview.overlapRows) })}
         </p>
       )}
       {preview.unmatchedRows > 0 && (
         <p className="text-muted-foreground">
-          {preview.unmatchedRows.toLocaleString()} row(s) are outside both ranges and will be
-          excluded.
+          {t('data.unmatchedWarning', { count: formatNumber(preview.unmatchedRows) })}
         </p>
       )}
     </div>
@@ -2173,46 +2220,47 @@ function DataNextActions({
   onOpenCatalog: () => void;
   onOpenResults: () => void;
 }) {
+  const { t } = useI18n();
   const action = !hasConfig
     ? {
-        title: 'Confirm processing configuration',
-        description: 'Feature and metadata columns determine whether uploads validate cleanly.',
+        title: t('data.confirmConfiguration'),
+        description: t('data.confirmConfigurationDescription'),
         command: null,
       }
     : !baselineReady
       ? {
-          title: 'Upload a baseline dataset',
-          description: 'Start with a healthy reference dataset or use the combined CSV splitter.',
+          title: t('data.uploadBaselineDataset'),
+          description: t('data.uploadBaselineDatasetDescription'),
           command: null,
         }
       : !monitoringComplete
         ? {
-            title: 'Upload monitoring data',
-            description: 'Attach monitoring data to the selected baseline target.',
+            title: t('data.uploadMonitoringData'),
+            description: t('data.uploadMonitoringDataDescription'),
             command: null,
           }
         : !hasMetadataStatus
           ? {
-              title: 'Open catalog and review metadata',
-              description: 'Catalog metadata unlocks validation, compatibility, and curation.',
+              title: t('data.reviewMetadata'),
+              description: t('data.reviewMetadataDescription'),
               command: 'catalog' as const,
             }
           : !hasVisualization
             ? {
-                title: 'Open result visualization',
-                description: 'Inspect baseline and monitoring coordinates before live operation.',
+                title: t('data.openResultVisualization'),
+                description: t('data.openResultVisualizationDescription'),
                 command: 'results' as const,
               }
             : {
-                title: 'Continue to live monitoring',
-                description: 'Processed data is ready for streaming and operational review.',
+                title: t('data.continueLiveMonitoring'),
+                description: t('data.continueLiveMonitoringDescription'),
                 command: 'live' as const,
               };
 
   return (
     <Card className="border-info-border bg-info-bg/40">
       <CardHeader>
-        <CardTitle className="text-base text-info-text">Next step</CardTitle>
+        <CardTitle className="text-base text-info-text">{t('data.nextStep')}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3 text-sm">
         <div className="font-semibold text-fg">{action.title}</div>
@@ -2220,20 +2268,20 @@ function DataNextActions({
         {action.command === 'catalog' && (
           <Button variant="outline" className="w-full justify-start" onClick={onOpenCatalog}>
             <Database className="mr-2 h-4 w-4" />
-            Open catalog
+            {t('dashboard.openCatalog')}
           </Button>
         )}
         {action.command === 'results' && (
           <Button variant="outline" className="w-full justify-start" onClick={onOpenResults}>
             <BarChart3 className="mr-2 h-4 w-4" />
-            Open visualization
+            {t('data.openVisualization')}
           </Button>
         )}
         {action.command === 'live' && (
           <Button asChild variant="outline" className="w-full justify-start">
             <Link href="/dashboard/live">
               <ArrowRight className="mr-2 h-4 w-4" />
-              Open live monitor
+              {t('data.openLiveMonitor')}
             </Link>
           </Button>
         )}
@@ -2253,6 +2301,8 @@ function MetricTile({
   value: ReactNode;
   detail: ReactNode;
 }) {
+  const { t, formatNumber } = useI18n();
+
   return (
     <div className="rounded-lg border border-border bg-surface p-3 shadow-sm">
       <div className="flex items-center gap-2 text-xs font-medium uppercase text-muted-foreground">
@@ -2300,12 +2350,14 @@ function FileValidationSummary({
   successLabel: string;
   headerLimit?: number;
 }) {
+  const { t, formatNumber } = useI18n();
+
   return (
     <div className="space-y-3 rounded-md border border-input bg-background/60 p-3 text-xs">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-muted-foreground">Selected file</span>
+        <span className="text-muted-foreground">{t('data.selectedFile')}</span>
         <span className="min-w-0 max-w-[70%] truncate text-right font-medium text-foreground">
-          {file?.name ?? 'None'}
+          {file?.name ?? t('data.selectedFileNone')}
         </span>
       </div>
 
@@ -2320,16 +2372,21 @@ function FileValidationSummary({
             <>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={validation?.valid ? 'success' : 'danger'}>
-                  {validation?.valid ? 'Valid' : 'Needs attention'}
+                  {validation?.valid ? t('data.valid') : t('data.needsAttention')}
                 </Badge>
                 <span className="text-muted-foreground">
-                  {validation?.fileSizeMb} MB | {validation?.previewRows} preview rows
+                  {t('data.fileSizePreview', {
+                    size: validation?.fileSizeMb ?? 0,
+                    rows: t('data.previewRows', {
+                      count: formatNumber(validation?.previewRows ?? 0),
+                    }),
+                  })}
                 </span>
               </div>
 
               {validation?.headers.length ? (
                 <p className="truncate text-muted-foreground">
-                  <strong className="text-fg">Headers:</strong>{' '}
+                  <strong className="text-fg">{t('data.headers')}:</strong>{' '}
                   {validation.headers.slice(0, headerLimit).join(', ')}
                 </p>
               ) : null}
@@ -2373,6 +2430,7 @@ function DatasetSourceCard({
     };
   };
 }) {
+  const { t, formatDate } = useI18n();
   const s = dataset.source;
   const isAuto = s.source === 'auto';
   const isManual = s.source === 'manual';
@@ -2380,15 +2438,15 @@ function DatasetSourceCard({
   // Primary line: device name (auto) OR "Manual upload" OR a fallback
   // for legacy rows where source attribution is unknown.
   const primary = isAuto
-    ? (s.deviceName ?? s.deviceSlug ?? 'IoT Hub device')
+    ? (s.deviceName ?? s.deviceSlug ?? t('data.iotHubDevice'))
     : isManual
-      ? 'Manual upload'
+      ? t('data.manualUpload')
       : `Dataset #${dataset.dinsight_id}`;
 
   // Secondary line: original filename + ingested time + internal ID.
   const secondaryParts: string[] = [];
   if (s.originalFileName) secondaryParts.push(s.originalFileName);
-  if (s.createdAt) secondaryParts.push(formatRelativeTime(s.createdAt));
+  if (s.createdAt) secondaryParts.push(formatRelativeTime(s.createdAt, t, formatDate));
   secondaryParts.push(`#${dataset.dinsight_id}`);
 
   return (
@@ -2400,7 +2458,7 @@ function DatasetSourceCard({
           {isAuto && s.iotHubName && (
             <div className="text-[10px] text-muted-foreground/80 truncate">
               IoT Hub: {s.iotHubName}
-              {s.iotHubDeviceId ? ` · device ID ${s.iotHubDeviceId}` : ''}
+              {s.iotHubDeviceId ? ` · ${t('data.deviceId')} ${s.iotHubDeviceId}` : ''}
             </div>
           )}
         </div>
@@ -2413,7 +2471,7 @@ function DatasetSourceCard({
                 : 'shrink-0 rounded-full bg-slate-500/15 text-slate-700 dark:text-slate-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide'
           }
         >
-          {isAuto ? 'Auto' : isManual ? 'Manual' : 'Unknown'}
+          {isAuto ? t('data.auto') : isManual ? t('common.manual') : t('data.unknown')}
         </span>
       </div>
     </div>
@@ -2423,16 +2481,20 @@ function DatasetSourceCard({
 // formatRelativeTime returns a compact human-friendly relative time
 // for the source-card secondary line. Falls back to the raw ISO
 // string when the input doesn't parse — the picker never throws.
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(
+  iso: string,
+  t: (key: string, values?: Record<string, string | number | boolean | null | undefined>) => string,
+  formatDate: (value: string | number | Date, options?: Intl.DateTimeFormatOptions) => string
+): string {
   const ms = Date.parse(iso);
   if (!Number.isFinite(ms)) return iso;
   const diff = Date.now() - ms;
   const minutes = Math.floor(diff / 60_000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes} min ago`;
+  if (minutes < 1) return t('health.justNow');
+  if (minutes < 60) return t('health.minutesAgo', { count: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} hr ago`;
+  if (hours < 24) return t('health.hoursAgo', { count: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} day${days === 1 ? '' : 's'} ago`;
-  return new Date(ms).toLocaleDateString();
+  if (days < 30) return t('health.daysAgo', { count: days });
+  return formatDate(ms);
 }
