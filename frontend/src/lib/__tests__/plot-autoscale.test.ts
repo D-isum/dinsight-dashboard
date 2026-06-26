@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   axisRangeRevisionPart,
   buildPaddedAxisRange,
+  expandAxisRange,
   plotRevisionFromParts,
 } from '@/lib/plot-autoscale';
 
@@ -34,6 +35,14 @@ describe('plot-autoscale', () => {
   it('creates stable revision parts for axis ranges', () => {
     expect(axisRangeRevisionPart(undefined)).toBe('auto');
     expect(axisRangeRevisionPart([0, 1])).toBe('0.0000000:1.0000000');
+  });
+
+  it('expands axis ranges around the current center', () => {
+    expect(expandAxisRange([-1, 1], { factor: 5 })).toEqual([-5, 5]);
+  });
+
+  it('honors a minimum expanded span for small coordinate clusters', () => {
+    expect(expandAxisRange([-0.5, 0.5], { factor: 5, minSpan: 10 })).toEqual([-5, 5]);
   });
 
   it('creates deterministic numeric chart revisions from key parts', () => {

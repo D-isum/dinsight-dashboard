@@ -39,6 +39,7 @@ import type { CoordinateSeries } from '@/lib/dataset-normalizers';
 import {
   axisRangeRevisionPart,
   buildPaddedAxisRange,
+  expandAxisRange,
   plotRevisionFromParts,
 } from '@/lib/plot-autoscale';
 import { alphaColor, usePlotTheme } from '@/lib/plot-theme';
@@ -148,6 +149,8 @@ const LIVE_MONITOR_PREFS_KEY = 'live-monitor:prefs:v1';
 const LIVE_MONITOR_DEVICE_ID_KEY = 'dinsight:live-monitor:device-id:v1';
 const LIVE_RECENT_WINDOW_POINTS = 500;
 const LIVE_IDLE_STATUS_REFRESH_MS = 15_000;
+const LIVE_OUTER_ZOOM_FACTOR = 5;
+const LIVE_OUTER_ZOOM_MIN_SPAN = 10;
 
 type RenderDensity = 'fast' | 'balanced' | 'detailed';
 
@@ -602,7 +605,7 @@ export default function LiveMonitorPage() {
   const liveChartZoomStorageKey = useMemo(
     () =>
       selectedId
-        ? `dinsight:chart-zoom:live:${user?.id ?? 'anon'}:${selectedId}:${monitorView}:${followLatest ? 'follow' : 'static'}`
+        ? `dinsight:chart-zoom:live:outer-v2:${user?.id ?? 'anon'}:${selectedId}:${monitorView}:${followLatest ? 'follow' : 'static'}`
         : undefined,
     [followLatest, monitorView, selectedId, user?.id]
   );
@@ -1746,14 +1749,22 @@ export default function LiveMonitorPage() {
           ...(anomalyResult?.anomalous_points?.map((point) => point.y) ?? []),
         ])
       : undefined;
-    const xZoomDefaults =
-      followLatest && focusedXAxisRange
-        ? { startValue: focusedXAxisRange[0], endValue: focusedXAxisRange[1] }
-        : {};
-    const yZoomDefaults =
-      followLatest && focusedYAxisRange
-        ? { startValue: focusedYAxisRange[0], endValue: focusedYAxisRange[1] }
-        : {};
+    const outerXAxisRange = expandAxisRange(xAxisRange, {
+      factor: LIVE_OUTER_ZOOM_FACTOR,
+      minSpan: LIVE_OUTER_ZOOM_MIN_SPAN,
+    });
+    const outerYAxisRange = expandAxisRange(yAxisRange, {
+      factor: LIVE_OUTER_ZOOM_FACTOR,
+      minSpan: LIVE_OUTER_ZOOM_MIN_SPAN,
+    });
+    const defaultXAxisView = followLatest && focusedXAxisRange ? focusedXAxisRange : xAxisRange;
+    const defaultYAxisView = followLatest && focusedYAxisRange ? focusedYAxisRange : yAxisRange;
+    const xZoomDefaults = defaultXAxisView
+      ? { startValue: defaultXAxisView[0], endValue: defaultXAxisView[1] }
+      : {};
+    const yZoomDefaults = defaultYAxisView
+      ? { startValue: defaultYAxisView[0], endValue: defaultYAxisView[1] }
+      : {};
 
     const option: EChartsOption = {
       animation: false,
@@ -1857,8 +1868,8 @@ export default function LiveMonitorPage() {
         name: t('live.dinsightXCoordinate'),
         nameLocation: 'middle',
         nameGap: 44,
-        min: xAxisRange?.[0],
-        max: xAxisRange?.[1],
+        min: outerXAxisRange?.[0] ?? xAxisRange?.[0],
+        max: outerXAxisRange?.[1] ?? xAxisRange?.[1],
         scale: true,
         axisLabel: { formatter: formatCoordinateAxisLabel },
         splitLine: { lineStyle: { color: alphaColor(plotTheme.chartGrid, 0.75) } },
@@ -1868,8 +1879,8 @@ export default function LiveMonitorPage() {
         name: t('live.dinsightYCoordinate'),
         nameLocation: 'middle',
         nameGap: 52,
-        min: yAxisRange?.[0],
-        max: yAxisRange?.[1],
+        min: outerYAxisRange?.[0] ?? yAxisRange?.[0],
+        max: outerYAxisRange?.[1] ?? yAxisRange?.[1],
         scale: true,
         axisLabel: { formatter: formatCoordinateAxisLabel },
         splitLine: { lineStyle: { color: alphaColor(plotTheme.chartGrid, 0.75) } },

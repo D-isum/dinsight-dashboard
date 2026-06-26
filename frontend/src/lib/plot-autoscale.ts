@@ -8,6 +8,11 @@ interface AxisRangeOptions {
   paddingRatio?: number;
 }
 
+interface AxisRangeExpansionOptions {
+  factor?: number;
+  minSpan?: number;
+}
+
 const DEFAULT_MIN_SPAN = 1;
 const DEFAULT_PADDING_RATIO = 0.08;
 
@@ -59,6 +64,27 @@ export function buildPaddedAxisRange(
 export function axisRangeRevisionPart(range: AxisRange | undefined): string {
   if (!range) return 'auto';
   return range.map((value) => value.toPrecision(8)).join(':');
+}
+
+export function expandAxisRange(
+  range: AxisRange | undefined,
+  options: AxisRangeExpansionOptions = {}
+): AxisRange | undefined {
+  if (!range) {
+    return undefined;
+  }
+
+  const [min, max] = range;
+  const span = max - min;
+  if (!Number.isFinite(span) || span <= 0) {
+    return range;
+  }
+
+  const factor = Math.max(1, options.factor ?? 1);
+  const targetSpan = Math.max(span * factor, options.minSpan ?? 0);
+  const center = (min + max) / 2;
+
+  return [center - targetSpan / 2, center + targetSpan / 2];
 }
 
 export function plotRevisionFromParts(parts: Array<string | number | null | undefined>): number {

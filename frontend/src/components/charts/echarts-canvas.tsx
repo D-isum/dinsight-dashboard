@@ -32,15 +32,7 @@ interface EChartsCanvasProps {
 
 type DataZoomSnapshot = Array<Record<string, unknown>>;
 
-const DATA_ZOOM_KEYS = [
-  'id',
-  'xAxisIndex',
-  'yAxisIndex',
-  'start',
-  'end',
-  'startValue',
-  'endValue',
-] as const;
+const DATA_ZOOM_ID_KEYS = ['id', 'xAxisIndex', 'yAxisIndex'] as const;
 
 function extractDataZoomSnapshot(chart: ECharts): DataZoomSnapshot | null {
   const option = chart.getOption() as { dataZoom?: Array<Record<string, unknown>> };
@@ -52,12 +44,28 @@ function extractDataZoomSnapshot(chart: ECharts): DataZoomSnapshot | null {
   const snapshot = dataZoom
     .map((zoom) => {
       const entry: Record<string, unknown> = {};
-      DATA_ZOOM_KEYS.forEach((key) => {
+      DATA_ZOOM_ID_KEYS.forEach((key) => {
         const value = zoom[key];
         if (value != null) {
           entry[key] = value;
         }
       });
+      const hasValueBounds = zoom.startValue != null || zoom.endValue != null;
+      if (hasValueBounds) {
+        if (zoom.startValue != null) {
+          entry.startValue = zoom.startValue;
+        }
+        if (zoom.endValue != null) {
+          entry.endValue = zoom.endValue;
+        }
+      } else {
+        if (zoom.start != null) {
+          entry.start = zoom.start;
+        }
+        if (zoom.end != null) {
+          entry.end = zoom.end;
+        }
+      }
       return entry;
     })
     .filter((entry) => Object.keys(entry).length > 0);
