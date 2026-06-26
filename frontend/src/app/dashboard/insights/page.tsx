@@ -1310,7 +1310,8 @@ export default function HealthInsightsPage() {
         return `<b>${item.seriesName}</b><br/>${t('insights.interval')}: ${value[3] ?? value[2]}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
       }
 
-      const pointCount = value[3] != null ? `<br/>${formatNumber(Number(value[3]))} ${t('common.points')}` : '';
+      const pointCount =
+        value[3] != null ? `<br/>${formatNumber(Number(value[3]))} ${t('common.points')}` : '';
       return `<b>${item.seriesName}</b><br/>${t('insights.interval')}: ${value[2] ?? formatAxisLabel(value[0])}${pointCount}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
     };
 
@@ -1786,7 +1787,14 @@ export default function HealthInsightsPage() {
       option,
       spikeCount: spikeTransitions.length,
     };
-  }, [plotTheme, shouldRenderWearPlots, transitionRows, wearResult?.metadata_column]);
+  }, [
+    formatNumber,
+    plotTheme,
+    shouldRenderWearPlots,
+    t,
+    transitionRows,
+    wearResult?.metadata_column,
+  ]);
 
   const latestMonitoringInterval = useMemo(() => {
     const monitoringIntervals = (wearResult?.intervals ?? [])
@@ -1976,8 +1984,8 @@ export default function HealthInsightsPage() {
       } else {
         logActivity({
           type: 'analysis',
-          title: 'Wear trend not ready',
-          description: 'Select a dataset, wear trend column, and healthy baseline intervals first.',
+          title: t('insights.wearTrendNotReady'),
+          description: t('insights.wearTrendNotReadyDescription'),
           datasetId: datasetId ?? undefined,
           href: '/dashboard/insights',
           status: 'warning',
@@ -1987,7 +1995,7 @@ export default function HealthInsightsPage() {
 
     window.addEventListener(DASHBOARD_COMMAND_EVENT, onCommand);
     return () => window.removeEventListener(DASHBOARD_COMMAND_EVENT, onCommand);
-  }, [applyWearTrendSelection, canRunWearTrend, datasetId, logActivity]);
+  }, [applyWearTrendSelection, canRunWearTrend, datasetId, logActivity, t]);
 
   return (
     <div className="space-y-5">
@@ -2273,7 +2281,9 @@ export default function HealthInsightsPage() {
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
                     <option value="adaptive">{t('insights.adaptiveBaselineSpread')}</option>
-                    <option value="statistical">{t('insights.baselineStatisticalPercentile')}</option>
+                    <option value="statistical">
+                      {t('insights.baselineStatisticalPercentile')}
+                    </option>
                     <option value="relative">{t('insights.relativeAboveBaselineMean')}</option>
                   </select>
                 </div>
@@ -2787,7 +2797,9 @@ export default function HealthInsightsPage() {
                                     <th className="pb-2 pr-4">{t('insights.interval')}</th>
                                     <th className="pb-2 pr-4">{t('data.type')}</th>
                                     <th className="pb-2 pr-4">{t('common.points')}</th>
-                                    <th className="pb-2 pr-4">{t('insights.distanceFromBaseline')}</th>
+                                    <th className="pb-2 pr-4">
+                                      {t('insights.distanceFromBaseline')}
+                                    </th>
                                     <th className="pb-2 pr-4">{t('insights.inBaselineCluster')}</th>
                                   </tr>
                                 </thead>
@@ -2863,9 +2875,7 @@ export default function HealthInsightsPage() {
                           )}
                         </button>
                         {showTransitionGuide && (
-                          <p className="mt-2">
-                            {t('insights.transitionGuide')}
-                          </p>
+                          <p className="mt-2">{t('insights.transitionGuide')}</p>
                         )}
                       </div>
 
@@ -2893,9 +2903,18 @@ export default function HealthInsightsPage() {
                           }
                           actions={
                             <>
-                              <ChartSwatch color={plotTheme.baseline} label={t('common.baseline')} />
-                              <ChartSwatch color={plotTheme.warning} label={t('insights.handoff')} />
-                              <ChartSwatch color={plotTheme.monitoring} label={t('common.monitoring')} />
+                              <ChartSwatch
+                                color={plotTheme.baseline}
+                                label={t('common.baseline')}
+                              />
+                              <ChartSwatch
+                                color={plotTheme.warning}
+                                label={t('insights.handoff')}
+                              />
+                              <ChartSwatch
+                                color={plotTheme.monitoring}
+                                label={t('common.monitoring')}
+                              />
                               <ChartSwatch color={plotTheme.danger} label={t('insights.spike')} />
                             </>
                           }

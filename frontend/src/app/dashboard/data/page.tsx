@@ -44,7 +44,10 @@ import {
   splitCombinedCsvFile,
 } from '@/lib/combined-csv-split';
 import { createDinsightPreviewPlot } from '@/lib/dinsight-preview-plot';
-import { formatDatasetOptionLabel, getDatasetSourceGroupKey } from '@/lib/dataset-source-groups';
+import {
+  formatDatasetOptionLabelLocalized,
+  getDatasetSourceGroupKey,
+} from '@/lib/dataset-source-groups';
 import { Actions } from '@/lib/permissions';
 import { usePlotTheme } from '@/lib/plot-theme';
 import {
@@ -98,6 +101,21 @@ function sortByCreatedAtDesc(
   if (Number.isFinite(at) && !Number.isFinite(bt)) return -1;
   if (!Number.isFinite(at) && Number.isFinite(bt)) return 1;
   return b.dinsight_id - a.dinsight_id;
+}
+
+function formatWorkflowStep(step: string, t: (key: string) => string) {
+  if (step === 'baseline') return t('data.baseline');
+  if (step === 'monitoring') return t('data.monitoring');
+  if (step === 'complete') return t('data.complete');
+  return step;
+}
+
+function formatWorkflowStatus(status: string, t: (key: string) => string) {
+  if (status === 'idle') return t('data.idle');
+  if (status === 'completed') return t('data.complete');
+  if (status === 'processing') return t('common.processing');
+  if (status === 'error') return t('common.failed');
+  return status;
 }
 
 export default function DataIngestionPage() {
@@ -699,7 +717,7 @@ export default function DataIngestionPage() {
       !combinedMonitoringStart ||
       !combinedMonitoringEnd
     ) {
-      setCombinedSplitError('Select a split column and complete all baseline/monitoring bounds.');
+      setCombinedSplitError(t('data.completeCombinedSplitBounds'));
       return;
     }
 
@@ -717,7 +735,7 @@ export default function DataIngestionPage() {
       });
       setCombinedSplitPreview(preview);
     } catch (error: any) {
-      setCombinedSplitError(error?.message || 'Unable to preview combined file split.');
+      setCombinedSplitError(error?.message || t('data.unablePreviewCombinedSplit'));
     } finally {
       setIsPreviewingSplit(false);
     }
@@ -736,7 +754,7 @@ export default function DataIngestionPage() {
     }
 
     if (!suggestedBaselineId) {
-      setManualBaselineError('Provide a valid baseline ID before uploading monitoring data.');
+      setManualBaselineError(t('data.provideValidBaselineId'));
       return;
     }
 
@@ -756,7 +774,7 @@ export default function DataIngestionPage() {
       !combinedMonitoringStart ||
       !combinedMonitoringEnd
     ) {
-      setCombinedSplitError('Select a split column and complete all baseline/monitoring bounds.');
+      setCombinedSplitError(t('data.completeCombinedSplitBounds'));
       return;
     }
 
@@ -774,7 +792,11 @@ export default function DataIngestionPage() {
         monitoringEnd: combinedMonitoringEnd,
       });
       setCombinedSplitSummary(
-        `Split ${split.totalRows.toLocaleString()} rows into ${split.baselineRows.toLocaleString()} baseline and ${split.monitoringRows.toLocaleString()} monitoring rows.`
+        t('data.splitRowsSummary', {
+          total: formatNumber(split.totalRows),
+          baseline: formatNumber(split.baselineRows),
+          monitoring: formatNumber(split.monitoringRows),
+        })
       );
       await uploadCombinedSplit(split.baselineFile, split.monitoringFile);
     } catch (error: any) {
@@ -902,36 +924,48 @@ export default function DataIngestionPage() {
   const processingDialogTitle =
     state.status === 'uploading'
       ? state.step === 'baseline'
-        ? 'Uploading baseline data'
-        : 'Uploading monitoring data'
+        ? t('data.uploadingBaselineData')
+        : t('data.uploadingMonitoringData')
       : state.status === 'processing'
         ? state.step === 'baseline'
-          ? 'Processing baseline data'
-          : 'Processing monitoring data'
+          ? t('data.processingBaselineData')
+          : t('data.processingMonitoringData')
         : state.status === 'completed'
           ? state.step === 'complete'
-            ? 'Monitoring processing complete'
-            : 'Baseline processing complete'
+            ? t('data.monitoringProcessingComplete')
+            : t('data.baselineProcessingComplete')
           : state.step === 'monitoring'
-            ? 'Monitoring processing failed'
-            : 'Baseline processing failed';
+            ? t('data.monitoringProcessingFailed')
+            : t('data.baselineProcessingFailed');
 
   const processingDialogDescription =
     state.status === 'completed'
       ? state.step === 'complete'
-        ? 'Monitoring data is ready. You can continue to live monitoring.'
-        : 'Baseline data is ready. Continue with monitoring upload.'
+        ? t('data.monitoringReadyLive')
+        : t('data.baselineReadyContinueMonitoring')
       : state.status === 'error'
-        ? 'Review the error details below and retry when ready.'
-        : 'Please wait while we process your files. This can take a few minutes for large datasets.';
+        ? t('data.reviewErrorRetry')
+        : t('data.processingMayTakeMinutes');
   const previewPlot = useMemo(
     () =>
       createDinsightPreviewPlot(previewBaselineData, previewMonitoringData, plotTheme, {
         datasetId: previewDatasetId,
         modeBar: true,
-        title: previewDatasetId ? `Dataset #${previewDatasetId}` : undefined,
+        title: previewDatasetId
+          ? t('dashboard.selectedDataset', { id: previewDatasetId })
+          : undefined,
+        labels: {
+          baseline: t('common.baseline'),
+          monitoring: t('common.monitoring'),
+          point: t('live.point'),
+          metadata: t('dashboard.metadata'),
+          moreFields: (count) => `+${formatNumber(count)} ${t('dashboard.metadata')}`,
+          xAxis: t('live.dinsightXCoordinate'),
+          yAxis: t('live.dinsightYCoordinate'),
+          formatNumber,
+        },
       }),
-    [plotTheme, previewBaselineData, previewDatasetId, previewMonitoringData]
+    [formatNumber, plotTheme, previewBaselineData, previewDatasetId, previewMonitoringData, t]
   );
   const inlinePreviewPlot = useMemo(
     () =>
@@ -939,8 +973,18 @@ export default function DataIngestionPage() {
         compact: true,
         datasetId: inlinePreviewDatasetId,
         modeBar: false,
+        labels: {
+          baseline: t('common.baseline'),
+          monitoring: t('common.monitoring'),
+          point: t('live.point'),
+          metadata: t('dashboard.metadata'),
+          moreFields: (count) => `+${formatNumber(count)} ${t('dashboard.metadata')}`,
+          xAxis: t('live.dinsightXCoordinate'),
+          yAxis: t('live.dinsightYCoordinate'),
+          formatNumber,
+        },
       }),
-    [inlineBaselineData, inlineMonitoringData, inlinePreviewDatasetId, plotTheme]
+    [formatNumber, inlineBaselineData, inlineMonitoringData, inlinePreviewDatasetId, plotTheme, t]
   );
 
   return (
@@ -1164,7 +1208,7 @@ export default function DataIngestionPage() {
                 <option value="">{t('data.selectSavedDataset')}</option>
                 {sourceFilteredDatasets.map((dataset) => (
                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                    {formatDatasetOptionLabel(dataset)}
+                    {formatDatasetOptionLabelLocalized(dataset, t)}
                   </option>
                 ))}
               </select>
@@ -1304,8 +1348,8 @@ export default function DataIngestionPage() {
           <MetricTile
             icon={<Upload className="h-4 w-4" />}
             label={t('data.uploadMode')}
-            value={state.step}
-            detail={state.statusMessage || state.status}
+            value={formatWorkflowStep(state.step, t)}
+            detail={state.statusMessage || formatWorkflowStatus(state.status, t)}
           />
           <MetricTile
             icon={<Database className="h-4 w-4" />}
@@ -1742,7 +1786,7 @@ export default function DataIngestionPage() {
                                 <option value="">{t('common.selectDataset')}</option>
                                 {filteredDatasets.map((dataset) => (
                                   <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                                    {formatDatasetOptionLabel(dataset)}
+                                    {formatDatasetOptionLabelLocalized(dataset, t)}
                                   </option>
                                 ))}
                               </select>

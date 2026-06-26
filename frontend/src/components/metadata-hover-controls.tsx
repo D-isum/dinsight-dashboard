@@ -3,6 +3,7 @@ import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ConfigDialog } from '@/components/ui/config-dialog';
+import { useI18n } from '@/i18n/client';
 
 interface MetadataHoverControlsProps {
   availableKeys: string[];
@@ -27,6 +28,7 @@ export function MetadataHoverControls({
   className,
   disabled = false,
 }: MetadataHoverControlsProps) {
+  const { t } = useI18n();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const hasSelection = metadataEnabled && selectedKeys.length > 0;
@@ -39,13 +41,11 @@ export function MetadataHoverControls({
     <div className={cn('space-y-3', className)}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-fg">Hover metadata</p>
-          <p className="text-xs text-fg-muted">
-            Choose which metadata fields appear when hovering over chart points.
-          </p>
+          <p className="text-sm font-medium text-fg">{t('live.hoverMetadata')}</p>
+          <p className="text-xs text-fg-muted">{t('live.hoverMetadataDescription')}</p>
         </div>
         <label className="mt-1 inline-flex items-center gap-2 text-xs text-fg-muted">
-          <span className="sr-only">Enable hover metadata</span>
+          <span className="sr-only">{t('live.enableHoverMetadata')}</span>
           <input
             id={toggleId}
             type="checkbox"
@@ -67,14 +67,16 @@ export function MetadataHoverControls({
               </Badge>
             ))}
             {remainingCount > 0 && (
-              <span className="text-xs text-fg-muted">+{remainingCount} more</span>
+              <span className="text-xs text-fg-muted">
+                {t('live.moreMetadataFields', { count: remainingCount })}
+              </span>
             )}
           </>
         ) : (
           <span id={`${toggleId}-status`} className="text-xs text-fg-muted">
             {hasMetadataAvailable
-              ? 'No metadata fields selected yet.'
-              : 'Metadata fields will appear once the dataset is loaded.'}
+              ? t('live.noMetadataFieldsSelected')
+              : t('live.metadataFieldsAfterLoad')}
           </span>
         )}
       </div>
@@ -86,14 +88,14 @@ export function MetadataHoverControls({
         onClick={() => setIsDialogOpen(true)}
         disabled={!hasMetadataAvailable || disabled}
       >
-        Configure fields
+        {t('live.configureFields')}
       </Button>
 
       <ConfigDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
-        title="Configure Hover Metadata"
-        description="Select which metadata columns should be included in chart hover tooltips."
+        title={t('live.configureHoverMetadata')}
+        description={t('live.configureHoverMetadataDescription')}
       >
         <div className="space-y-4">
           <div className="flex items-center gap-2">
@@ -103,10 +105,10 @@ export function MetadataHoverControls({
               onClick={onSelectAll}
               disabled={!hasMetadataAvailable}
             >
-              Select all
+              {t('common.selectAll')}
             </Button>
             <Button size="sm" variant="ghost" onClick={onClearAll}>
-              Clear
+              {t('common.clear')}
             </Button>
           </div>
 
@@ -136,14 +138,12 @@ export function MetadataHoverControls({
               })
             ) : (
               <div className="px-4 py-6 text-center text-sm text-fg-muted">
-                Metadata fields will become available once data is loaded.
+                {t('live.metadataFieldsAfterLoad')}
               </div>
             )}
           </div>
 
-          <div className="text-xs text-fg-muted">
-            Tip: Limit selected fields to the most relevant information to keep hover cards concise.
-          </div>
+          <div className="text-xs text-fg-muted">{t('live.hoverMetadataTip')}</div>
         </div>
       </ConfigDialog>
     </div>

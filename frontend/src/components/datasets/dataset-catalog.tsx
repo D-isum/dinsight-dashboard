@@ -322,7 +322,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       });
 
     return [...metadataRows, ...unregisteredRows];
-  }, [allDatasetsQuery.data, dinsightSummaries, listQuery.data, typeFilter]);
+  }, [allDatasetsQuery.data, dinsightSummaries, listQuery.data, t, typeFilter]);
 
   const filtered = useMemo(() => {
     let items = catalogItems.filter((item) => filteredDatasetIds.includes(item.dataset_id));
@@ -566,12 +566,17 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   <TableHead>{t('data.catalogRecords')}</TableHead>
                   <TableHead>{t('data.catalogRegistered')}</TableHead>
                   <TableHead className="w-20 text-right">{t('common.export')}</TableHead>
-                  {canDelete && <TableHead className="w-20 text-right">{t('common.delete')}</TableHead>}
+                  {canDelete && (
+                    <TableHead className="w-20 text-right">{t('common.delete')}</TableHead>
+                  )}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {listQuery.isLoading || isLoadingDatasets ? (
-                  <TableLoading message={t('data.loadingDatasetCatalog')} rowSpan={catalogColumnCount} />
+                  <TableLoading
+                    message={t('data.loadingDatasetCatalog')}
+                    rowSpan={catalogColumnCount}
+                  />
                 ) : filtered.length === 0 ? (
                   <TableEmpty
                     rowSpan={catalogColumnCount}
@@ -752,7 +757,10 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   description={t('data.fetchingPreviewCoordinates')}
                 />
               ) : previewBaselineError ? (
-                <ChartEmptyState title={t('data.previewUnavailable')} description={previewBaselineError} />
+                <ChartEmptyState
+                  title={t('data.previewUnavailable')}
+                  description={previewBaselineError}
+                />
               ) : previewPlot ? (
                 <div className="h-[280px]">
                   <EChartsCanvas
@@ -891,9 +899,7 @@ function DeleteImpactDialog({
             <AlertTriangle className="h-5 w-5" />
             {t('data.deleteDatasetQuestion', { id: datasetId ?? 'N/A' })}
           </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t('data.deleteDatasetExplanation')}
-          </AlertDialogDescription>
+          <AlertDialogDescription>{t('data.deleteDatasetExplanation')}</AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger-text">
@@ -1035,7 +1041,9 @@ function DetailDrawer({
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-canvas px-6 py-4">
           <div>
             <h2 className="text-lg font-semibold text-fg">{t('data.datasetDetails')}</h2>
-            <p className="text-xs text-fg-muted">{t('dashboard.selectedDataset', { id: datasetId })}</p>
+            <p className="text-xs text-fg-muted">
+              {t('dashboard.selectedDataset', { id: datasetId })}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
@@ -1101,9 +1109,7 @@ function DetailDrawer({
                 </div>
               ) : !metadataQuery.data ? (
                 <div className="space-y-3">
-                  <p className="text-sm text-fg-muted">
-                    {t('data.noMetadataRegistered')}
-                  </p>
+                  <p className="text-sm text-fg-muted">{t('data.noMetadataRegistered')}</p>
                   {onRegisterMetadata && (
                     <Button variant="outline" size="sm" onClick={onRegisterMetadata}>
                       <Plus className="mr-2 h-4 w-4" />
@@ -1124,9 +1130,7 @@ function DetailDrawer({
                 <GitBranch className="h-4 w-4" />
                 {t('data.lineage')}
               </CardTitle>
-              <CardDescription>
-                {t('data.lineageDescription')}
-              </CardDescription>
+              <CardDescription>{t('data.lineageDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {lineageQuery.isLoading ? (
@@ -1178,7 +1182,9 @@ function DetailDrawer({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-fg-muted">
-                          {row.records_processed != null ? formatNumber(row.records_processed) : '—'}
+                          {row.records_processed != null
+                            ? formatNumber(row.records_processed)
+                            : '—'}
                         </TableCell>
                         <TableCell className="text-sm text-fg-muted">
                           {formatDate(row.created_at, {
@@ -1232,7 +1238,8 @@ function DetailDrawer({
                       <TableRow key={row.id}>
                         <TableCell>
                           <div className="font-medium text-fg">
-                            {row.validation_rule?.name ?? `${t('data.rule')} #${row.validation_rule_id}`}
+                            {row.validation_rule?.name ??
+                              `${t('data.rule')} #${row.validation_rule_id}`}
                           </div>
                           {row.validation_rule?.rule_type && (
                             <div className="text-xs text-fg-muted">
@@ -1278,9 +1285,7 @@ function DetailDrawer({
                 <ShieldCheck className="h-4 w-4" />
                 {t('settings.validationRules')}
               </CardTitle>
-              <CardDescription>
-                {t('data.validationRulesDescription')}
-              </CardDescription>
+              <CardDescription>{t('data.validationRulesDescription')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ValidationRulesPanel datasetId={datasetId} />

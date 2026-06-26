@@ -84,7 +84,9 @@ export function PlatformDevicesSection() {
                     <>
                       {d.iot_hub_device_id}
                       {d.iot_hub_name && (
-                        <div className="text-[10px]">{t('admin.hub', { name: d.iot_hub_name })}</div>
+                        <div className="text-[10px]">
+                          {t('admin.hub', { name: d.iot_hub_name })}
+                        </div>
                       )}
                     </>
                   ) : (

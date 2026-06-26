@@ -141,7 +141,11 @@ function AccountSecurityView() {
         label: t('settings.operations'),
         description: t('settings.alertsAndValidation'),
         sections: [
-          { value: 'active-alerts' as const, label: t('settings.activeAlerts'), icon: AlertOctagon },
+          {
+            value: 'active-alerts' as const,
+            label: t('settings.activeAlerts'),
+            icon: AlertOctagon,
+          },
           { value: 'alert-rules' as const, label: t('settings.alertRules'), icon: ShieldAlert },
           { value: 'validation' as const, label: t('settings.validationRules'), icon: ShieldCheck },
         ],
@@ -333,9 +337,7 @@ function AccountSecurityView() {
             <UserCog className="h-6 w-6" />
             {t('settings.title')}
           </CardTitle>
-          <CardDescription>
-            {t('settings.description')}
-          </CardDescription>
+          <CardDescription>{t('settings.description')}</CardDescription>
         </CardHeader>
       </Card>
 
@@ -452,9 +454,7 @@ function AccountSecurityView() {
             </CardHeader>
             <CardContent className="space-y-4">
               {authProvider === 'oidc' ? (
-                <p className="text-sm text-fg-muted">
-                  {t('settings.ssoPasswordDisabled')}
-                </p>
+                <p className="text-sm text-fg-muted">{t('settings.ssoPasswordDisabled')}</p>
               ) : (
                 <>
                   <div className="space-y-2">
@@ -572,9 +572,7 @@ function AccountSecurityView() {
                 <Building2 className="h-5 w-5" />
                 {t('settings.organizationMemberships')}
               </CardTitle>
-              <CardDescription>
-                {t('settings.organizationMembershipsDescription')}
-              </CardDescription>
+              <CardDescription>{t('settings.organizationMembershipsDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {(user?.organizations ?? []).length === 0 ? (
@@ -632,9 +630,7 @@ function AccountSecurityView() {
                 <ScrollText className="h-5 w-5" />
                 {t('settings.license')}
               </CardTitle>
-              <CardDescription>
-                {t('settings.licenseDescription')}
-              </CardDescription>
+              <CardDescription>{t('settings.licenseDescription')}</CardDescription>
             </CardHeader>
             <CardContent>
               {licenseLoading ? (
@@ -643,9 +639,7 @@ function AccountSecurityView() {
                   {t('settings.loadingLicenseDetails')}
                 </div>
               ) : !licenseInfo ? (
-                <p className="text-sm text-fg-muted">
-                  {t('settings.licenseUnavailable')}
-                </p>
+                <p className="text-sm text-fg-muted">{t('settings.licenseUnavailable')}</p>
               ) : (
                 <div className="space-y-4">
                   {isDevLicenseExtensionActive && (
@@ -724,9 +718,11 @@ function AccountSecurityView() {
                             })
                           : '—'}{' '}
                         <span className="text-fg-muted">
-                          ({t('settings.daysFromNow', {
+                          (
+                          {t('settings.daysFromNow', {
                             days: formatNumber(licenseDisplayDaysUntilExpiry ?? 0),
-                          })})
+                          })}
+                          )
                         </span>
                       </p>
                       {isDevLicenseExtensionActive && licenseOriginalExpiresAt && (
@@ -734,9 +730,9 @@ function AccountSecurityView() {
                           {t('settings.originalExpiry', {
                             date: formatDate(licenseOriginalExpiresAt, {
                               dateStyle: undefined,
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
                             }),
                           })}
                         </p>
@@ -802,9 +798,7 @@ function AccountSecurityView() {
                 <Bell className="h-5 w-5" />
                 {t('settings.emailNotifications')}
               </CardTitle>
-              <CardDescription>
-                {t('settings.emailNotificationsDescription')}
-              </CardDescription>
+              <CardDescription>{t('settings.emailNotificationsDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <label className="flex items-center justify-between gap-3 rounded-md border border-strong p-3">
@@ -851,9 +845,7 @@ function AccountSecurityView() {
                 <AlertOctagon className="h-5 w-5" />
                 {t('settings.activeAlerts')}
               </CardTitle>
-              <CardDescription>
-                {t('settings.activeAlertsDescription')}
-              </CardDescription>
+              <CardDescription>{t('settings.activeAlertsDescription')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ActiveAlertsSection />
@@ -868,9 +860,7 @@ function AccountSecurityView() {
                 <ShieldAlert className="h-5 w-5" />
                 {t('settings.alertRules')}
               </CardTitle>
-              <CardDescription>
-                {t('settings.alertRulesDescription')}
-              </CardDescription>
+              <CardDescription>{t('settings.alertRulesDescription')}</CardDescription>
             </CardHeader>
             <CardContent>
               <AlertRulesSection />
@@ -901,9 +891,7 @@ function AccountSecurityView() {
                   <ClipboardList className="h-5 w-5" />
                   {t('settings.auditLog')}
                 </CardTitle>
-                <CardDescription>
-                  {t('settings.auditLogDescription')}
-                </CardDescription>
+                <CardDescription>{t('settings.auditLogDescription')}</CardDescription>
               </CardHeader>
               <CardContent>
                 <AuditLogSection />

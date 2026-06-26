@@ -180,7 +180,7 @@ export function createDinsightPreviewPlot(
     axisRangeRevisionPart(yAxisRange),
   ]);
   const formatAxisLabel = (value: number) =>
-      labels.formatNumber(Number(value), {
+    labels.formatNumber(Number(value), {
       maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
     });
   const option: EChartsOption = {

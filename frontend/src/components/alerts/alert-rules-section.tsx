@@ -33,6 +33,7 @@ import { RequirePermission, usePermission } from '@/components/auth/require-perm
 import { Actions } from '@/lib/permissions';
 import { api, type CreateAlertRuleRequest } from '@/lib/api-client';
 import { useAuth } from '@/context/auth-context';
+import { useI18n } from '@/i18n/client';
 
 // AlertRulesSection is the self-contained CRUD surface for alert rules.
 // Originally lived inline in /dashboard/alerts; extracted so it can be
@@ -53,12 +54,13 @@ interface AlertRuleItem {
 }
 
 const ALERT_TYPES = [
-  { value: 'anomaly', label: 'Anomaly detection' },
-  { value: 'threshold', label: 'Threshold exceeded' },
+  { value: 'anomaly', labelKey: 'settings.alertTypeAnomaly' },
+  { value: 'threshold', labelKey: 'settings.alertTypeThreshold' },
 ];
 
 export function AlertRulesSection() {
   const { currentOrg } = useAuth();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const canCreate = usePermission(Actions.AlertRuleCreate);
@@ -95,14 +97,11 @@ export function AlertRulesSection() {
   return (
     <div className="space-y-3">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-fg-muted">
-          Rules drive alert generation. Operators and admins can create or edit; only admins can
-          delete.
-        </p>
+        <p className="text-sm text-fg-muted">{t('settings.alertRulesIntro')}</p>
         {canCreate && (
           <Button onClick={() => setCreating(true)} size="sm">
             <Plus className="mr-2 h-4 w-4" />
-            New rule
+            {t('settings.newRule')}
           </Button>
         )}
       </div>
@@ -111,7 +110,7 @@ export function AlertRulesSection() {
         {isLoading ? (
           <Table>
             <TableBody>
-              <TableLoading message="Loading rules" />
+              <TableLoading message={t('settings.loadingRules')} />
             </TableBody>
           </Table>
         ) : rules.length === 0 ? (
@@ -119,9 +118,7 @@ export function AlertRulesSection() {
             <TableBody>
               <TableEmpty
                 message={
-                  canCreate
-                    ? 'No rules yet. Click "New rule" to create your first one.'
-                    : 'No alert rules configured for this organization.'
+                  canCreate ? t('settings.noRulesCanCreate') : t('settings.noAlertRulesConfigured')
                 }
               />
             </TableBody>
@@ -130,10 +127,10 @@ export function AlertRulesSection() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Threshold</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{t('settings.name')}</TableHead>
+                <TableHead>{t('settings.type')}</TableHead>
+                <TableHead>{t('settings.threshold')}</TableHead>
+                <TableHead className="text-right">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -142,13 +139,15 @@ export function AlertRulesSection() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-fg">{rule.name}</span>
-                      {!rule.is_active && <Badge variant="outline">Disabled</Badge>}
+                      {!rule.is_active && <Badge variant="outline">{t('settings.disabled')}</Badge>}
                     </div>
                     {rule.description && (
                       <div className="text-xs text-fg-muted">{rule.description}</div>
                     )}
                   </TableCell>
-                  <TableCell className="text-sm text-fg-muted">{rule.alert_type}</TableCell>
+                  <TableCell className="text-sm text-fg-muted">
+                    {formatAlertType(rule.alert_type, t)}
+                  </TableCell>
                   <TableCell className="text-sm text-fg-muted">{rule.anomaly_threshold}%</TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
@@ -157,7 +156,7 @@ export function AlertRulesSection() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setEditing(rule)}
-                          aria-label={`Edit ${rule.name}`}
+                          aria-label={t('settings.editRuleNamed', { name: rule.name })}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -167,7 +166,7 @@ export function AlertRulesSection() {
                           variant="ghost"
                           size="sm"
                           onClick={() => setDeleteTarget(rule)}
-                          aria-label={`Delete ${rule.name}`}
+                          aria-label={t('settings.deleteRuleNamed', { name: rule.name })}
                         >
                           <Trash2 className="h-4 w-4 text-danger" />
                         </Button>
@@ -200,14 +199,9 @@ export function AlertRulesSection() {
         <ConfirmationDialog
           open={deleteTarget !== null}
           onOpenChange={(open) => !open && setDeleteTarget(null)}
-          title="Delete alert rule?"
-          description={
-            <>
-              The rule <strong>{deleteTarget.name}</strong> will be removed permanently. Active
-              alerts already fired by this rule are not affected.
-            </>
-          }
-          confirmText="Delete rule"
+          title={t('settings.deleteAlertRuleQuestion')}
+          description={t('settings.deleteAlertRuleDescription', { name: deleteTarget.name })}
+          confirmText={t('settings.deleteRule')}
           variant="destructive"
           onConfirm={() => deleteMutation.mutate(deleteTarget.id)}
         />
@@ -261,6 +255,7 @@ function parseRecipients(raw?: Record<string, unknown>): string[] {
 }
 
 function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
+  const { t } = useI18n();
   const isEdit = rule !== null;
   const [name, setName] = useState(rule?.name ?? '');
   const [description, setDescription] = useState(rule?.description ?? '');
@@ -284,7 +279,7 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
     onError: (e: unknown) => {
       const message =
         (e as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-        'Failed to save rule. Check the inputs and retry.';
+        t('settings.failedSaveRule');
       setError(message);
     },
   });
@@ -309,17 +304,17 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
   const submit = () => {
     setError(null);
     if (!name.trim()) {
-      setError('Name is required.');
+      setError(t('settings.ruleNameRequired'));
       return;
     }
     if (threshold < 0.5 || threshold > 50) {
-      setError('Threshold must be between 0.5 and 50.');
+      setError(t('settings.thresholdRangeError'));
       return;
     }
     const sortedBands = [...severityBands].sort((a, b) => a.min_pct - b.min_pct);
     for (let i = 1; i < sortedBands.length; i++) {
       if (sortedBands[i].min_pct <= sortedBands[i - 1].min_pct) {
-        setError('Severity bands must have strictly ascending minimum percentages.');
+        setError(t('settings.severityBandsAscendingError'));
         return;
       }
     }
@@ -330,7 +325,7 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
       .filter((s) => s.length > 0);
     for (const r of recipients) {
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r)) {
-        setError(`"${r}" doesn't look like an email address.`);
+        setError(t('settings.invalidRecipientEmail', { email: r }));
         return;
       }
     }
@@ -349,59 +344,59 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
     <AlertDialog open onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{isEdit ? 'Edit alert rule' : 'New alert rule'}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {isEdit ? t('settings.editAlertRule') : t('settings.newAlertRule')}
+          </AlertDialogTitle>
           <AlertDialogDescription>
-            Rules fire alerts when a stored anomaly classification crosses the threshold. Pick
-            severity bands and email recipients per rule; per-user opt-outs may still suppress
-            individual deliveries.
+            {t('settings.alertRuleEditorDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {error && (
           <Alert variant="danger">
             <AlertOctagon className="h-4 w-4" />
-            <AlertTitle>Cannot save</AlertTitle>
+            <AlertTitle>{t('settings.cannotSave')}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="rule-name">Name</Label>
+            <Label htmlFor="rule-name">{t('settings.name')}</Label>
             <Input
               id="rule-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. High anomaly on Line 3 baseline"
+              placeholder={t('settings.ruleNamePlaceholder')}
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rule-description">Description (optional)</Label>
+            <Label htmlFor="rule-description">{t('settings.descriptionOptional')}</Label>
             <Input
               id="rule-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="What this rule catches and who should care"
+              placeholder={t('settings.ruleDescriptionPlaceholder')}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="rule-type">Type</Label>
+              <Label htmlFor="rule-type">{t('settings.type')}</Label>
               <select
                 id="rule-type"
                 value={alertType}
                 onChange={(e) => setAlertType(e.target.value)}
                 className="w-full rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
               >
-                {ALERT_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+                {ALERT_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {t(type.labelKey)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="rule-threshold">Threshold (anomaly %)</Label>
+              <Label htmlFor="rule-threshold">{t('settings.thresholdAnomalyPercent')}</Label>
               <Input
                 id="rule-threshold"
                 type="number"
@@ -423,32 +418,27 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
                 className="h-4 w-4 rounded border-strong text-accent focus:ring-focus"
               />
               <Label htmlFor="rule-active" className="cursor-pointer">
-                Rule is active
+                {t('settings.ruleIsActive')}
               </Label>
             </div>
           )}
 
           <div className="space-y-2 rounded-md border border-strong bg-surface-muted p-3">
             <div className="flex items-center justify-between">
-              <Label>Severity bands</Label>
+              <Label>{t('settings.severityBands')}</Label>
               <Button size="sm" variant="ghost" onClick={addBand}>
                 <Plus className="mr-1 h-3.5 w-3.5" />
-                Add band
+                {t('settings.addBand')}
               </Button>
             </div>
-            <p className="text-xs text-fg-muted">
-              An alert&apos;s severity is the band with the highest min % that the anomaly still
-              crosses. Bands must be in ascending order.
-            </p>
+            <p className="text-xs text-fg-muted">{t('settings.severityBandsHelp')}</p>
             <div className="space-y-2">
               {severityBands.length === 0 && (
-                <p className="text-xs italic text-fg-muted">
-                  No bands defined — every alert will fall through to the default severity.
-                </p>
+                <p className="text-xs italic text-fg-muted">{t('settings.noSeverityBands')}</p>
               )}
               {severityBands.map((band, idx) => (
                 <div key={idx} className="flex items-center gap-2">
-                  <span className="text-xs text-fg-muted">at ≥</span>
+                  <span className="text-xs text-fg-muted">{t('settings.atLeast')}</span>
                   <Input
                     type="number"
                     min={0}
@@ -457,27 +447,27 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
                     value={band.min_pct}
                     onChange={(e) => updateBand(idx, { min_pct: Number(e.target.value) })}
                     className="w-20"
-                    aria-label="Minimum anomaly percentage"
+                    aria-label={t('settings.minimumAnomalyPercentage')}
                   />
-                  <span className="text-xs text-fg-muted">%, severity</span>
+                  <span className="text-xs text-fg-muted">{t('settings.percentSeverity')}</span>
                   <select
                     value={band.severity}
                     onChange={(e) =>
                       updateBand(idx, { severity: e.target.value as SeverityBand['severity'] })
                     }
                     className="rounded-md border border-strong bg-surface px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
-                    aria-label="Severity"
+                    aria-label={t('settings.severity')}
                   >
-                    <option value="low">low</option>
-                    <option value="medium">medium</option>
-                    <option value="high">high</option>
-                    <option value="critical">critical</option>
+                    <option value="low">{t('settings.severityLow')}</option>
+                    <option value="medium">{t('settings.severityMedium')}</option>
+                    <option value="high">{t('settings.severityHigh')}</option>
+                    <option value="critical">{t('settings.severityCritical')}</option>
                   </select>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => removeBand(idx)}
-                    aria-label="Remove band"
+                    aria-label={t('settings.removeBand')}
                   >
                     <Trash2 className="h-3.5 w-3.5 text-danger" />
                   </Button>
@@ -487,7 +477,7 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="rule-recipients">Email recipients (comma-separated)</Label>
+            <Label htmlFor="rule-recipients">{t('settings.emailRecipients')}</Label>
             <textarea
               id="rule-recipients"
               value={recipientsRaw}
@@ -496,30 +486,27 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
               rows={2}
               className="block w-full rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             />
-            <p className="text-xs text-fg-muted">
-              Leave empty to store alert rows without sending email. Users with email notifications
-              disabled won&apos;t receive messages even when listed.
-            </p>
+            <p className="text-xs text-fg-muted">{t('settings.emailRecipientsHelp')}</p>
           </div>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={onClose}>{t('common.cancel')}</AlertDialogCancel>
           <AlertDialogAction disabled={mutation.isPending} onClick={submit}>
             {mutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving
+                {t('settings.saving')}
               </>
             ) : isEdit ? (
               <>
                 <CheckCircle2 className="mr-2 h-4 w-4" />
-                Save changes
+                {t('data.saveChanges')}
               </>
             ) : (
               <>
                 <Plus className="mr-2 h-4 w-4" />
-                Create rule
+                {t('settings.createRule')}
               </>
             )}
           </AlertDialogAction>
@@ -527,4 +514,10 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
       </AlertDialogContent>
     </AlertDialog>
   );
+}
+
+function formatAlertType(type: string, t: (key: string) => string) {
+  if (type === 'anomaly') return t('settings.alertTypeAnomaly');
+  if (type === 'threshold') return t('settings.alertTypeThreshold');
+  return type;
 }

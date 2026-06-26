@@ -20,7 +20,8 @@ import { api, type CreateDatasetMetadataRequest } from '@/lib/api-client';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select';
-import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
+import { formatDatasetOptionLabelLocalized } from '@/lib/dataset-source-groups';
+import { useI18n } from '@/i18n/client';
 
 // RegisterMetadataDialog lets an operator+admin attach metadata to a
 // dinsight_data row that doesn't have any yet. The catalog page lists
@@ -32,16 +33,16 @@ import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
 // the metadata listing the caller passes in.
 
 const DATASET_TYPES = [
-  { value: 'baseline', label: 'Baseline' },
-  { value: 'comparison', label: 'Comparison' },
-  { value: 'monitoring', label: 'Monitoring' },
+  { value: 'baseline', labelKey: 'data.datasetTypeBaseline' },
+  { value: 'comparison', labelKey: 'data.datasetTypeComparison' },
+  { value: 'monitoring', labelKey: 'data.datasetTypeMonitoring' },
 ];
 
 const PROCESSING_STAGES = [
-  { value: '', label: '— Not specified —' },
-  { value: 'raw', label: 'Raw' },
-  { value: 'preprocessed', label: 'Preprocessed' },
-  { value: 'transformed', label: 'Transformed' },
+  { value: '', labelKey: 'data.processingStageNotSpecified' },
+  { value: 'raw', labelKey: 'data.processingStageRaw' },
+  { value: 'preprocessed', labelKey: 'data.processingStagePreprocessed' },
+  { value: 'transformed', labelKey: 'data.processingStageTransformed' },
 ];
 
 export interface RegisterMetadataDialogProps {
@@ -59,6 +60,7 @@ export function RegisterMetadataDialog({
   initialDatasetId,
 }: RegisterMetadataDialogProps) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   const [datasetId, setDatasetId] = useState<number | null>(null);
   const [datasetType, setDatasetType] = useState('baseline');
@@ -101,10 +103,7 @@ export function RegisterMetadataDialog({
       handleClose();
     },
     onError: (e: any) => {
-      setError(
-        e?.response?.data?.message ||
-          'Failed to register metadata. The dataset may already have a metadata row.'
-      );
+      setError(e?.response?.data?.message || t('data.registerMetadataFailed'));
     },
   });
 
@@ -124,11 +123,11 @@ export function RegisterMetadataDialog({
   const submit = () => {
     setError(null);
     if (datasetId === null) {
-      setError('Pick a dataset to attach metadata to.');
+      setError(t('data.pickDatasetForMetadata'));
       return;
     }
     if (!name.trim()) {
-      setError('Name is required.');
+      setError(t('data.metadataNameRequired'));
       return;
     }
     const tags = tagsRaw
@@ -152,24 +151,23 @@ export function RegisterMetadataDialog({
     <AlertDialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : handleClose())}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Register dataset metadata</AlertDialogTitle>
+          <AlertDialogTitle>{t('data.registerDatasetMetadataTitle')}</AlertDialogTitle>
           <AlertDialogDescription>
-            Attaches a human-readable record to a dinsight dataset that doesn&apos;t have one yet.
-            Datasets without metadata don&apos;t appear in the catalog.
+            {t('data.registerDatasetMetadataDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {error && (
           <Alert variant="danger">
             <AlertOctagon className="h-4 w-4" />
-            <AlertTitle>Cannot register</AlertTitle>
+            <AlertTitle>{t('data.cannotRegisterMetadata')}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="reg-source">Device / source</Label>
+            <Label htmlFor="reg-source">{t('data.deviceSource')}</Label>
             <DatasetSourceSelect
               groups={datasetSourceGroups}
               selectedSourceKey={selectedSourceKey}
@@ -180,7 +178,7 @@ export function RegisterMetadataDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reg-dataset">Dataset</Label>
+            <Label htmlFor="reg-dataset">{t('data.dataset')}</Label>
             <select
               id="reg-dataset"
               value={datasetId ?? ''}
@@ -190,41 +188,38 @@ export function RegisterMetadataDialog({
             >
               <option value="">
                 {isLoading
-                  ? 'Loading datasets…'
+                  ? t('data.loadingDatasets')
                   : candidateDatasets.length === 0
-                    ? 'All datasets for this source already have metadata'
-                    : 'Pick a dataset…'}
+                    ? t('data.allSourceDatasetsHaveMetadata')
+                    : t('data.pickDataset')}
               </option>
               {candidateDatasets.map((dataset) => (
                 <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                  {formatDatasetOptionLabel(dataset)}
+                  {formatDatasetOptionLabelLocalized(dataset, t)}
                 </option>
               ))}
             </select>
-            <p className="text-xs text-fg-muted">
-              The list shows dinsight_data rows in your org that don&apos;t yet have a metadata
-              record.
-            </p>
+            <p className="text-xs text-fg-muted">{t('data.metadataSourceHelp')}</p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="reg-type">Dataset type</Label>
+              <Label htmlFor="reg-type">{t('data.datasetType')}</Label>
               <select
                 id="reg-type"
                 value={datasetType}
                 onChange={(e) => setDatasetType(e.target.value)}
                 className="w-full rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
               >
-                {DATASET_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
+                {DATASET_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>
+                    {t(type.labelKey)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reg-version">Version</Label>
+              <Label htmlFor="reg-version">{t('data.version')}</Label>
               <Input
                 id="reg-version"
                 value={version}
@@ -235,28 +230,28 @@ export function RegisterMetadataDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reg-name">Name</Label>
+            <Label htmlFor="reg-name">{t('data.name')}</Label>
             <Input
               id="reg-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Line 3 baseline, Q4 2025"
+              placeholder={t('data.metadataNamePlaceholder')}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reg-description">Description</Label>
+            <Label htmlFor="reg-description">{t('data.descriptionLabel')}</Label>
             <Input
               id="reg-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short note about what this dataset is for"
+              placeholder={t('data.metadataDescriptionPlaceholder')}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="reg-stage">Processing stage</Label>
+              <Label htmlFor="reg-stage">{t('data.processingStage')}</Label>
               <select
                 id="reg-stage"
                 value={processingStage}
@@ -265,24 +260,24 @@ export function RegisterMetadataDialog({
               >
                 {PROCESSING_STAGES.map((s) => (
                   <option key={s.value} value={s.value}>
-                    {s.label}
+                    {t(s.labelKey)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reg-frequency">Sampling frequency</Label>
+              <Label htmlFor="reg-frequency">{t('data.samplingFrequency')}</Label>
               <Input
                 id="reg-frequency"
                 value={samplingFrequency}
                 onChange={(e) => setSamplingFrequency(e.target.value)}
-                placeholder="1min / event-driven"
+                placeholder={t('data.samplingFrequencyPlaceholder')}
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="reg-tags">Tags (comma-separated)</Label>
+            <Label htmlFor="reg-tags">{t('data.tagsCommaSeparated')}</Label>
             <Input
               id="reg-tags"
               value={tagsRaw}
@@ -293,7 +288,7 @@ export function RegisterMetadataDialog({
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel onClick={handleClose}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel onClick={handleClose}>{t('common.cancel')}</AlertDialogCancel>
           <AlertDialogAction
             disabled={mutation.isPending || datasetId === null || !name.trim()}
             onClick={submit}
@@ -301,12 +296,12 @@ export function RegisterMetadataDialog({
             {mutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Registering
+                {t('data.registeringMetadata')}
               </>
             ) : (
               <>
                 <Plus className="mr-2 h-4 w-4" />
-                Register metadata
+                {t('data.registerMetadata')}
               </>
             )}
           </AlertDialogAction>

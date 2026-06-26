@@ -21,6 +21,7 @@ import {
   TableLoading,
   TableRow,
 } from '@/components/ui/table';
+import { useI18n } from '@/i18n/client';
 
 // AuditLogSection embeds the audit-log feed inside the Account &
 // Security tab. Was previously a standalone /dashboard/audit page; the
@@ -59,57 +60,58 @@ const PAGE_SIZE = 50;
 // English so a non-engineer reading the audit log understands that
 // "failure" is just "the request returned 4xx/5xx" — not a security
 // alert. The Status column carries the raw HTTP code.
-const OUTCOME_TOOLTIP =
-  'success = the request returned a 2xx/3xx status. failure = the request returned 4xx (client error: bad input, missing permission, resource not found) or 5xx (server error). Hover the badge for what the specific code means.';
-
 // Per-status hover hint for failure rows. Picks the most common reason
 // users actually see; non-listed codes fall back to the generic family.
-function failureHint(status?: number): string {
+function failureHint(
+  status: number | undefined,
+  t: (key: string, values?: Record<string, any>) => string
+): string {
   switch (status) {
     case 400:
-      return 'HTTP 400 — Bad Request. The payload was rejected by validation (missing field, invalid value, empty selection).';
+      return t('settings.auditHttp400');
     case 401:
-      return 'HTTP 401 — Unauthorized. Token expired or missing.';
+      return t('settings.auditHttp401');
     case 403:
-      return "HTTP 403 — Forbidden. Your role doesn't permit this action in this org.";
+      return t('settings.auditHttp403');
     case 404:
-      return "HTTP 404 — Not Found. The target resource doesn't exist or isn't visible in your org scope.";
+      return t('settings.auditHttp404');
     case 409:
-      return 'HTTP 409 — Conflict. Duplicate name, version mismatch, or concurrent edit.';
+      return t('settings.auditHttp409');
     case 422:
-      return "HTTP 422 — Unprocessable. Payload was well-formed but couldn't be acted on (semantic validation failed).";
+      return t('settings.auditHttp422');
     case 429:
-      return 'HTTP 429 — Too Many Requests. Rate limit hit; retry after a short backoff.';
+      return t('settings.auditHttp429');
     case 500:
-      return 'HTTP 500 — Server error. The BE crashed or hit an unexpected condition. Check server logs.';
+      return t('settings.auditHttp500');
     case 502:
     case 503:
     case 504:
-      return `HTTP ${status} — Upstream/availability error. A dependency was unreachable or slow.`;
+      return t('settings.auditHttpUpstream', { status });
     default:
-      if (status && status >= 500) return `HTTP ${status} — server-side failure.`;
-      if (status && status >= 400) return `HTTP ${status} — client-side rejection.`;
-      return 'Request failed. See Status column for the HTTP code.';
+      if (status && status >= 500) return t('settings.auditHttpServerFailure', { status });
+      if (status && status >= 400) return t('settings.auditHttpClientRejection', { status });
+      return t('settings.auditRequestFailed');
   }
 }
 
-const RESOURCE_TYPE_FILTERS: { value: string; label: string }[] = [
-  { value: '', label: 'All resources' },
-  { value: 'alert', label: 'Alerts' },
-  { value: 'alert_rule', label: 'Alert rules' },
-  { value: 'analysis', label: 'Analyses' },
-  { value: 'anomaly_classification', label: 'Anomaly classifications' },
-  { value: 'dataset', label: 'Datasets' },
-  { value: 'dataset_metadata', label: 'Dataset metadata' },
-  { value: 'data_lineage', label: 'Data lineage' },
-  { value: 'data_validation_rule', label: 'Validation rules' },
-  { value: 'data_validation_result', label: 'Validation results' },
-  { value: 'file_upload', label: 'File uploads' },
-  { value: 'config', label: 'Configuration' },
+const RESOURCE_TYPE_FILTERS: { value: string; labelKey: string }[] = [
+  { value: '', labelKey: 'settings.auditAllResources' },
+  { value: 'alert', labelKey: 'settings.auditAlerts' },
+  { value: 'alert_rule', labelKey: 'settings.alertRules' },
+  { value: 'analysis', labelKey: 'settings.auditAnalyses' },
+  { value: 'anomaly_classification', labelKey: 'settings.auditAnomalyClassifications' },
+  { value: 'dataset', labelKey: 'common.datasets' },
+  { value: 'dataset_metadata', labelKey: 'settings.auditDatasetMetadata' },
+  { value: 'data_lineage', labelKey: 'settings.auditDataLineage' },
+  { value: 'data_validation_rule', labelKey: 'settings.validationRules' },
+  { value: 'data_validation_result', labelKey: 'settings.auditValidationResults' },
+  { value: 'file_upload', labelKey: 'settings.auditFileUploads' },
+  { value: 'config', labelKey: 'data.configuration' },
 ];
 
 export function AuditLogSection() {
   const { currentOrg } = useAuth();
+  const { t, formatNumber, formatDate } = useI18n();
   const [page, setPage] = useState(0);
   const [resourceType, setResourceType] = useState('');
 
@@ -137,11 +139,8 @@ export function AuditLogSection() {
     return (
       <Alert variant="warning">
         <ShieldAlert aria-hidden="true" />
-        <AlertTitle>Admin access required</AlertTitle>
-        <AlertDescription>
-          The audit log is restricted to organization administrators. Ask an admin to grant you the
-          role if you need visibility.
-        </AlertDescription>
+        <AlertTitle>{t('settings.adminAccessRequired')}</AlertTitle>
+        <AlertDescription>{t('settings.auditAdminOnlyDescription')}</AlertDescription>
       </Alert>
     );
   }
@@ -151,20 +150,24 @@ export function AuditLogSection() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasPrev = page > 0;
   const hasNext = (page + 1) * PAGE_SIZE < total;
+  const selectedResourceLabel =
+    RESOURCE_TYPE_FILTERS.find((option) => option.value === resourceType)?.labelKey ?? '';
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="text-sm text-fg-muted">
-          Every change in {currentOrg?.name ?? 'this organization'}, ordered by recency. Showing{' '}
-          {items.length > 0 ? `${page * PAGE_SIZE + 1}–${page * PAGE_SIZE + items.length}` : '0'}
-          {' of '}
-          {total.toLocaleString()} entries
-          {resourceType ? ` for ${resourceType}` : ''}.
+          {t('settings.auditShowingSummary', {
+            org: currentOrg?.name ?? t('settings.thisOrganization'),
+            start: items.length > 0 ? page * PAGE_SIZE + 1 : 0,
+            end: items.length > 0 ? page * PAGE_SIZE + items.length : 0,
+            total: formatNumber(total),
+            resource: resourceType ? t(selectedResourceLabel) : t('settings.auditAllResources'),
+          })}
         </p>
         <div className="flex items-center gap-2">
           <label htmlFor="audit-resource-filter" className="text-sm text-fg-muted">
-            Resource
+            {t('settings.resource')}
           </label>
           <select
             id="audit-resource-filter"
@@ -174,7 +177,7 @@ export function AuditLogSection() {
           >
             {RESOURCE_TYPE_FILTERS.map((opt) => (
               <option key={opt.value} value={opt.value}>
-                {opt.label}
+                {t(opt.labelKey)}
               </option>
             ))}
           </select>
@@ -185,58 +188,54 @@ export function AuditLogSection() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>When</TableHead>
-              <TableHead>Who</TableHead>
-              <TableHead>Action</TableHead>
-              <TableHead>Resource</TableHead>
+              <TableHead>{t('data.when')}</TableHead>
+              <TableHead>{t('settings.who')}</TableHead>
+              <TableHead>{t('common.actions')}</TableHead>
+              <TableHead>{t('settings.resource')}</TableHead>
               <TableHead align="center">
                 <span className="inline-flex items-center gap-1">
-                  Outcome
+                  {t('settings.outcome')}
                   <span
-                    title={OUTCOME_TOOLTIP}
-                    aria-label={OUTCOME_TOOLTIP}
+                    title={t('settings.outcomeTooltip')}
+                    aria-label={t('settings.outcomeTooltip')}
                     className="cursor-help text-fg-muted"
                   >
                     <Info className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                 </span>
               </TableHead>
-              <TableHead align="right">Status</TableHead>
+              <TableHead align="right">{t('settings.status')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {auditQuery.isLoading ? (
-              <TableLoading message="Loading audit log…" rowSpan={6} />
+              <TableLoading message={t('settings.loadingAuditLog')} rowSpan={6} />
             ) : auditQuery.isError ? (
-              <TableError
-                message="Failed to load the audit log. Refresh the page to try again."
-                rowSpan={6}
-              />
+              <TableError message={t('settings.failedLoadAuditLog')} rowSpan={6} />
             ) : items.length === 0 ? (
-              <TableEmpty
-                message="No audit entries yet. Mutating actions (uploads, alert rules, deletes) will appear here."
-                rowSpan={6}
-              />
+              <TableEmpty message={t('settings.noAuditEntries')} rowSpan={6} />
             ) : (
               items.map((entry) => (
                 <TableRow
                   key={entry.id}
                   intent={entry.outcome === 'failure' ? 'danger' : undefined}
                 >
-                  <TableCell mono>{formatWhen(entry.occurred_at)}</TableCell>
-                  <TableCell>{whoLabel(entry)}</TableCell>
+                  <TableCell mono>{formatWhen(entry.occurred_at, formatDate)}</TableCell>
+                  <TableCell>{whoLabel(entry, t)}</TableCell>
                   <TableCell mono>{entry.action}</TableCell>
                   <TableCell>{resourceLabel(entry)}</TableCell>
                   <TableCell align="center">
                     <span
                       title={
                         entry.outcome === 'failure'
-                          ? failureHint(entry.response_status)
-                          : 'HTTP 2xx/3xx — request completed normally.'
+                          ? failureHint(entry.response_status, t)
+                          : t('settings.auditHttpSuccess')
                       }
                     >
                       <Badge variant={entry.outcome === 'success' ? 'success' : 'danger'}>
-                        {entry.outcome}
+                        {entry.outcome === 'success'
+                          ? t('settings.outcomeSuccess')
+                          : t('settings.outcomeFailure')}
                       </Badge>
                     </span>
                   </TableCell>
@@ -252,12 +251,10 @@ export function AuditLogSection() {
 
       {total > PAGE_SIZE && (
         <nav
-          aria-label="Audit pagination"
+          aria-label={t('settings.auditPagination')}
           className="flex items-center justify-between text-sm text-fg-muted"
         >
-          <span>
-            Page {page + 1} of {totalPages.toLocaleString()}
-          </span>
+          <span>{t('settings.pageOf', { page: page + 1, total: formatNumber(totalPages) })}</span>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -266,7 +263,7 @@ export function AuditLogSection() {
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-              Previous
+              {t('common.previous')}
             </Button>
             <Button
               variant="outline"
@@ -274,7 +271,7 @@ export function AuditLogSection() {
               disabled={!hasNext || auditQuery.isFetching}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {t('common.next')}
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
@@ -284,18 +281,22 @@ export function AuditLogSection() {
   );
 }
 
-function formatWhen(iso: string): string {
+function formatWhen(
+  iso: string,
+  formatDate: (value: string | number | Date, options?: Intl.DateTimeFormatOptions) => string
+): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  const date = d.toISOString().slice(0, 10);
-  const time = d.toISOString().slice(11, 19);
-  return `${date} ${time}`;
+  return formatDate(d, { dateStyle: 'short', timeStyle: 'medium' });
 }
 
-function whoLabel(entry: AuditEntry): string {
+function whoLabel(
+  entry: AuditEntry,
+  t: (key: string, values?: Record<string, any>) => string
+): string {
   if (entry.user_full_name) return entry.user_full_name;
   if (entry.user_email) return entry.user_email;
-  if (entry.user_id) return `User #${entry.user_id}`;
+  if (entry.user_id) return t('settings.userId', { id: entry.user_id });
   return '—';
 }
 

@@ -863,9 +863,7 @@ export default function DashboardPage() {
                         : t('common.notAvailable')}
                     </Badge>
                   </div>
-                  <p className="mt-2 max-w-3xl text-sm opacity-90">
-                    {machineRecommendation}
-                  </p>
+                  <p className="mt-2 max-w-3xl text-sm opacity-90">{machineRecommendation}</p>
                 </div>
                 <Button
                   variant="outline"

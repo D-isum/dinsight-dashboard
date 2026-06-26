@@ -19,6 +19,7 @@ import { DatasetSourceSelect } from '@/components/datasets/dataset-source-select
 import { api } from '@/lib/api-client';
 import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
+import { useI18n } from '@/i18n/client';
 
 // Backend's compatibility analysis result. Mirrors the fields populated
 // by handler.performCompatibilityAnalysis. Keep names in sync with
@@ -63,6 +64,7 @@ export function CompatibilityCheckDialog({
   onOpenChange,
   initialDatasetId,
 }: CompatibilityCheckDialogProps) {
+  const { t } = useI18n();
   const [datasetA, setDatasetA] = useState<number | null>(initialDatasetId ?? null);
   const [datasetB, setDatasetB] = useState<number | null>(null);
 
@@ -125,16 +127,15 @@ export function CompatibilityCheckDialog({
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <ShieldQuestion className="h-5 w-5" />
-            Check dataset compatibility
+            {t('data.checkDatasetCompatibility')}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            Pick two registered datasets and the backend will compare their dimensions, sampling,
-            and metadata to score how cleanly they can be combined.
+            {t('data.checkDatasetCompatibilityDescription')}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="space-y-2">
-          <Label htmlFor="compatibility-source">Device / source</Label>
+          <Label htmlFor="compatibility-source">{t('data.deviceSource')}</Label>
           <DatasetSourceSelect
             groups={datasetSourceGroups}
             selectedSourceKey={selectedSourceKey}
@@ -146,7 +147,7 @@ export function CompatibilityCheckDialog({
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="dataset-a">Dataset A</Label>
+            <Label htmlFor="dataset-a">{t('data.datasetA')}</Label>
             <DatasetPicker
               id="dataset-a"
               value={datasetA}
@@ -158,7 +159,7 @@ export function CompatibilityCheckDialog({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dataset-b">Dataset B</Label>
+            <Label htmlFor="dataset-b">{t('data.datasetB')}</Label>
             <DatasetPicker
               id="dataset-b"
               value={datasetB}
@@ -173,10 +174,10 @@ export function CompatibilityCheckDialog({
         {checkMutation.isError && (
           <Alert variant="danger">
             <AlertOctagon className="h-4 w-4" />
-            <AlertTitle>Compatibility check failed</AlertTitle>
+            <AlertTitle>{t('data.compatibilityCheckFailed')}</AlertTitle>
             <AlertDescription>
               {(checkMutation.error as any)?.response?.data?.message ||
-                'Unable to run the check. Both datasets must have metadata registered.'}
+                t('data.compatibilityCheckFailedDescription')}
             </AlertDescription>
           </Alert>
         )}
@@ -185,7 +186,7 @@ export function CompatibilityCheckDialog({
 
         <AlertDialogFooter className="gap-2 sm:gap-2">
           <Button variant="outline" onClick={() => handleOpenChange(false)}>
-            Close
+            {t('common.close')}
           </Button>
           <Button
             disabled={!canRun || checkMutation.isPending}
@@ -194,12 +195,12 @@ export function CompatibilityCheckDialog({
             {checkMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Checking
+                {t('data.checkingCompatibility')}
               </>
             ) : checkMutation.data ? (
-              'Run again'
+              t('data.runAgain')
             ) : (
-              'Check compatibility'
+              t('data.checkCompatibility')
             )}
           </Button>
         </AlertDialogFooter>
@@ -227,6 +228,8 @@ function DatasetPicker({
   disabled,
   excludeId,
 }: DatasetPickerProps) {
+  const { t } = useI18n();
+
   return (
     <select
       id={id}
@@ -235,12 +238,12 @@ function DatasetPicker({
       disabled={disabled || isLoading}
       className="w-full rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus disabled:opacity-60"
     >
-      <option value="">{isLoading ? 'Loading datasets…' : 'Select a dataset…'}</option>
+      <option value="">{isLoading ? t('data.loadingDatasets') : t('data.selectDataset')}</option>
       {datasets
         .filter((d) => d.dataset_id !== excludeId)
         .map((d) => (
           <option key={d.id} value={d.dataset_id}>
-            #{d.dataset_id} · {d.name} ({d.dataset_type})
+            #{d.dataset_id} · {d.name} ({formatDatasetType(d.dataset_type, t)})
           </option>
         ))}
     </select>
@@ -248,6 +251,7 @@ function DatasetPicker({
 }
 
 function ResultPanel({ result }: { result: CompatibilityResult }) {
+  const { t } = useI18n();
   const variant =
     result.overall_compatibility === 'compatible'
       ? 'success'
@@ -257,10 +261,10 @@ function ResultPanel({ result }: { result: CompatibilityResult }) {
 
   const label =
     result.overall_compatibility === 'compatible'
-      ? 'Compatible'
+      ? t('data.compatible')
       : result.overall_compatibility === 'incompatible'
-        ? 'Incompatible'
-        : 'Partially compatible';
+        ? t('data.incompatible')
+        : t('data.partiallyCompatible');
 
   return (
     <div className="space-y-3 rounded-lg border border-strong bg-surface p-4">
@@ -282,7 +286,9 @@ function ResultPanel({ result }: { result: CompatibilityResult }) {
 
       {result.compatibility_checks && result.compatibility_checks.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-wide text-fg-muted">Per-check breakdown</p>
+          <p className="text-xs uppercase tracking-wide text-fg-muted">
+            {t('data.perCheckBreakdown')}
+          </p>
           <ul className="space-y-1.5 text-sm">
             {result.compatibility_checks.map((check, idx) => (
               <li key={idx} className="flex items-start gap-2">
@@ -306,7 +312,17 @@ function ResultPanel({ result }: { result: CompatibilityResult }) {
 }
 
 function CheckStatusBadge({ status }: { status: string }) {
-  if (status === 'pass') return <Badge variant="default">Pass</Badge>;
-  if (status === 'fail') return <Badge variant="destructive">Fail</Badge>;
+  const { t } = useI18n();
+
+  if (status === 'pass') return <Badge variant="default">{t('data.passed')}</Badge>;
+  if (status === 'fail') return <Badge variant="destructive">{t('data.failed')}</Badge>;
+  if (status === 'warning') return <Badge variant="secondary">{t('common.warning')}</Badge>;
   return <Badge variant="secondary">{status}</Badge>;
+}
+
+function formatDatasetType(type: string, t: (key: string) => string) {
+  if (type === 'baseline') return t('data.datasetTypeBaseline');
+  if (type === 'comparison') return t('data.datasetTypeComparison');
+  if (type === 'monitoring') return t('data.datasetTypeMonitoring');
+  return type;
 }

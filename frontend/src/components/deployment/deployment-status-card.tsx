@@ -52,7 +52,8 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
             </div>
             {!compact && (
               <p className="truncate text-xs text-muted-foreground">
-                {t('license.api')}: <span className="font-medium text-fg">{runtime.apiBaseUrl}</span>
+                {t('license.api')}:{' '}
+                <span className="font-medium text-fg">{runtime.apiBaseUrl}</span>
               </p>
             )}
           </div>
@@ -93,7 +94,9 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
             </div>
             <div>
               {t('license.customer')}:{' '}
-              <span className="font-medium text-fg">{license?.customerId ?? t('common.unknown')}</span>
+              <span className="font-medium text-fg">
+                {license?.customerId ?? t('common.unknown')}
+              </span>
             </div>
           </div>
         )}

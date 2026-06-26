@@ -17,6 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { api, type CreateDatasetMetadataRequest } from '@/lib/api-client';
+import { useI18n } from '@/i18n/client';
 
 // EditMetadataDialog lets operators+admins curate the user-facing
 // metadata for a dataset that the ingestion pipeline registered. The
@@ -45,6 +46,7 @@ export interface EditMetadataDialogProps {
 
 export function EditMetadataDialog({ open, onOpenChange, meta, onSaved }: EditMetadataDialogProps) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const [name, setName] = useState(meta.name);
   const [description, setDescription] = useState(meta.description ?? '');
   const [processingStage, setProcessingStage] = useState(meta.processing_stage ?? '');
@@ -63,16 +65,14 @@ export function EditMetadataDialog({ open, onOpenChange, meta, onSaved }: EditMe
       onOpenChange(false);
     },
     onError: (e: any) => {
-      setError(
-        e?.response?.data?.message || 'Failed to save metadata. Check the inputs and retry.'
-      );
+      setError(e?.response?.data?.message || t('data.failedSaveMetadata'));
     },
   });
 
   const submit = () => {
     setError(null);
     if (!name.trim()) {
-      setError('Name is required.');
+      setError(t('data.metadataNameRequired'));
       return;
     }
     const tags = tagsRaw
@@ -99,58 +99,57 @@ export function EditMetadataDialog({ open, onOpenChange, meta, onSaved }: EditMe
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Edit dataset metadata</AlertDialogTitle>
+          <AlertDialogTitle>{t('data.editDatasetMetadataTitle')}</AlertDialogTitle>
           <AlertDialogDescription>
-            Updates the human-readable metadata for dataset #{meta.dataset_id}. Pipeline-set fields
-            (dataset type, parent, quality metrics) are not editable here.
+            {t('data.editDatasetMetadataDescription', { id: meta.dataset_id })}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         {error && (
           <Alert variant="danger">
             <AlertOctagon className="h-4 w-4" />
-            <AlertTitle>Cannot save</AlertTitle>
+            <AlertTitle>{t('data.cannotSaveMetadata')}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="meta-name">Name</Label>
+            <Label htmlFor="meta-name">{t('data.name')}</Label>
             <Input id="meta-name" value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="meta-description">Description</Label>
+            <Label htmlFor="meta-description">{t('data.descriptionLabel')}</Label>
             <Input
               id="meta-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short note about what this dataset is for"
+              placeholder={t('data.metadataDescriptionPlaceholder')}
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="meta-stage">Processing stage</Label>
+              <Label htmlFor="meta-stage">{t('data.processingStage')}</Label>
               <Input
                 id="meta-stage"
                 value={processingStage}
                 onChange={(e) => setProcessingStage(e.target.value)}
-                placeholder="raw / preprocessed / transformed"
+                placeholder={t('data.processingStagePlaceholder')}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="meta-frequency">Sampling frequency</Label>
+              <Label htmlFor="meta-frequency">{t('data.samplingFrequency')}</Label>
               <Input
                 id="meta-frequency"
                 value={samplingFrequency}
                 onChange={(e) => setSamplingFrequency(e.target.value)}
-                placeholder="1min / 1hour / event-driven"
+                placeholder={t('data.samplingFrequencyLongPlaceholder')}
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="meta-version">Version</Label>
+              <Label htmlFor="meta-version">{t('data.version')}</Label>
               <Input
                 id="meta-version"
                 value={version}
@@ -159,7 +158,7 @@ export function EditMetadataDialog({ open, onOpenChange, meta, onSaved }: EditMe
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="meta-tags">Tags (comma-separated)</Label>
+              <Label htmlFor="meta-tags">{t('data.tagsCommaSeparated')}</Label>
               <Input
                 id="meta-tags"
                 value={tagsRaw}
@@ -171,17 +170,17 @@ export function EditMetadataDialog({ open, onOpenChange, meta, onSaved }: EditMe
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
           <AlertDialogAction disabled={mutation.isPending} onClick={submit}>
             {mutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving
+                {t('settings.saving')}
               </>
             ) : (
               <>
                 <Save className="mr-2 h-4 w-4" />
-                Save changes
+                {t('data.saveChanges')}
               </>
             )}
           </AlertDialogAction>

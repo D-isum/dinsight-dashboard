@@ -209,11 +209,7 @@ function SessionsTable({ includeEnded }: { includeEnded: boolean }) {
         {query.isError && <TableError message={t('admin.failedLoadSessions')} rowSpan={7} />}
         {query.isSuccess && query.data.length === 0 && (
           <TableEmpty
-            message={
-              includeEnded
-                ? t('admin.noSupportSessions')
-                : t('admin.noActiveSessions')
-            }
+            message={includeEnded ? t('admin.noSupportSessions') : t('admin.noActiveSessions')}
             rowSpan={7}
           />
         )}

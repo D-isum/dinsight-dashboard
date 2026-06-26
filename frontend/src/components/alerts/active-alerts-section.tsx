@@ -31,6 +31,7 @@ import { usePermission } from '@/components/auth/require-permission';
 import { Actions } from '@/lib/permissions';
 import { api } from '@/lib/api-client';
 import { useAuth } from '@/context/auth-context';
+import { useI18n } from '@/i18n/client';
 
 // ActiveAlertsSection is the operational feed of alerts that fired
 // against this org's stored anomaly classifications. Was its own page
@@ -104,6 +105,7 @@ function ActiveAlertsTable({
   canResolve,
   onChanged,
 }: ActiveAlertsTableProps) {
+  const { t, formatDate } = useI18n();
   const [resolveTarget, setResolveTarget] = useState<AlertItem | null>(null);
   const [resolveMessage, setResolveMessage] = useState('');
 
@@ -140,7 +142,7 @@ function ActiveAlertsTable({
       <div className="rounded-md border border-border">
         <Table>
           <TableBody>
-            <TableLoading message="Loading alerts" />
+            <TableLoading message={t('settings.loadingAlerts')} />
           </TableBody>
         </Table>
       </div>
@@ -152,7 +154,7 @@ function ActiveAlertsTable({
       <div className="rounded-md border border-border">
         <Table>
           <TableBody>
-            <TableEmpty message="No active alerts in this organization." />
+            <TableEmpty message={t('settings.noActiveAlertsInOrg')} />
           </TableBody>
         </Table>
       </div>
@@ -165,11 +167,11 @@ function ActiveAlertsTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Severity</TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Fired</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{t('settings.severity')}</TableHead>
+              <TableHead>{t('settings.alertTitle')}</TableHead>
+              <TableHead>{t('settings.status')}</TableHead>
+              <TableHead>{t('settings.fired')}</TableHead>
+              <TableHead className="text-right">{t('common.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -186,7 +188,7 @@ function ActiveAlertsTable({
                   <StatusBadge status={alert.status} />
                 </TableCell>
                 <TableCell className="text-sm text-fg-muted">
-                  {new Date(alert.created_at).toLocaleString(undefined, {
+                  {formatDate(alert.created_at, {
                     dateStyle: 'short',
                     timeStyle: 'short',
                   })}
@@ -200,7 +202,7 @@ function ActiveAlertsTable({
                         disabled={ackMutation.isPending}
                         onClick={() => ackMutation.mutate({ id: alert.id })}
                       >
-                        Acknowledge
+                        {t('settings.acknowledge')}
                       </Button>
                     )}
                     {alert.status !== 'resolved' && canResolve && (
@@ -212,7 +214,7 @@ function ActiveAlertsTable({
                           setResolveMessage('');
                         }}
                       >
-                        Resolve
+                        {t('settings.resolve')}
                       </Button>
                     )}
                   </div>
@@ -229,23 +231,22 @@ function ActiveAlertsTable({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Resolve alert</AlertDialogTitle>
+            <AlertDialogTitle>{t('settings.resolveAlert')}</AlertDialogTitle>
             <AlertDialogDescription>
-              {resolveTarget?.title}. Add a short note about what was done — it&apos;s recorded in
-              the audit log.
+              {t('settings.resolveAlertDescription', { title: resolveTarget?.title ?? '' })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2">
-            <Label htmlFor="resolve-message">Resolution note</Label>
+            <Label htmlFor="resolve-message">{t('settings.resolutionNote')}</Label>
             <Input
               id="resolve-message"
-              placeholder="e.g. Fan bearing replaced; vibration returned to baseline."
+              placeholder={t('settings.resolutionNotePlaceholder')}
               value={resolveMessage}
               onChange={(e) => setResolveMessage(e.target.value)}
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               disabled={!resolveMessage.trim() || resolveMutation.isPending}
               onClick={() =>
@@ -259,10 +260,10 @@ function ActiveAlertsTable({
               {resolveMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Resolving
+                  {t('settings.resolving')}
                 </>
               ) : (
-                'Resolve alert'
+                t('settings.resolveAlert')
               )}
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -273,17 +274,34 @@ function ActiveAlertsTable({
 }
 
 function SeverityBadge({ severity }: { severity: string }) {
+  const { t } = useI18n();
   const variant =
     severity === 'critical' || severity === 'high'
       ? 'destructive'
       : severity === 'medium'
         ? 'default'
         : 'secondary';
-  return <Badge variant={variant as 'destructive' | 'default' | 'secondary'}>{severity}</Badge>;
+  return (
+    <Badge variant={variant as 'destructive' | 'default' | 'secondary'}>
+      {formatSeverityLabel(severity, t)}
+    </Badge>
+  );
 }
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === 'resolved') return <Badge variant="outline">Resolved</Badge>;
-  if (status === 'acknowledged') return <Badge variant="secondary">Acknowledged</Badge>;
-  return <Badge variant="default">Active</Badge>;
+  const { t } = useI18n();
+
+  if (status === 'resolved') return <Badge variant="outline">{t('settings.resolved')}</Badge>;
+  if (status === 'acknowledged') {
+    return <Badge variant="secondary">{t('settings.acknowledged')}</Badge>;
+  }
+  return <Badge variant="default">{t('settings.active')}</Badge>;
+}
+
+function formatSeverityLabel(severity: string, t: (key: string) => string) {
+  if (severity === 'low') return t('settings.severityLow');
+  if (severity === 'medium') return t('settings.severityMedium');
+  if (severity === 'high') return t('settings.severityHigh');
+  if (severity === 'critical') return t('settings.severityCritical');
+  return severity;
 }

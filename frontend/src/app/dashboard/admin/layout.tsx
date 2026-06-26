@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ShieldAlert, ChevronLeft } from 'lucide-react';
 import { usePlatformAdmin } from '@/components/auth/require-permission';
 import { useAuth } from '@/context/auth-context';
+import { useI18n } from '@/i18n/client';
 
 // /dashboard/admin layout — the vendor-staff "platform admin" surface
 // split out of the customer dashboard so the customer-facing UI never
@@ -22,6 +23,7 @@ import { useAuth } from '@/context/auth-context';
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { isLoading } = useAuth();
   const isPlatformAdmin = usePlatformAdmin();
+  const { t } = useI18n();
 
   if (isLoading) {
     return (
@@ -45,10 +47,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <ShieldAlert className="h-4 w-4 text-amber-700 dark:text-amber-400" />
             </div>
             <div className="flex flex-col leading-tight">
-              <span className="text-sm font-semibold text-fg">D'Insight Admin</span>
-              <span className="text-xs text-fg-muted">
-                Vendor-staff surface — managing customers, fleet, and support sessions
-              </span>
+              <span className="text-sm font-semibold text-fg">{t('admin.adminSurface')}</span>
+              <span className="text-xs text-fg-muted">{t('admin.adminSurfaceDescription')}</span>
             </div>
           </div>
           <Link
@@ -56,7 +56,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted hover:text-fg transition-colors"
           >
             <ChevronLeft className="h-3 w-3" />
-            Back to dashboard
+            {t('admin.backToDashboard')}
           </Link>
         </div>
       </div>
@@ -67,19 +67,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 }
 
 function NotAuthorized() {
+  const { t } = useI18n();
+
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center gap-3 px-4 text-center">
       <ShieldAlert className="h-10 w-10 text-muted-foreground" />
-      <h1 className="text-xl font-semibold">Not authorized</h1>
+      <h1 className="text-xl font-semibold">{t('admin.notAuthorized')}</h1>
       <p className="text-sm text-muted-foreground max-w-md">
-        This area is reserved for D'Insight platform administrators. If you reached this page by
-        mistake, return to your dashboard.
+        {t('admin.notAuthorizedDescription')}
       </p>
       <Link
         href="/dashboard"
         className="mt-2 inline-flex items-center gap-1 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-contrast hover:opacity-90"
       >
-        Back to dashboard
+        {t('admin.backToDashboard')}
       </Link>
     </div>
   );

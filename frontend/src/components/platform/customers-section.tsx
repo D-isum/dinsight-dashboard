@@ -282,12 +282,7 @@ function CustomersTable() {
         </TableHeader>
         <TableBody>
           {query.isLoading && <TableLoading message={t('admin.loadingCustomers')} rowSpan={7} />}
-          {query.isError && (
-            <TableError
-              message={t('admin.failedLoadCustomers')}
-              rowSpan={7}
-            />
-          )}
+          {query.isError && <TableError message={t('admin.failedLoadCustomers')} rowSpan={7} />}
           {query.isSuccess && query.data.length === 0 && (
             <TableEmpty message={t('admin.noCustomers')} rowSpan={7} />
           )}
@@ -327,11 +322,7 @@ function CustomersTable() {
                       size="sm"
                       className="gap-2 text-destructive hover:text-destructive"
                       disabled={isDefault || deleteMutation.isPending}
-                      title={
-                        isDefault
-                          ? t('admin.protectedDefaultOrg')
-                          : undefined
-                      }
+                      title={isDefault ? t('admin.protectedDefaultOrg') : undefined}
                       onClick={() => setPendingDelete(c)}
                     >
                       <Trash2 className="h-4 w-4" />

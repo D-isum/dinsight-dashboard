@@ -1304,12 +1304,7 @@ export default function LiveMonitorPage() {
       reasons: machineReasons,
       updatedAt: new Date().toISOString(),
     });
-  }, [
-    machineReasons,
-    machineRecommendation,
-    machineStatus.state,
-    setMachineHealthSnapshot,
-  ]);
+  }, [machineReasons, machineRecommendation, machineStatus.state, setMachineHealthSnapshot]);
 
   useEffect(() => {
     if (!streamingStatus || !selectedId) {
@@ -2569,9 +2564,7 @@ export default function LiveMonitorPage() {
                               : t('live.boundarySavedAsDrawn')
                           }`
                         : t('live.chartToolbarHint')}
-                      {showContours
-                        ? ` ${t('live.baselineDensityOverlay')}`
-                        : ''}
+                      {showContours ? ` ${t('live.baselineDensityOverlay')}` : ''}
                     </p>
                   </>
                 ) : (
@@ -2607,7 +2600,9 @@ export default function LiveMonitorPage() {
           <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             {autoRefresh
-              ? t('live.autoRefreshSeconds', { seconds: isStreaming ? refreshIntervalMs / 1000 : 10 })
+              ? t('live.autoRefreshSeconds', {
+                  seconds: isStreaming ? refreshIntervalMs / 1000 : 10,
+                })
               : t('live.manualRefresh')}
           </div>
         </CardContent>
