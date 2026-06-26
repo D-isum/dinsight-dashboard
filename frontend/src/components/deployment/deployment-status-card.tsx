@@ -4,8 +4,10 @@ import { AlertTriangle, CheckCircle2, Server, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useDeploymentStatus } from '@/hooks/useDeploymentStatus';
+import { useI18n } from '@/i18n/client';
 
 export function DeploymentStatusCard({ compact = false }: { compact?: boolean }) {
+  const { t, formatDate, formatNumber } = useI18n();
   const { runtime, license, isLoadingLicense, licenseError } = useDeploymentStatus();
   const signedExpiresAt = license?.originalExpiresAt ?? license?.expiresAt ?? null;
   const activeExpiresAt =
@@ -28,14 +30,14 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
     !devExtensionActive &&
     runtime.devLicenseExtensionDays != null;
   const statusLabel = isLoadingLicense
-    ? 'Checking license'
+    ? t('license.checking')
     : licenseError
-      ? 'License unavailable'
+      ? t('license.unavailable')
       : devExtensionActive && licenseValid
-        ? 'Dev extension active'
+        ? t('license.devExtensionStatus')
         : licenseValid
-          ? 'License valid'
-          : 'License attention';
+          ? t('license.valid')
+          : t('license.attention');
 
   return (
     <Card className="border-border/60">
@@ -50,7 +52,7 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
             </div>
             {!compact && (
               <p className="truncate text-xs text-muted-foreground">
-                API: <span className="font-medium text-fg">{runtime.apiBaseUrl}</span>
+                {t('license.api')}: <span className="font-medium text-fg">{runtime.apiBaseUrl}</span>
               </p>
             )}
           </div>
@@ -70,21 +72,28 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
         {!compact && (
           <div className="mt-3 grid gap-2 text-xs text-muted-foreground sm:grid-cols-3">
             <div>
-              Expires:{' '}
+              {t('license.expires')}:{' '}
               <span className="font-medium text-fg">
-                {activeExpiresAt ? new Date(activeExpiresAt).toLocaleDateString() : 'Unknown'}
+                {activeExpiresAt ? formatDate(activeExpiresAt) : t('common.unknown')}
               </span>
             </div>
             <div>
-              Devices:{' '}
+              {t('license.devices')}:{' '}
               <span className="font-medium text-fg">
-                {license?.registeredDevices ?? 'N/A'} /{' '}
-                {license?.maxDevices === -1 ? 'Unlimited' : (license?.maxDevices ?? 'N/A')}
+                {license?.registeredDevices != null
+                  ? formatNumber(license.registeredDevices)
+                  : t('common.notAvailable')}{' '}
+                /{' '}
+                {license?.maxDevices === -1
+                  ? t('license.unlimited')
+                  : license?.maxDevices != null
+                    ? formatNumber(license.maxDevices)
+                    : t('common.notAvailable')}
               </span>
             </div>
             <div>
-              Customer:{' '}
-              <span className="font-medium text-fg">{license?.customerId ?? 'Unknown'}</span>
+              {t('license.customer')}:{' '}
+              <span className="font-medium text-fg">{license?.customerId ?? t('common.unknown')}</span>
             </div>
           </div>
         )}
@@ -92,20 +101,20 @@ export function DeploymentStatusCard({ compact = false }: { compact?: boolean })
         {devExtensionActive ? (
           <div className="mt-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning-text">
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Development extension is active. Original expiry:{' '}
-            {license?.originalExpiresAt
-              ? new Date(license.originalExpiresAt).toLocaleDateString()
-              : 'unknown'}
-            ; effective access until{' '}
-            {activeExpiresAt ? new Date(activeExpiresAt).toLocaleDateString() : 'unknown'}. Disable
-            before production.
+            {t('license.activeExtensionWarning', {
+              originalDate: license?.originalExpiresAt
+                ? formatDate(license.originalExpiresAt)
+                : t('common.unknown'),
+              effectiveDate: activeExpiresAt ? formatDate(activeExpiresAt) : t('common.unknown'),
+            })}
           </div>
         ) : (
           showInactiveExtensionWarning && (
             <div className="mt-3 flex items-start gap-2 rounded-md border border-warning-border bg-warning-bg px-3 py-2 text-xs text-warning-text">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              Dev license extension advertised for {runtime.devLicenseExtensionDays} day(s), but the
-              API has not reported an active extension. Keep this disabled in production builds.
+              {t('license.inactiveExtensionWarning', {
+                days: formatNumber(runtime.devLicenseExtensionDays ?? 0),
+              })}
             </div>
           )
         )}

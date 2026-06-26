@@ -1,5 +1,7 @@
 import type { DinsightDatasetSummary } from '@/lib/dataset-normalizers';
 
+type Translate = (key: string, values?: Record<string, string | number | boolean | null>) => string;
+
 export interface DatasetSourceGroup {
   key: string;
   label: string;
@@ -124,18 +126,33 @@ export function resolveDatasetSourceGroupKey(
 }
 
 export function formatDatasetOptionLabel(dataset: DinsightDatasetSummary): string {
+  return formatDatasetOptionLabelLocalized(dataset);
+}
+
+export function formatDatasetSourceGroupLabel(group: DatasetSourceGroup, t: Translate): string {
+  if (group.source === 'manual' && group.key === 'manual') return t('dashboard.manualUploads');
+  if (group.source === 'unknown') return t('dashboard.unknownLegacySource');
+  return group.label;
+}
+
+export function formatDatasetOptionLabelLocalized(
+  dataset: DinsightDatasetSummary,
+  t?: Translate
+): string {
   const id = `#${dataset.dinsight_id}`;
   if (dataset.source.source === 'auto') {
     const device =
       dataset.source.deviceName ??
       dataset.source.deviceSlug ??
       dataset.source.iotHubDeviceId ??
+      t?.('common.dataset')?.toLowerCase() ??
       'device';
     const file = dataset.source.originalFileName?.split('/').pop() ?? '';
-    return file ? `${id} - ${device} - ${file} - Auto` : `${id} - ${device} - Auto`;
+    const autoLabel = t?.('data.auto') ?? 'Auto';
+    return file ? `${id} - ${device} - ${file} - ${autoLabel}` : `${id} - ${device} - ${autoLabel}`;
   }
   if (dataset.source.source === 'manual') {
-    return `${id} - Manual upload`;
+    return `${id} - ${t?.('data.manualUpload') ?? 'Manual upload'}`;
   }
   return `${id} - ${dataset.name}`;
 }

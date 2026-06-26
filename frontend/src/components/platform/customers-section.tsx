@@ -19,6 +19,7 @@ import {
   TableLoading,
   TableRow,
 } from '@/components/ui/table';
+import { useI18n } from '@/i18n/client';
 
 // CustomersSection renders the customer-org onboarding form + the
 // customers list table. One of four sibling sections inside
@@ -51,12 +52,13 @@ interface OnboardResponse {
 }
 
 export function CustomersSection() {
+  const { t } = useI18n();
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h2 className="text-lg font-semibold">Customer organizations</h2>
+        <h2 className="text-lg font-semibold">{t('admin.customerOrganizations')}</h2>
         <p className="text-sm text-muted-foreground">
-          Onboard a new customer and view the current customers on this D'Insight deployment.
+          {t('admin.customerOrganizationsDescription')}
         </p>
       </header>
 
@@ -69,6 +71,7 @@ export function CustomersSection() {
 // ---------- Onboard form ----------
 
 function OnboardCustomerForm() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -93,7 +96,7 @@ function OnboardCustomerForm() {
     },
     onError: (err: unknown) => {
       setOnboarded(null);
-      setError(extractApiError(err) ?? 'Failed to onboard customer.');
+      setError(extractApiError(err) ?? t('admin.failedOnboardCustomer'));
     },
   });
 
@@ -108,12 +111,8 @@ function OnboardCustomerForm() {
 
   return (
     <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-      <h3 className="text-sm font-semibold">Onboard a new customer</h3>
-      <p className="text-xs text-muted-foreground">
-        Creates the organization and issues an admin invitation in one step. The invitation
-        accept-URL is shown once after creation — share it with the new admin out-of-band (or wait
-        for the invitation email if SMTP is configured).
-      </p>
+      <h3 className="text-sm font-semibold">{t('admin.onboardNewCustomer')}</h3>
+      <p className="text-xs text-muted-foreground">{t('admin.onboardDescription')}</p>
       <form
         className="grid grid-cols-1 md:grid-cols-2 gap-3"
         onSubmit={(e) => {
@@ -124,7 +123,7 @@ function OnboardCustomerForm() {
       >
         <div>
           <label className="block text-xs font-medium mb-1" htmlFor="cust-name">
-            Customer name
+            {t('admin.customerName')}
           </label>
           <Input
             id="cust-name"
@@ -136,7 +135,7 @@ function OnboardCustomerForm() {
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" htmlFor="cust-slug">
-            Slug (URL + container-name)
+            {t('admin.slugContainer')}
           </label>
           <Input
             id="cust-slug"
@@ -145,12 +144,12 @@ function OnboardCustomerForm() {
             onChange={(e) => setSlug(e.target.value)}
             placeholder="acme-mfg"
             pattern="^[a-z][a-z0-9-]{1,30}$"
-            title="Lowercase letters, digits, hyphens. Must start with a letter. Max 31 chars."
+            title={t('admin.slugTitle')}
           />
         </div>
         <div className="md:col-span-2">
           <label className="block text-xs font-medium mb-1" htmlFor="cust-admin">
-            Customer admin email
+            {t('admin.customerAdminEmail')}
           </label>
           <Input
             id="cust-admin"
@@ -172,14 +171,14 @@ function OnboardCustomerForm() {
             ) : (
               <UserPlus className="h-4 w-4" />
             )}
-            {mutation.isPending ? 'Onboarding…' : 'Onboard customer'}
+            {mutation.isPending ? t('admin.onboarding') : t('admin.onboardCustomer')}
           </Button>
         </div>
       </form>
 
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Couldn&apos;t onboard customer</AlertTitle>
+          <AlertTitle>{t('admin.couldntOnboardCustomer')}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -196,17 +195,20 @@ function OnboardedReceipt({
   onboarded: OnboardResponse;
   onDismiss: () => void;
 }) {
+  const { t, formatDate } = useI18n();
   const [copied, setCopied] = useState(false);
   return (
     <Alert>
       <AlertTitle className="flex items-center gap-2">
         <Building2 className="h-4 w-4" />
-        {onboarded.org_name} onboarded
+        {t('admin.onboarded', { name: onboarded.org_name })}
       </AlertTitle>
       <AlertDescription className="space-y-2">
         <div className="text-sm">
-          Invitation issued to <span className="font-medium">{onboarded.admin_email}</span>. Expires{' '}
-          {new Date(onboarded.expires_at).toLocaleString()}.
+          {t('admin.invitationIssued', {
+            email: onboarded.admin_email,
+            date: formatDate(onboarded.expires_at, { dateStyle: 'medium', timeStyle: 'short' }),
+          })}
         </div>
         <div className="rounded border border-strong bg-surface-muted p-2 text-xs font-mono break-all">
           {onboarded.accept_url}
@@ -224,10 +226,10 @@ function OnboardedReceipt({
             }}
           >
             <Copy className="h-3 w-3" />
-            {copied ? 'Copied!' : 'Copy accept URL'}
+            {copied ? t('admin.copied') : t('admin.copyAcceptUrl')}
           </Button>
           <Button type="button" size="sm" variant="ghost" onClick={onDismiss}>
-            Dismiss
+            {t('admin.dismiss')}
           </Button>
         </div>
       </AlertDescription>
@@ -238,6 +240,7 @@ function OnboardedReceipt({
 // ---------- Customers table ----------
 
 function CustomersTable() {
+  const { t, formatDate: formatLocaleDate, formatNumber } = useI18n();
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: ['platform', 'organizations'],
@@ -253,40 +256,40 @@ function CustomersTable() {
       qc.invalidateQueries({ queryKey: ['platform', 'organizations'] });
       setPendingDelete(null);
     },
-    onError: (err) => setErrorMsg(extractApiError(err) ?? 'Failed to delete customer.'),
+    onError: (err) => setErrorMsg(extractApiError(err) ?? t('admin.actionBlocked')),
   });
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold">Current customers</h3>
+      <h3 className="text-sm font-semibold">{t('admin.currentCustomers')}</h3>
       {errorMsg && (
         <Alert variant="destructive">
-          <AlertTitle>Action blocked</AlertTitle>
+          <AlertTitle>{t('admin.actionBlocked')}</AlertTitle>
           <AlertDescription>{errorMsg}</AlertDescription>
         </Alert>
       )}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Slug</TableHead>
-            <TableHead>Members</TableHead>
-            <TableHead>Pending</TableHead>
-            <TableHead>Plan</TableHead>
-            <TableHead>Created</TableHead>
-            <TableHead aria-label="Actions" />
+            <TableHead>{t('admin.name')}</TableHead>
+            <TableHead>{t('admin.slug')}</TableHead>
+            <TableHead>{t('admin.members')}</TableHead>
+            <TableHead>{t('admin.pending')}</TableHead>
+            <TableHead>{t('admin.plan')}</TableHead>
+            <TableHead>{t('admin.created')}</TableHead>
+            <TableHead aria-label={t('common.actions')} />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {query.isLoading && <TableLoading message="Loading customers…" rowSpan={7} />}
+          {query.isLoading && <TableLoading message={t('admin.loadingCustomers')} rowSpan={7} />}
           {query.isError && (
             <TableError
-              message="Failed to load customers. Refresh the page to try again."
+              message={t('admin.failedLoadCustomers')}
               rowSpan={7}
             />
           )}
           {query.isSuccess && query.data.length === 0 && (
-            <TableEmpty message="No customers yet. Onboard one with the form above." rowSpan={7} />
+            <TableEmpty message={t('admin.noCustomers')} rowSpan={7} />
           )}
           {query.isSuccess &&
             query.data.map((c) => {
@@ -297,7 +300,7 @@ function CustomersTable() {
                     {c.name}
                     {isDefault && (
                       <Badge variant="outline" className="ml-2 gap-1">
-                        <ShieldAlert className="h-3 w-3" /> platform
+                        <ShieldAlert className="h-3 w-3" /> {t('admin.platform')}
                       </Badge>
                     )}
                   </TableCell>
@@ -305,17 +308,18 @@ function CustomersTable() {
                     {c.slug}
                   </TableCell>
                   <TableCell>
-                    <span className="font-medium">{c.total_members}</span>
+                    <span className="font-medium">{formatNumber(c.total_members)}</span>
                     <span className="text-xs text-muted-foreground ml-1">
-                      ({c.admin_count}a/{c.operator_count}o/{c.viewer_count}v)
+                      ({formatNumber(c.admin_count)}a/{formatNumber(c.operator_count)}o/
+                      {formatNumber(c.viewer_count)}v)
                     </span>
                   </TableCell>
-                  <TableCell>{c.pending_invite_count}</TableCell>
+                  <TableCell>{formatNumber(c.pending_invite_count)}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {c.plan} / {c.subscription_status}
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {formatDate(c.created_at)}
+                    {formatLocaleDate(c.created_at, { dateStyle: 'medium', timeStyle: 'short' })}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button
@@ -325,13 +329,13 @@ function CustomersTable() {
                       disabled={isDefault || deleteMutation.isPending}
                       title={
                         isDefault
-                          ? 'The default (platform-admin) organization is protected.'
+                          ? t('admin.protectedDefaultOrg')
                           : undefined
                       }
                       onClick={() => setPendingDelete(c)}
                     >
                       <Trash2 className="h-4 w-4" />
-                      Delete
+                      {t('common.delete')}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -363,21 +367,22 @@ function DeleteConfirmDialog({
   onConfirm: (purge: boolean) => void;
   onCancel: () => void;
 }) {
+  const { t, formatNumber } = useI18n();
   const [typed, setTyped] = useState('');
   const [purge, setPurge] = useState(false);
   const canConfirm = typed.trim() === customer.slug;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="max-w-lg w-full rounded-lg bg-surface border border-strong p-5 space-y-3">
-        <h4 className="text-lg font-semibold">Delete customer {customer.name}?</h4>
-        <p className="text-sm text-muted-foreground">
-          This permanently removes the organization, every tenant-scoped row that belongs to it
-          (file uploads, dinsight data, analyses, alerts, lineage, validation results — 13 tables in
-          all), every membership, and every invitation. Action runs in a single transaction; partial
-          failures roll back.
-        </p>
+        <h4 className="text-lg font-semibold">
+          {t('admin.deleteCustomerQuestion', { name: customer.name })}
+        </h4>
+        <p className="text-sm text-muted-foreground">{t('admin.deleteCustomerDescription')}</p>
         <div className="rounded border border-strong bg-surface-muted p-2 text-xs">
-          {customer.total_members} members · {customer.pending_invite_count} pending invites
+          {t('admin.memberInviteSummary', {
+            members: formatNumber(customer.total_members),
+            invites: formatNumber(customer.pending_invite_count),
+          })}
         </div>
         <label className="flex items-start gap-2 text-sm">
           <input
@@ -387,14 +392,13 @@ function DeleteConfirmDialog({
             onChange={(e) => setPurge(e.target.checked)}
           />
           <span>
-            <span className="font-medium">Also hard-delete orphaned user accounts</span> (users
-            whose only org was this one). Without this option, they&apos;re deactivated (login +
-            refresh blocked) but their account rows stay on disk for audit continuity.
+            <span className="font-medium">{t('admin.hardDeleteUsers')}</span>{' '}
+            {t('admin.hardDeleteUsersDescription')}
           </span>
         </label>
         <div>
           <label className="block text-xs font-medium mb-1" htmlFor="confirm-slug">
-            Type <code className="font-mono">{customer.slug}</code> to confirm:
+            {t('admin.typeSlugToConfirm', { slug: customer.slug })}
           </label>
           <Input
             id="confirm-slug"
@@ -405,7 +409,7 @@ function DeleteConfirmDialog({
         </div>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="ghost" onClick={onCancel} disabled={isPending}>
-            Cancel
+            {t('common.cancel')}
           </Button>
           <Button
             variant="destructive"
@@ -414,7 +418,7 @@ function DeleteConfirmDialog({
             className="gap-2"
           >
             {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            Delete {customer.slug}
+            {t('common.delete')} {customer.slug}
           </Button>
         </div>
       </div>
@@ -433,13 +437,6 @@ function slugify(s: string): string {
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '')
     .slice(0, 31);
-}
-
-function formatDate(iso: string): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
 }
 
 interface ApiErrorShape {

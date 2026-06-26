@@ -21,7 +21,10 @@ import {
   publishDashboardCommand,
   useDashboardWorkspace,
 } from '@/context/dashboard-workspace-context';
-import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
+import {
+  formatDatasetOptionLabelLocalized,
+  formatDatasetSourceGroupLabel,
+} from '@/lib/dataset-source-groups';
 import { mainNavItems } from '@/lib/nav-config';
 import { useI18n } from '@/i18n/client';
 
@@ -190,18 +193,20 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     const sourceDatasets = filteredDatasets.length ? filteredDatasets : datasets;
     const candidates = queryText
       ? datasets.filter((dataset) => {
-          const label = formatDatasetOptionLabel(dataset).toLowerCase();
+          const label = formatDatasetOptionLabelLocalized(dataset, t).toLowerCase();
           return label.includes(queryText) || String(dataset.dinsight_id).includes(queryText);
         })
       : [...sourceDatasets].reverse();
 
     return candidates.slice(0, 8);
-  }, [datasets, filteredDatasets, queryText]);
+  }, [datasets, filteredDatasets, queryText, t]);
 
   const sourceMatches = useMemo(() => {
     if (!queryText) return groups.slice(0, 6);
-    return groups.filter((group) => group.label.toLowerCase().includes(queryText)).slice(0, 6);
-  }, [groups, queryText]);
+    return groups
+      .filter((group) => formatDatasetSourceGroupLabel(group, t).toLowerCase().includes(queryText))
+      .slice(0, 6);
+  }, [groups, queryText, t]);
 
   const savedViewMatches = useMemo(() => {
     if (!queryText) return savedViews.slice(0, 5);
@@ -362,7 +367,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 key={group.key}
                 command={{
                   id: `source:${group.key}`,
-                  title: group.label,
+                  title: formatDatasetSourceGroupLabel(group, t),
                   description:
                     group.datasets.length === 1
                       ? t('command.oneDatasetInSource')
@@ -383,7 +388,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
                 key={dataset.dinsight_id}
                 command={{
                   id: `dataset:${dataset.dinsight_id}`,
-                  title: formatDatasetOptionLabel(dataset),
+                  title: formatDatasetOptionLabelLocalized(dataset, t),
                   description:
                     dataset.records != null
                       ? t('command.records', { count: formatNumber(dataset.records) })

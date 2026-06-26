@@ -629,6 +629,14 @@ export default function LiveMonitorPage() {
         : mode === 'lasso'
           ? t('live.latestShapeLasso')
           : t('live.latestShapeRectangle');
+  const selectionHelper = (mode: SelectionMode) =>
+    mode === 'circle'
+      ? t('live.helperCircle')
+      : mode === 'oval'
+        ? t('live.helperOval')
+        : mode === 'lasso'
+          ? t('live.helperLasso')
+          : t('live.helperRectangle');
   boundariesRef.current = boundaries;
 
   const {
@@ -1274,6 +1282,17 @@ export default function LiveMonitorPage() {
   }, [anomalyResult?.anomaly_percentage, manualClassification]);
 
   const machineStatus = useMachineHealthStatus({ anomalyPercentage, wearTrendScore: null });
+  const machineRecommendation = useMemo(
+    () => t(machineStatus.recommendationKey),
+    [machineStatus.recommendationKey, t]
+  );
+  const machineReasons = useMemo(
+    () =>
+      machineStatus.reasonsI18n.length > 0
+        ? machineStatus.reasonsI18n.map((reason) => t(reason.key, reason.values))
+        : [machineRecommendation],
+    [machineRecommendation, machineStatus.reasonsI18n, t]
+  );
 
   const baselineCount = baselineData?.dinsight_x.length ?? 0;
   const monitoringCount = effectiveMonitoringData?.dinsight_x.length ?? 0;
@@ -1281,13 +1300,13 @@ export default function LiveMonitorPage() {
   useEffect(() => {
     setMachineHealthSnapshot({
       state: machineStatus.state,
-      recommendation: machineStatus.recommendation,
-      reasons: machineStatus.reasons,
+      recommendation: machineRecommendation,
+      reasons: machineReasons,
       updatedAt: new Date().toISOString(),
     });
   }, [
-    machineStatus.reasons,
-    machineStatus.recommendation,
+    machineReasons,
+    machineRecommendation,
     machineStatus.state,
     setMachineHealthSnapshot,
   ]);
@@ -1410,14 +1429,14 @@ export default function LiveMonitorPage() {
     const tooltipFormatter = (params: any) => {
       const value = params?.data?.value ?? params?.data;
       if (!Array.isArray(value)) {
-        return `<b>${params?.seriesName ?? 'Point'}</b>`;
+        return `<b>${params?.seriesName ?? t('live.point')}</b>`;
       }
 
       const metadata = value[3] ? `<br/>${value[3]}` : '';
       return `<b>${params.seriesName}</b><br/>X: ${Number(value[0]).toFixed(4)}<br/>Y: ${Number(value[1]).toFixed(4)}${metadata}`;
     };
     const formatCoordinateAxisLabel = (value: number) =>
-      Number(value).toLocaleString(undefined, {
+      formatNumber(Number(value), {
         maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
       });
     const scatterPerformanceOptions = hasActiveMetadata
@@ -1432,7 +1451,7 @@ export default function LiveMonitorPage() {
         const densitySeriesIndex = series.length;
         series.push({
           type: 'scatter',
-          name: 'Baseline density',
+          name: t('live.baselineDensity'),
           data: density.data,
           symbol: 'rect',
           symbolSize: 11,
@@ -1460,9 +1479,15 @@ export default function LiveMonitorPage() {
 
     series.push({
       type: 'scatter',
-      name: 'Baseline',
+      name: t('common.baseline'),
       data: baselineData.dinsight_x.map((x, index) =>
-        toSeriesPoint(x, baselineData.dinsight_y[index], index, baselineHover[index], 'Baseline')
+        toSeriesPoint(
+          x,
+          baselineData.dinsight_y[index],
+          index,
+          baselineHover[index],
+          t('common.baseline')
+        )
       ),
       symbolSize: pointSize,
       ...scatterPerformanceOptions,
@@ -1497,8 +1522,8 @@ export default function LiveMonitorPage() {
         if (visibleNormalIndices.length > 0) {
           series.push({
             type: 'scatter',
-            name: `Normal (${visibleNormalIndices.length.toLocaleString()})`,
-            data: visibleNormalIndices.map((index) => pointForIndex(index, 'Normal')),
+            name: `${t('common.normal')} (${formatNumber(visibleNormalIndices.length)})`,
+            data: visibleNormalIndices.map((index) => pointForIndex(index, t('common.normal'))),
             symbolSize: pointSize + 1,
             ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.normal, 0.86) },
@@ -1507,8 +1532,8 @@ export default function LiveMonitorPage() {
         if (visibleAnomalyIndices.length > 0) {
           series.push({
             type: 'scatter',
-            name: `Anomaly (${visibleAnomalyIndices.length.toLocaleString()})`,
-            data: visibleAnomalyIndices.map((index) => pointForIndex(index, 'Anomaly')),
+            name: `${t('common.anomaly')} (${formatNumber(visibleAnomalyIndices.length)})`,
+            data: visibleAnomalyIndices.map((index) => pointForIndex(index, t('common.anomaly'))),
             symbolSize: pointSize + 2,
             ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.anomaly, 0.92) },
@@ -1517,8 +1542,8 @@ export default function LiveMonitorPage() {
         if (normalLatest.length > 0) {
           series.push({
             type: 'scatter',
-            name: `Normal latest (${normalLatest.length})`,
-            data: normalLatest.map((index) => pointForIndex(index, 'Normal latest')),
+            name: `${t('live.normalLatest')} (${formatNumber(normalLatest.length)})`,
+            data: normalLatest.map((index) => pointForIndex(index, t('live.normalLatest'))),
             symbolSize: pointSize + 6,
             itemStyle: {
               color: plotTheme.normal,
@@ -1531,8 +1556,8 @@ export default function LiveMonitorPage() {
         if (anomalyLatest.length > 0) {
           series.push({
             type: 'scatter',
-            name: `Anomaly latest (${anomalyLatest.length})`,
-            data: anomalyLatest.map((index) => pointForIndex(index, 'Anomaly latest')),
+            name: `${t('live.anomalyLatest')} (${formatNumber(anomalyLatest.length)})`,
+            data: anomalyLatest.map((index) => pointForIndex(index, t('live.anomalyLatest'))),
             symbolSize: pointSize + 7,
             itemStyle: {
               color: plotTheme.anomaly,
@@ -1553,8 +1578,8 @@ export default function LiveMonitorPage() {
         if (normal.length > 0) {
           series.push({
             type: 'scatter',
-            name: 'Monitoring (normal)',
-            data: normal.map((point) => pointForIndex(point.index, 'Monitoring normal')),
+            name: t('live.monitoringNormal'),
+            data: normal.map((point) => pointForIndex(point.index, t('live.monitoringNormal'))),
             symbolSize: pointSize,
             ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.normal, 0.78) },
@@ -1563,8 +1588,8 @@ export default function LiveMonitorPage() {
         if (anomalies.length > 0) {
           series.push({
             type: 'scatter',
-            name: 'Monitoring (anomaly)',
-            data: anomalies.map((point) => pointForIndex(point.index, 'Monitoring anomaly')),
+            name: t('live.monitoringAnomaly'),
+            data: anomalies.map((point) => pointForIndex(point.index, t('live.monitoringAnomaly'))),
             symbolSize: pointSize + 2,
             ...scatterPerformanceOptions,
             itemStyle: { color: alphaColor(plotTheme.anomaly, 0.95) },
@@ -1590,8 +1615,8 @@ export default function LiveMonitorPage() {
         if (regularIndices.length > 0) {
           series.push({
             type: 'scatter',
-            name: 'Monitoring',
-            data: regularIndices.map((index) => pointForIndex(index, 'Monitoring')),
+            name: t('common.monitoring'),
+            data: regularIndices.map((index) => pointForIndex(index, t('common.monitoring'))),
             symbolSize: pointSize,
             ...scatterPerformanceOptions,
             itemStyle: {
@@ -1603,7 +1628,7 @@ export default function LiveMonitorPage() {
         if (showTrajectoryLine && trajectoryLine.length > 1) {
           series.push({
             type: 'line',
-            name: 'Trajectory',
+            name: t('live.trajectory'),
             data: trajectoryLine.map((index) => [
               effectiveMonitoringData.dinsight_x[index],
               effectiveMonitoringData.dinsight_y[index],
@@ -1618,11 +1643,11 @@ export default function LiveMonitorPage() {
         if (trailOnly.length > 0) {
           series.push({
             type: 'scatter',
-            name: `Trail (${trailOnly.length})`,
+            name: `${t('live.trail')} (${formatNumber(trailOnly.length)})`,
             data: trailOnly.map((index, position) => {
               const opacity =
                 trailOnly.length === 1 ? 0.7 : 0.32 + (position / (trailOnly.length - 1)) * 0.48;
-              return pointForIndex(index, 'Trail', {
+              return pointForIndex(index, t('live.trail'), {
                 color: alphaColor(plotTheme.trailMid, opacity),
                 borderColor: alphaColor(plotTheme.trailLatest, 0.45),
                 borderWidth: 0.5,
@@ -1636,8 +1661,8 @@ export default function LiveMonitorPage() {
         if (latestOnly.length > 0) {
           series.push({
             type: 'scatter',
-            name: `Latest (${latestOnly.length})`,
-            data: latestOnly.map((index) => pointForIndex(index, 'Latest')),
+            name: `${t('common.latest')} (${formatNumber(latestOnly.length)})`,
+            data: latestOnly.map((index) => pointForIndex(index, t('common.latest'))),
             symbolSize: pointSize + 7,
             itemStyle: {
               color: plotTheme.latest,
@@ -1657,7 +1682,7 @@ export default function LiveMonitorPage() {
       }
       series.push({
         type: 'line',
-        name: `Normal area ${index + 1}`,
+        name: t('live.normalAreaLabel', { index: index + 1 }),
         data: lineData,
         showSymbol: false,
         silent: true,
@@ -1728,10 +1753,10 @@ export default function LiveMonitorPage() {
                 brush: {
                   type: [activeBrushType, 'keep', 'clear'],
                   title: {
-                    rect: 'Draw normal area',
-                    polygon: 'Draw lasso normal area',
-                    keep: 'Keep previous areas',
-                    clear: 'Clear chart brush',
+                    rect: t('live.drawNormalArea'),
+                    polygon: t('live.drawLassoNormalArea'),
+                    keep: t('live.keepPreviousAreas'),
+                    clear: t('live.clearChartBrush'),
                   },
                 },
               }
@@ -1764,7 +1789,7 @@ export default function LiveMonitorPage() {
       ],
       xAxis: {
         type: 'value',
-        name: "D'insight X Coordinate",
+        name: t('live.dinsightXCoordinate'),
         nameLocation: 'middle',
         nameGap: 44,
         min: xAxisRange?.[0],
@@ -1775,7 +1800,7 @@ export default function LiveMonitorPage() {
       },
       yAxis: {
         type: 'value',
-        name: "D'insight Y Coordinate",
+        name: t('live.dinsightYCoordinate'),
         nameLocation: 'middle',
         nameGap: 52,
         min: yAxisRange?.[0],
@@ -1797,6 +1822,7 @@ export default function LiveMonitorPage() {
     effectiveMonitoringData,
     enableMultipleSelections,
     followLatest,
+    formatNumber,
     hasActiveMetadata,
     latestGlowCount,
     latestIndices,
@@ -1807,6 +1833,7 @@ export default function LiveMonitorPage() {
     pointSize,
     showContours,
     showTrajectoryLine,
+    t,
     trailIndices,
     trailPoints,
   ]);
@@ -1969,7 +1996,7 @@ export default function LiveMonitorPage() {
                     <p className="mt-1 text-2xl font-bold leading-none">
                       {healthStateText(machineStatus.state)}
                     </p>
-                    <p className="mt-2 text-xs">{machineStatus.recommendation}</p>
+                    <p className="mt-2 text-xs">{machineRecommendation}</p>
                   </div>
                   <Badge variant={statusLabel === 'streaming' ? 'success' : 'outline'}>
                     {statusText(statusLabel)}
@@ -1994,7 +2021,7 @@ export default function LiveMonitorPage() {
                 <div className="mt-3 rounded-md border border-current/20 bg-white/25 p-2 dark:bg-black/10">
                   <p className="text-xs font-semibold uppercase">{t('live.why')}</p>
                   <ul className="mt-1 space-y-1 text-xs">
-                    {machineStatus.reasons.map((reason) => (
+                    {machineReasons.map((reason) => (
                       <li key={reason}>{reason}</li>
                     ))}
                   </ul>
@@ -2297,7 +2324,7 @@ export default function LiveMonitorPage() {
                           variant={selectionMode === mode ? 'default' : 'outline'}
                           className="justify-start gap-2"
                           onClick={() => setSelectionMode(mode)}
-                          title={config.helper}
+                          title={selectionHelper(mode)}
                         >
                           <ShapeIcon className="h-4 w-4" aria-hidden="true" />
                           {selectionModeLabel(mode)}
@@ -2306,11 +2333,13 @@ export default function LiveMonitorPage() {
                     })}
                   </div>
                   <div className="rounded-md border border-info-border bg-info-bg px-3 py-2 text-xs text-info-text">
-                    <p className="font-medium">{activeSelectionConfig.helper}</p>
+                    <p className="font-medium">{selectionHelper(selectionMode)}</p>
                     <p className="mt-1">
                       {selectionMode === 'circle' || selectionMode === 'oval'
-                        ? `${activeSelectionConfig.label} boundaries are fitted from the selected chart bounds.`
-                        : `${activeSelectionConfig.label} brush is active on the coordinate map.`}
+                        ? t('live.fittedBoundaryActive', {
+                            shape: selectionModeLabel(selectionMode),
+                          })
+                        : t('live.brushActive', { shape: selectionModeLabel(selectionMode) })}
                     </p>
                   </div>
 
@@ -2532,25 +2561,27 @@ export default function LiveMonitorPage() {
                     />
                     <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
                       {manualSelectionEnabled
-                        ? `Drawing ${activeSelectionConfig.label.toLowerCase()} normal areas. ${
+                        ? `${t('live.drawingNormalAreas', {
+                            shape: selectionModeLabel(selectionMode).toLowerCase(),
+                          })} ${
                             selectionMode === 'circle' || selectionMode === 'oval'
-                              ? 'The selected bounds are converted to the chosen rounded shape.'
-                              : 'The selected boundary is saved as drawn.'
+                              ? t('live.roundedShapeConversion')
+                              : t('live.boundarySavedAsDrawn')
                           }`
-                        : 'Zoom, restore, and image export are available in the chart toolbar; use the sliders or mouse wheel to inspect dense ranges.'}
+                        : t('live.chartToolbarHint')}
                       {showContours
-                        ? ' Baseline density overlay is rendered natively in ECharts.'
+                        ? ` ${t('live.baselineDensityOverlay')}`
                         : ''}
                     </p>
                   </>
                 ) : (
                   <WorkflowState
                     icon={<Database className="h-5 w-5" aria-hidden="true" />}
-                    title="No coordinate map available"
-                    description="Select a processed dataset with baseline coordinates, or upload a baseline from Data Ingestion before starting live monitoring."
+                    title={t('live.noCoordinateMapAvailable')}
+                    description={t('live.noCoordinateMapDescription')}
                     action={
                       <Button asChild variant="outline" size="sm">
-                        <Link href="/dashboard/data">Open Data Ingestion</Link>
+                        <Link href="/dashboard/data">{t('live.openDataIngestion')}</Link>
                       </Button>
                     }
                     className="h-[clamp(560px,74vh,800px)]"
@@ -2566,18 +2597,18 @@ export default function LiveMonitorPage() {
         <CardContent className="flex flex-wrap gap-3 py-4">
           <Button asChild>
             <Link href="/dashboard/insights">
-              Open health insights
+              {t('live.openHealthInsights')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard/data">Upload more data</Link>
+            <Link href="/dashboard/data">{t('live.uploadMoreData')}</Link>
           </Button>
           <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             {autoRefresh
-              ? `Auto-refresh ${isStreaming ? refreshIntervalMs / 1000 : 10}s`
-              : 'Manual refresh'}
+              ? t('live.autoRefreshSeconds', { seconds: isStreaming ? refreshIntervalMs / 1000 : 10 })
+              : t('live.manualRefresh')}
           </div>
         </CardContent>
       </Card>

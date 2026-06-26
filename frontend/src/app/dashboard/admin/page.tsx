@@ -8,6 +8,7 @@ import { PlatformAnalyticsSection } from '@/components/platform/platform-analyti
 import { CustomersSection } from '@/components/platform/customers-section';
 import { PlatformDevicesSection } from '@/components/platform/platform-devices-section';
 import { SupportSessionsSection } from '@/components/platform/support-sessions-section';
+import { useI18n } from '@/i18n/client';
 
 // /dashboard/admin landing — the vendor-staff platform-admin surface.
 // Four sections in tabs:
@@ -37,6 +38,7 @@ export default function AdminPage() {
 function AdminContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useI18n();
   const initialTab: AdminTab = isAdminTab(searchParams.get('tab'))
     ? (searchParams.get('tab') as AdminTab)
     : 'overview';
@@ -59,30 +61,27 @@ function AdminContent() {
   return (
     <div className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-semibold">Platform administration</h1>
-        <p className="text-sm text-muted-foreground">
-          Manage customer organizations, view fleet-wide ingestion metrics, and open audited support
-          sessions. These tools affect customer organizations outside the current organization.
-        </p>
+        <h1 className="text-2xl font-semibold">{t('admin.title')}</h1>
+        <p className="text-sm text-muted-foreground">{t('admin.description')}</p>
       </header>
 
       <Tabs value={tab} onValueChange={(v) => setTab(v as AdminTab)}>
         <TabsList className="grid w-full grid-cols-4 max-w-2xl">
           <TabsTrigger value="overview" className="gap-2">
             <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Overview</span>
+            <span className="hidden sm:inline">{t('admin.overview')}</span>
           </TabsTrigger>
           <TabsTrigger value="customers" className="gap-2">
             <Building2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Customers</span>
+            <span className="hidden sm:inline">{t('admin.customers')}</span>
           </TabsTrigger>
           <TabsTrigger value="devices" className="gap-2">
             <HardDrive className="h-4 w-4" />
-            <span className="hidden sm:inline">Devices</span>
+            <span className="hidden sm:inline">{t('admin.devices')}</span>
           </TabsTrigger>
           <TabsTrigger value="support" className="gap-2">
             <LifeBuoy className="h-4 w-4" />
-            <span className="hidden sm:inline">Support</span>
+            <span className="hidden sm:inline">{t('admin.support')}</span>
           </TabsTrigger>
         </TabsList>
 

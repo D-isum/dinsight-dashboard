@@ -40,7 +40,10 @@ const formatMetadataValue = (value: unknown): string => {
   }
 };
 
-const metadataTooltipHtml = (metadata?: MetadataEntry): string => {
+const metadataTooltipHtml = (
+  metadata: MetadataEntry | undefined,
+  labels: { metadata: string; moreFields: (count: number) => string }
+): string => {
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) {
     return '';
   }
@@ -56,8 +59,8 @@ const metadataTooltipHtml = (metadata?: MetadataEntry): string => {
     .join('<br/>');
   const remaining = entries.length - visibleEntries.length;
 
-  return `<br/><br/><b>Metadata</b><br/>${rows}${
-    remaining > 0 ? `<br/>+${remaining} more field${remaining === 1 ? '' : 's'}` : ''
+  return `<br/><br/><b>${escapeHtml(labels.metadata)}</b><br/>${rows}${
+    remaining > 0 ? `<br/>${escapeHtml(labels.moreFields(remaining))}` : ''
   }`;
 };
 
@@ -81,6 +84,16 @@ export function createDinsightPreviewPlot(
     datasetId?: number | null;
     modeBar?: boolean;
     title?: string;
+    labels?: {
+      baseline?: string;
+      monitoring?: string;
+      point?: string;
+      metadata?: string;
+      moreFields?: (count: number) => string;
+      xAxis?: string;
+      yAxis?: string;
+      formatNumber?: (value: number, options?: Intl.NumberFormatOptions) => string;
+    };
   } = {}
 ) {
   if (!baselineData || baselineData.dinsight_x.length === 0) {
@@ -91,6 +104,21 @@ export function createDinsightPreviewPlot(
   const modeBar = options.modeBar ?? !compact;
   const baselineCount = baselineData.dinsight_x.length;
   const monitoringCount = monitoringData?.dinsight_x.length ?? 0;
+  const labels = {
+    baseline: options.labels?.baseline ?? 'Baseline',
+    monitoring: options.labels?.monitoring ?? 'Monitoring',
+    point: options.labels?.point ?? 'Point',
+    metadata: options.labels?.metadata ?? 'Metadata',
+    moreFields:
+      options.labels?.moreFields ??
+      ((count: number) => `+${count} more field${count === 1 ? '' : 's'}`),
+    xAxis: options.labels?.xAxis ?? "D'insight X",
+    yAxis: options.labels?.yAxis ?? "D'insight Y",
+    formatNumber:
+      options.labels?.formatNumber ??
+      ((value: number, formatOptions?: Intl.NumberFormatOptions) =>
+        value.toLocaleString(undefined, formatOptions)),
+  };
   const scatterPerformanceOptions =
     hasMetadataEntries(baselineData.metadata) || hasMetadataEntries(monitoringData?.metadata)
       ? {}
@@ -99,20 +127,20 @@ export function createDinsightPreviewPlot(
   const tooltipFormatter = (params: any) => {
     const value = params?.data?.value ?? params?.data;
     if (!Array.isArray(value)) {
-      return `<b>${params?.seriesName ?? 'Point'}</b>`;
+      return `<b>${params?.seriesName ?? labels.point}</b>`;
     }
     const metadata = typeof value[3] === 'string' ? value[3] : '';
-    return `<b>${params.seriesName}</b><br/>Point: ${Number(value[2]).toLocaleString()}<br/>X: ${Number(value[0]).toFixed(4)}<br/>Y: ${Number(value[1]).toFixed(4)}${metadata}`;
+    return `<b>${params.seriesName}</b><br/>${labels.point}: ${labels.formatNumber(Number(value[2]))}<br/>X: ${Number(value[0]).toFixed(4)}<br/>Y: ${Number(value[1]).toFixed(4)}${metadata}`;
   };
   const series: any[] = [
     {
       type: 'scatter',
-      name: `Baseline (${baselineCount.toLocaleString()})`,
+      name: `${labels.baseline} (${labels.formatNumber(baselineCount)})`,
       data: baselineData.dinsight_x.map((x, index) => [
         x,
         baselineData.dinsight_y[index],
         index + 1,
-        metadataTooltipHtml(baselineData.metadata?.[index]),
+        metadataTooltipHtml(baselineData.metadata?.[index], labels),
       ]),
       symbolSize: pointSize,
       ...scatterPerformanceOptions,
@@ -123,12 +151,12 @@ export function createDinsightPreviewPlot(
   if (monitoringData && monitoringData.dinsight_x.length > 0) {
     series.push({
       type: 'scatter',
-      name: `Monitoring (${monitoringCount.toLocaleString()})`,
+      name: `${labels.monitoring} (${labels.formatNumber(monitoringCount)})`,
       data: monitoringData.dinsight_x.map((x, index) => [
         x,
         monitoringData.dinsight_y[index],
         index + 1,
-        metadataTooltipHtml(monitoringData.metadata?.[index]),
+        metadataTooltipHtml(monitoringData.metadata?.[index], labels),
       ]),
       symbolSize: pointSize,
       ...scatterPerformanceOptions,
@@ -152,7 +180,7 @@ export function createDinsightPreviewPlot(
     axisRangeRevisionPart(yAxisRange),
   ]);
   const formatAxisLabel = (value: number) =>
-    Number(value).toLocaleString(undefined, {
+      labels.formatNumber(Number(value), {
       maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
     });
   const option: EChartsOption = {
@@ -221,7 +249,7 @@ export function createDinsightPreviewPlot(
         ],
     xAxis: {
       type: 'value',
-      name: compact ? '' : "D'insight X",
+      name: compact ? '' : labels.xAxis,
       nameLocation: 'middle',
       nameGap: compact ? 28 : 44,
       min: xAxisRange?.[0],
@@ -234,7 +262,7 @@ export function createDinsightPreviewPlot(
     },
     yAxis: {
       type: 'value',
-      name: compact ? '' : "D'insight Y",
+      name: compact ? '' : labels.yAxis,
       nameLocation: 'middle',
       nameGap: compact ? 34 : 52,
       min: yAxisRange?.[0],

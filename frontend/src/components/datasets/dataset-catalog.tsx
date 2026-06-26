@@ -65,6 +65,7 @@ import {
   useDashboardWorkspace,
 } from '@/context/dashboard-workspace-context';
 import { cn } from '@/utils/cn';
+import { useI18n } from '@/i18n/client';
 
 // Catalog browses the dataset metadata + lineage + validation that
 // upload + processing pipelines record server-side.
@@ -98,6 +99,7 @@ export interface DatasetCatalogProps {
 
 export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
   const { currentOrg } = useAuth();
+  const { t, formatDate, formatNumber } = useI18n();
   const plotTheme = usePlotTheme();
   const {
     datasets: dinsightSummaries,
@@ -170,12 +172,12 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
     onSuccess: (_data, datasetId) => {
       setDeleteDatasetId('');
       setPendingDeleteDatasetId(null);
-      setDeleteFeedback(`Dataset #${datasetId} deleted.`);
+      setDeleteFeedback(t('data.deleteCompleted', { id: datasetId }));
       setSelectedDatasetId((current) => (current === datasetId ? null : current));
       publishDashboardActivity({
         type: 'catalog',
-        title: `Deleted dataset #${datasetId}`,
-        description: 'Catalog deletion completed and related dataset caches were refreshed.',
+        title: t('data.deleteActivityTitle', { id: datasetId }),
+        description: t('data.deleteActivityDescription'),
         datasetId,
         href: '/dashboard/data?catalog=open',
         status: 'success',
@@ -189,14 +191,14 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
         error?.response?.data?.error?.message ||
         error?.response?.data?.message ||
         error?.message ||
-        'Unable to delete dataset.';
+        t('data.unableToDeleteDataset');
       setDeleteFeedback(message);
     },
   });
 
   const requestDelete = (datasetId: number) => {
     if (!Number.isInteger(datasetId) || datasetId <= 0) {
-      setDeleteFeedback('Enter a valid dataset ID.');
+      setDeleteFeedback(t('data.enterValidDatasetId'));
       return;
     }
     setDeleteFeedback(null);
@@ -222,7 +224,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
 
   const requestExport = async (datasetId: number) => {
     if (!Number.isInteger(datasetId) || datasetId <= 0) {
-      setExportFeedback('Select a valid dataset ID before exporting.');
+      setExportFeedback(t('data.selectValidDatasetExport'));
       return;
     }
 
@@ -247,17 +249,17 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
-      setExportFeedback(`Dataset #${datasetId} export started.`);
+      setExportFeedback(t('data.exportStarted', { id: datasetId }));
       publishDashboardActivity({
         type: 'catalog',
-        title: `Exported dataset #${datasetId}`,
-        description: `CSV export started: ${filename}.`,
+        title: t('data.exportActivityTitle', { id: datasetId }),
+        description: t('data.exportActivityDescription', { filename }),
         datasetId,
         href: '/dashboard/data?catalog=open',
         status: 'success',
       });
     } catch (error: any) {
-      let message = 'Unable to export the selected processed dataset.';
+      let message = t('data.unableToExportDataset');
       const payload = error?.response?.data;
       if (payload instanceof Blob) {
         try {
@@ -303,7 +305,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
           dataset_id: summary.dinsight_id,
           dataset_type: 'unregistered',
           name,
-          description: 'Processed dataset without catalog metadata.',
+          description: t('data.processedWithoutMetadata'),
           tags: [],
           total_records: undefined,
           data_quality_score: undefined,
@@ -378,8 +380,18 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
         compact: true,
         datasetId: previewDatasetId,
         modeBar: false,
+        labels: {
+          baseline: t('common.baseline'),
+          monitoring: t('common.monitoring'),
+          point: t('live.point'),
+          metadata: t('dashboard.metadata'),
+          moreFields: (count) => `+${formatNumber(count)} ${t('dashboard.metadata')}`,
+          xAxis: t('live.dinsightXCoordinate'),
+          yAxis: t('live.dinsightYCoordinate'),
+          formatNumber,
+        },
       }),
-    [plotTheme, previewBaselineData, previewDatasetId, previewMonitoringData]
+    [formatNumber, plotTheme, previewBaselineData, previewDatasetId, previewMonitoringData, t]
   );
   const previewItem = filtered.find((item) => item.dataset_id === previewDatasetId) ?? null;
   const catalogColumnCount = canDelete ? 9 : 8;
@@ -393,12 +405,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
               <div className="min-w-0">
                 <CardTitle className="flex items-center gap-2 text-2xl">
                   <Database className="h-6 w-6" />
-                  Dataset catalog
+                  {t('data.catalogTitle')}
                 </CardTitle>
-                <CardDescription>
-                  Browse datasets registered for this organization with their lineage and validation
-                  status. Uploads and processing runs add entries automatically.
-                </CardDescription>
+                <CardDescription>{t('data.catalogPageDescription')}</CardDescription>
               </div>
               <div className="flex shrink-0 flex-wrap items-center gap-2">
                 {canCreate && (
@@ -409,13 +418,13 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     }}
                   >
                     <Plus className="mr-2 h-4 w-4" />
-                    Register metadata
+                    {t('data.registerMetadata')}
                   </Button>
                 )}
                 <Button variant="outline" asChild>
                   <Link href="/dashboard/data">
                     <ArrowLeft className="mr-2 h-4 w-4" />
-                    Back to Data Ingestion
+                    {t('data.backToDataIngestion')}
                   </Link>
                 </Button>
               </div>
@@ -425,7 +434,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
         <CardContent className={cn(isModal && 'p-4')}>
           <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto] xl:items-center">
             <Input
-              placeholder="Search by name, description, or tag"
+              placeholder={t('data.searchCatalogPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="min-w-0"
@@ -435,10 +444,10 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
               onChange={(e) => setTypeFilter(e.target.value)}
               className="rounded-md border border-strong bg-surface px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-focus"
             >
-              <option value="">All types</option>
-              <option value="baseline">Baseline</option>
-              <option value="comparison">Comparison</option>
-              <option value="monitoring">Monitoring</option>
+              <option value="">{t('data.allTypes')}</option>
+              <option value="baseline">{t('common.baseline')}</option>
+              <option value="comparison">{t('common.comparison')}</option>
+              <option value="monitoring">{t('common.monitoring')}</option>
             </select>
             <DatasetSourceSelect
               groups={datasetSourceGroups}
@@ -448,7 +457,10 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
             />
             {catalogItems.length > 0 && (
               <span className="whitespace-nowrap text-sm text-fg-muted">
-                {filtered.length} of {catalogItems.length} datasets
+                {t('data.datasetsCount', {
+                  filtered: formatNumber(filtered.length),
+                  total: formatNumber(catalogItems.length),
+                })}
               </span>
             )}
             {isModal && canCreate && (
@@ -460,19 +472,19 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 }}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Register metadata
+                {t('data.registerMetadata')}
               </Button>
             )}
           </div>
           <div className="mt-4 grid gap-3 border-t border-border pt-4 lg:grid-cols-2">
             <div className="rounded-md border border-border bg-surface-muted/35 p-3">
               <div className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
-                Export dataset
+                {t('data.exportDataset')}
               </div>
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <Input
                   inputMode="numeric"
-                  placeholder="Dataset ID"
+                  placeholder={t('data.datasetId')}
                   value={exportDatasetId}
                   onChange={(event) => setExportDatasetId(event.target.value)}
                   className="w-36"
@@ -487,7 +499,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   ) : (
                     <Download className="mr-2 h-4 w-4" />
                   )}
-                  Export by ID
+                  {t('data.exportById')}
                 </Button>
                 {exportFeedback && (
                   <span className="min-w-0 text-sm text-fg-muted">{exportFeedback}</span>
@@ -497,12 +509,12 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
             {canDelete && (
               <div className="rounded-md border border-danger-border bg-danger-bg/45 p-3">
                 <div className="mb-2 text-xs font-medium uppercase tracking-wide text-danger-text">
-                  Delete dataset
+                  {t('data.deleteDataset')}
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Input
                     inputMode="numeric"
-                    placeholder="Dataset ID"
+                    placeholder={t('data.datasetId')}
                     value={deleteDatasetId}
                     onChange={(event) => setDeleteDatasetId(event.target.value)}
                     className="w-36"
@@ -517,7 +529,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     ) : (
                       <Trash2 className="mr-2 h-4 w-4" />
                     )}
-                    Delete by ID
+                    {t('data.deleteById')}
                   </Button>
                   {deleteFeedback && (
                     <span className="min-w-0 text-sm text-fg-muted">{deleteFeedback}</span>
@@ -546,27 +558,27 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
               </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Quality</TableHead>
-                  <TableHead>Validation</TableHead>
-                  <TableHead>Records</TableHead>
-                  <TableHead>Registered</TableHead>
-                  <TableHead className="w-20 text-right">Export</TableHead>
-                  {canDelete && <TableHead className="w-20 text-right">Delete</TableHead>}
+                  <TableHead>{t('data.catalogName')}</TableHead>
+                  <TableHead>{t('data.catalogSource')}</TableHead>
+                  <TableHead>{t('data.catalogType')}</TableHead>
+                  <TableHead>{t('data.catalogQuality')}</TableHead>
+                  <TableHead>{t('data.catalogValidation')}</TableHead>
+                  <TableHead>{t('data.catalogRecords')}</TableHead>
+                  <TableHead>{t('data.catalogRegistered')}</TableHead>
+                  <TableHead className="w-20 text-right">{t('common.export')}</TableHead>
+                  {canDelete && <TableHead className="w-20 text-right">{t('common.delete')}</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {listQuery.isLoading || isLoadingDatasets ? (
-                  <TableLoading message="Loading dataset catalog" rowSpan={catalogColumnCount} />
+                  <TableLoading message={t('data.loadingDatasetCatalog')} rowSpan={catalogColumnCount} />
                 ) : filtered.length === 0 ? (
                   <TableEmpty
                     rowSpan={catalogColumnCount}
                     message={
                       search || typeFilter
-                        ? 'No datasets match the current filters.'
-                        : 'No datasets registered yet. Upload one from the Data Ingestion page.'
+                        ? t('data.noDatasetsMatchFilters')
+                        : t('data.noDatasetsRegistered')
                     }
                   />
                 ) : (
@@ -591,8 +603,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                         )}
                         {!item.has_metadata && (
                           <div className="mt-1 line-clamp-2 text-xs text-warning-text">
-                            Register metadata to unlock curation, validation, and compatibility
-                            workflows.
+                            {t('data.registerMetadataHint')}
                           </div>
                         )}
                       </TableCell>
@@ -601,7 +612,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       </TableCell>
                       <TableCell>
                         <Badge variant={item.has_metadata ? 'secondary' : 'warning'}>
-                          {item.has_metadata ? item.dataset_type : 'No metadata'}
+                          {item.has_metadata ? item.dataset_type : t('data.noMetadata')}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-sm">
@@ -611,11 +622,12 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                         <ValidationBadge status={item.validation_status} />
                       </TableCell>
                       <TableCell className="text-sm text-fg-muted">
-                        {item.total_records?.toLocaleString() ?? '—'}
+                        {item.total_records != null ? formatNumber(item.total_records) : '—'}
                       </TableCell>
                       <TableCell className="text-sm text-fg-muted">
                         {item.created_at
-                          ? new Date(item.created_at).toLocaleDateString(undefined, {
+                          ? formatDate(item.created_at, {
+                              dateStyle: undefined,
                               year: 'numeric',
                               month: 'short',
                               day: 'numeric',
@@ -626,7 +638,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                         <Button
                           variant="ghost"
                           size="sm"
-                          aria-label={`Export dataset ${item.dataset_id}`}
+                          aria-label={t('data.exportDataset')}
                           disabled={exportingDatasetId === item.dataset_id}
                           className="gap-1.5"
                           onClick={(event) => {
@@ -639,7 +651,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                           ) : (
                             <Download className="h-4 w-4" />
                           )}
-                          <span className="text-xs">Export</span>
+                          <span className="text-xs">{t('common.export')}</span>
                         </Button>
                       </TableCell>
                       {canDelete && (
@@ -648,7 +660,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                             variant="ghost"
                             size="sm"
                             className="gap-1.5 text-danger-text hover:bg-danger-bg hover:text-danger-text"
-                            aria-label={`Delete dataset ${item.dataset_id}`}
+                            aria-label={t('data.deleteDataset')}
                             disabled={deleteMutation.isPending}
                             onClick={(event) => {
                               event.stopPropagation();
@@ -656,7 +668,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                             }}
                           >
                             <Trash2 className="h-4 w-4" />
-                            <span className="text-xs">Delete</span>
+                            <span className="text-xs">{t('common.delete')}</span>
                           </Button>
                         </TableCell>
                       )}
@@ -670,23 +682,23 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
 
         {isModal && (
           <ChartFrame
-            title="Dataset preview"
-            description="Sampled baseline and monitoring coordinates for the catalog selection."
+            title={t('data.datasetPreview')}
+            description={t('data.datasetPreviewDescription')}
             className="self-start"
             stats={
               <>
                 <ChartStat
-                  label="Dataset"
+                  label={t('common.dataset')}
                   value={previewDatasetId ? `#${previewDatasetId}` : '—'}
                 />
                 <ChartStat
-                  label="Baseline"
-                  value={(previewBaselineData?.dinsight_x.length ?? 0).toLocaleString()}
+                  label={t('common.baseline')}
+                  value={formatNumber(previewBaselineData?.dinsight_x.length ?? 0)}
                   tone="info"
                 />
                 <ChartStat
-                  label="Monitoring"
-                  value={(previewMonitoringData?.dinsight_x.length ?? 0).toLocaleString()}
+                  label={t('common.monitoring')}
+                  value={formatNumber(previewMonitoringData?.dinsight_x.length ?? 0)}
                   tone={previewMonitoringData?.dinsight_x.length ? 'danger' : 'neutral'}
                 />
               </>
@@ -699,7 +711,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 }
                 className="max-w-[220px] rounded-md border border-input bg-background px-2 py-1.5 text-xs"
               >
-                <option value="">Select dataset</option>
+                <option value="">{t('common.selectDataset')}</option>
                 {filtered.map((item) => (
                   <option key={item.dataset_id} value={item.dataset_id}>
                     #{item.dataset_id} - {item.name}
@@ -717,11 +729,13 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   </div>
                   <div className="mt-1 flex flex-wrap gap-2 text-fg-muted">
                     <span>
-                      {previewItem.has_metadata ? previewItem.dataset_type : 'No metadata'}
+                      {previewItem.has_metadata ? previewItem.dataset_type : t('data.noMetadata')}
                     </span>
                     <span>•</span>
                     <span>
-                      {sourceByDinsightId.get(previewItem.dataset_id)?.source ?? 'Manual upload'}
+                      {sourceByDinsightId.get(previewItem.dataset_id)?.source === 'auto'
+                        ? t('data.auto')
+                        : t('data.manualUpload')}
                     </span>
                   </div>
                 </div>
@@ -729,16 +743,16 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
 
               {!previewDatasetId ? (
                 <ChartEmptyState
-                  title="No dataset selected"
-                  description="Choose a catalog row or use the selector above to preview coordinates."
+                  title={t('data.noProcessedResult')}
+                  description={t('data.chooseCatalogRow')}
                 />
               ) : isLoadingPreviewBaseline || isLoadingPreviewMonitoring ? (
                 <ChartEmptyState
-                  title="Loading preview"
-                  description="Fetching sampled baseline and monitoring coordinates."
+                  title={t('data.loadingPreview')}
+                  description={t('data.fetchingPreviewCoordinates')}
                 />
               ) : previewBaselineError ? (
-                <ChartEmptyState title="Preview unavailable" description={previewBaselineError} />
+                <ChartEmptyState title={t('data.previewUnavailable')} description={previewBaselineError} />
               ) : previewPlot ? (
                 <div className="h-[280px]">
                   <EChartsCanvas
@@ -749,8 +763,8 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 </div>
               ) : (
                 <ChartEmptyState
-                  title="No coordinates available"
-                  description="This dataset has no processed baseline coordinates yet."
+                  title={t('data.noCoordinates')}
+                  description={t('data.noCoordinatesDescription')}
                 />
               )}
               {previewMonitoringError && (
@@ -764,7 +778,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     onClick={() => void requestExport(previewDatasetId)}
                   >
                     <Download className="mr-2 h-4 w-4" />
-                    Export
+                    {t('common.export')}
                   </Button>
                   <Button variant="outline" size="sm" asChild>
                     <Link
@@ -772,7 +786,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       onClick={() => selectWorkspaceDataset(previewDatasetId)}
                     >
                       <Monitor className="mr-2 h-4 w-4" />
-                      Open in Live
+                      {t('data.openInLive')}
                     </Link>
                   </Button>
                   <Button variant="outline" size="sm" asChild>
@@ -781,7 +795,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       onClick={() => selectWorkspaceDataset(previewDatasetId)}
                     >
                       <BarChart3 className="mr-2 h-4 w-4" />
-                      Open in Insights
+                      {t('data.openInInsights')}
                     </Link>
                   </Button>
                   <Button
@@ -793,7 +807,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     }}
                   >
                     <BarChart3 className="mr-2 h-4 w-4" />
-                    Details
+                    {t('data.details')}
                   </Button>
                 </div>
               )}
@@ -868,32 +882,33 @@ function DeleteImpactDialog({
   onCancel: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <AlertDialog open={open} onOpenChange={(next) => !next && onCancel()}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 text-danger-text">
             <AlertTriangle className="h-5 w-5" />
-            Delete dataset #{datasetId ?? 'N/A'}?
+            {t('data.deleteDatasetQuestion', { id: datasetId ?? 'N/A' })}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            This permanently removes the processed dataset graph for this organization.
+            {t('data.deleteDatasetExplanation')}
           </AlertDialogDescription>
         </AlertDialogHeader>
 
         <div className="rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger-text">
-          <div className="font-semibold">Deletion impact</div>
+          <div className="font-semibold">{t('data.deletionImpact')}</div>
           <ul className="mt-2 list-disc space-y-1 pl-5">
-            <li>Baseline D'Insight coordinates and metadata</li>
-            <li>Monitoring rows and generated monitoring coordinates</li>
-            <li>Generated visualization/export records tied to the dataset</li>
-            <li>Dataset metadata, lineage, validation results, and analysis comparisons</li>
-            <li>Upload file references associated with this dataset</li>
+            <li>{t('data.deletionImpactBaseline')}</li>
+            <li>{t('data.deletionImpactMonitoring')}</li>
+            <li>{t('data.deletionImpactVisualization')}</li>
+            <li>{t('data.deletionImpactMetadata')}</li>
+            <li>{t('data.deletionImpactUploads')}</li>
           </ul>
         </div>
 
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel disabled={isDeleting}>{t('common.cancel')}</AlertDialogCancel>
           <AlertDialogAction
             disabled={isDeleting}
             onClick={(event) => {
@@ -905,10 +920,10 @@ function DeleteImpactDialog({
             {isDeleting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Deleting
+                {t('data.deleting')}
               </>
             ) : (
-              'Delete dataset'
+              t('data.deleteDataset')
             )}
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -918,9 +933,10 @@ function DeleteImpactDialog({
 }
 
 function ValidationBadge({ status }: { status?: string }) {
+  const { t } = useI18n();
   if (!status) return <span className="text-fg-muted">—</span>;
-  if (status === 'passed') return <Badge variant="default">Passed</Badge>;
-  if (status === 'failed') return <Badge variant="destructive">Failed</Badge>;
+  if (status === 'passed') return <Badge variant="default">{t('data.passed')}</Badge>;
+  if (status === 'failed') return <Badge variant="destructive">{t('data.failed')}</Badge>;
   return <Badge variant="secondary">{status}</Badge>;
 }
 
@@ -977,6 +993,7 @@ function DetailDrawer({
   isExporting,
   isDeleting,
 }: DetailDrawerProps) {
+  const { t, formatDate, formatNumber } = useI18n();
   const [editingMetadata, setEditingMetadata] = useState(false);
   const [compatibilityOpen, setCompatibilityOpen] = useState(false);
   const canUpdateMetadata = usePermission(Actions.DatasetUpdate);
@@ -1017,20 +1034,20 @@ function DetailDrawer({
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-canvas px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-fg">Dataset details</h2>
-            <p className="text-xs text-fg-muted">Dataset #{datasetId}</p>
+            <h2 className="text-lg font-semibold text-fg">{t('data.datasetDetails')}</h2>
+            <p className="text-xs text-fg-muted">{t('dashboard.selectedDataset', { id: datasetId })}</p>
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard/live" onClick={onOpenLive}>
                 <Monitor className="mr-2 h-4 w-4" />
-                Live
+                {t('data.live')}
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard/insights" onClick={onOpenInsights}>
                 <BarChart3 className="mr-2 h-4 w-4" />
-                Insights
+                {t('common.insights')}
               </Link>
             </Button>
             <Button variant="outline" size="sm" onClick={onExport} disabled={isExporting}>
@@ -1039,11 +1056,11 @@ function DetailDrawer({
               ) : (
                 <Download className="mr-2 h-4 w-4" />
               )}
-              Export
+              {t('common.export')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCompatibilityOpen(true)}>
               <ShieldQuestion className="mr-2 h-4 w-4" />
-              Check compatibility
+              {t('data.checkCompatibility')}
             </Button>
             {onDelete && (
               <Button variant="destructive" size="sm" onClick={onDelete} disabled={isDeleting}>
@@ -1052,10 +1069,10 @@ function DetailDrawer({
                 ) : (
                   <Trash2 className="mr-2 h-4 w-4" />
                 )}
-                Delete
+                {t('common.delete')}
               </Button>
             )}
-            <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
+            <Button variant="ghost" size="sm" onClick={onClose} aria-label={t('common.close')}>
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -1067,12 +1084,12 @@ function DetailDrawer({
             <CardHeader className="flex flex-row items-start justify-between space-y-0">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Tag className="h-4 w-4" />
-                Metadata
+                {t('data.metadataTitle')}
               </CardTitle>
               {metadataQuery.data && canUpdateMetadata && (
                 <Button variant="ghost" size="sm" onClick={() => setEditingMetadata(true)}>
                   <Pencil className="mr-2 h-4 w-4" />
-                  Edit
+                  {t('common.edit')}
                 </Button>
               )}
             </CardHeader>
@@ -1080,17 +1097,17 @@ function DetailDrawer({
               {metadataQuery.isLoading ? (
                 <div className="flex items-center gap-2 text-sm text-fg-muted">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading metadata
+                  {t('data.loadingMetadata')}
                 </div>
               ) : !metadataQuery.data ? (
                 <div className="space-y-3">
                   <p className="text-sm text-fg-muted">
-                    No metadata registered for this dataset yet.
+                    {t('data.noMetadataRegistered')}
                   </p>
                   {onRegisterMetadata && (
                     <Button variant="outline" size="sm" onClick={onRegisterMetadata}>
                       <Plus className="mr-2 h-4 w-4" />
-                      Register metadata
+                      {t('data.registerMetadata')}
                     </Button>
                   )}
                 </div>
@@ -1105,34 +1122,34 @@ function DetailDrawer({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <GitBranch className="h-4 w-4" />
-                Lineage
+                {t('data.lineage')}
               </CardTitle>
               <CardDescription>
-                Transformations that produced or consumed this dataset.
+                {t('data.lineageDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {lineageQuery.isLoading ? (
                 <Table>
                   <TableBody>
-                    <TableLoading message="Loading lineage" />
+                    <TableLoading message={t('data.loadingLineage')} />
                   </TableBody>
                 </Table>
               ) : lineageQuery.data?.length === 0 ? (
                 <Table>
                   <TableBody>
-                    <TableEmpty message="No lineage records yet." />
+                    <TableEmpty message={t('data.noLineageRecords')} />
                   </TableBody>
                 </Table>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Process</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Records</TableHead>
-                      <TableHead>When</TableHead>
+                      <TableHead>{t('data.process')}</TableHead>
+                      <TableHead>{t('data.type')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead>{t('data.catalogRecords')}</TableHead>
+                      <TableHead>{t('data.when')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1161,10 +1178,11 @@ function DetailDrawer({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-fg-muted">
-                          {row.records_processed?.toLocaleString() ?? '—'}
+                          {row.records_processed != null ? formatNumber(row.records_processed) : '—'}
                         </TableCell>
                         <TableCell className="text-sm text-fg-muted">
-                          {new Date(row.created_at).toLocaleDateString(undefined, {
+                          {formatDate(row.created_at, {
+                            dateStyle: undefined,
                             month: 'short',
                             day: 'numeric',
                           })}
@@ -1182,31 +1200,31 @@ function DetailDrawer({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShieldCheck className="h-4 w-4" />
-                Validation history
+                {t('data.validationHistory')}
               </CardTitle>
-              <CardDescription>Rule-based validation runs against this dataset.</CardDescription>
+              <CardDescription>{t('data.validationHistoryDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               {validationQuery.isLoading ? (
                 <Table>
                   <TableBody>
-                    <TableLoading message="Loading validation history" />
+                    <TableLoading message={t('data.loadingValidationHistory')} />
                   </TableBody>
                 </Table>
               ) : validationQuery.data?.length === 0 ? (
                 <Table>
                   <TableBody>
-                    <TableEmpty message="No validation runs yet." />
+                    <TableEmpty message={t('data.noValidationRuns')} />
                   </TableBody>
                 </Table>
               ) : (
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Rule</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Pass / Fail</TableHead>
-                      <TableHead>When</TableHead>
+                      <TableHead>{t('data.rule')}</TableHead>
+                      <TableHead>{t('common.status')}</TableHead>
+                      <TableHead>{t('data.passFail')}</TableHead>
+                      <TableHead>{t('data.when')}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1214,7 +1232,7 @@ function DetailDrawer({
                       <TableRow key={row.id}>
                         <TableCell>
                           <div className="font-medium text-fg">
-                            {row.validation_rule?.name ?? `Rule #${row.validation_rule_id}`}
+                            {row.validation_rule?.name ?? `${t('data.rule')} #${row.validation_rule_id}`}
                           </div>
                           {row.validation_rule?.rule_type && (
                             <div className="text-xs text-fg-muted">
@@ -1236,11 +1254,11 @@ function DetailDrawer({
                           </Badge>
                         </TableCell>
                         <TableCell className="text-sm text-fg-muted">
-                          {row.records_passed.toLocaleString()} /{' '}
-                          {row.records_failed.toLocaleString()}
+                          {formatNumber(row.records_passed)} / {formatNumber(row.records_failed)}
                         </TableCell>
                         <TableCell className="text-sm text-fg-muted">
-                          {new Date(row.created_at).toLocaleDateString(undefined, {
+                          {formatDate(row.created_at, {
+                            dateStyle: undefined,
                             month: 'short',
                             day: 'numeric',
                           })}
@@ -1258,11 +1276,10 @@ function DetailDrawer({
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <ShieldCheck className="h-4 w-4" />
-                Validation rules
+                {t('settings.validationRules')}
               </CardTitle>
               <CardDescription>
-                Org-wide rules. Run any subset against this dataset; results land in the history
-                above.
+                {t('data.validationRulesDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1298,6 +1315,7 @@ function DetailDrawer({
 }
 
 function MetadataPanel({ meta }: { meta: DetailMetadata }) {
+  const { t, formatDate, formatNumber } = useI18n();
   return (
     <div className="space-y-4">
       <div>
@@ -1306,24 +1324,30 @@ function MetadataPanel({ meta }: { meta: DetailMetadata }) {
       </div>
 
       <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-        <FieldRow label="Type" value={meta.dataset_type} />
-        <FieldRow label="Version" value={meta.version ?? '—'} />
-        <FieldRow label="Processing stage" value={meta.processing_stage ?? '—'} />
-        <FieldRow label="Sampling frequency" value={meta.sampling_frequency ?? '—'} />
-        <FieldRow label="Total records" value={meta.total_records?.toLocaleString() ?? '—'} />
+        <FieldRow label={t('data.type')} value={meta.dataset_type} />
+        <FieldRow label={t('data.version')} value={meta.version ?? '—'} />
+        <FieldRow label={t('data.processingStage')} value={meta.processing_stage ?? '—'} />
+        <FieldRow label={t('data.samplingFrequency')} value={meta.sampling_frequency ?? '—'} />
         <FieldRow
-          label="Quality score"
+          label={t('data.totalRecords')}
+          value={meta.total_records != null ? formatNumber(meta.total_records) : '—'}
+        />
+        <FieldRow
+          label={t('data.qualityScore')}
           value={
             meta.data_quality_score !== undefined ? `${meta.data_quality_score.toFixed(1)}%` : '—'
           }
         />
-        <FieldRow label="Validation" value={meta.validation_status ?? '—'} />
-        <FieldRow label="Used in analyses" value={meta.used_in_analyses?.toString() ?? '0'} />
+        <FieldRow label={t('data.catalogValidation')} value={meta.validation_status ?? '—'} />
+        <FieldRow
+          label={t('data.usedInAnalyses')}
+          value={formatNumber(meta.used_in_analyses ?? 0)}
+        />
       </div>
 
       {meta.tags && meta.tags.length > 0 && (
         <div>
-          <Label>Tags</Label>
+          <Label>{t('data.tags')}</Label>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {meta.tags.map((tag) => (
               <Badge key={tag} variant="secondary">
@@ -1336,7 +1360,9 @@ function MetadataPanel({ meta }: { meta: DetailMetadata }) {
 
       <div className="flex items-center gap-2 text-xs text-fg-muted">
         <Calendar className="h-3.5 w-3.5" />
-        Registered {new Date(meta.created_at).toLocaleString()}
+        {t('data.registeredAt', {
+          date: formatDate(meta.created_at, { dateStyle: 'medium', timeStyle: 'short' }),
+        })}
       </div>
     </div>
   );
@@ -1361,13 +1387,14 @@ function Label({ children }: { children: ReactNode }) {
 // Auto/Manual badge to the right. "—" for legacy rows where the
 // /dinsight list doesn't have source info.
 function CatalogSourceCell({ source }: { source?: DinsightDatasetSource }) {
+  const { t } = useI18n();
   if (!source || source.source === 'unknown') {
     return <span className="text-xs text-fg-muted">—</span>;
   }
   const isAuto = source.source === 'auto';
   const primary = isAuto
-    ? (source.deviceName ?? source.deviceSlug ?? 'IoT Hub device')
-    : 'Manual upload';
+    ? (source.deviceName ?? source.deviceSlug ?? t('data.iotHubDevice'))
+    : t('data.manualUpload');
   return (
     <div className="flex items-center gap-2">
       <div className="min-w-0 flex-1">
@@ -1383,7 +1410,7 @@ function CatalogSourceCell({ source }: { source?: DinsightDatasetSource }) {
             : 'shrink-0 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide'
         }
       >
-        {isAuto ? 'Auto' : 'Manual'}
+        {isAuto ? t('data.auto') : t('common.manual')}
       </span>
     </div>
   );

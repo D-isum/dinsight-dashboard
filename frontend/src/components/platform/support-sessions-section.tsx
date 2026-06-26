@@ -19,6 +19,7 @@ import {
   TableLoading,
   TableRow,
 } from '@/components/ui/table';
+import { useI18n } from '@/i18n/client';
 
 // SupportSessionsSection is the audited "vendor admin looked at
 // customer data" flow. Open a session against a target customer org
@@ -48,23 +49,21 @@ interface SupportSession {
 }
 
 export function SupportSessionsSection() {
+  const { t } = useI18n();
   const [includeEnded, setIncludeEnded] = useState(false);
 
   return (
     <section className="space-y-4">
       <header>
-        <h3 className="text-sm font-semibold">Support mode</h3>
-        <p className="text-xs text-muted-foreground">
-          Open an explicit, time-bounded session before viewing a customer&apos;s data. The customer
-          can pull the audit log later via their account page — no silent impersonation.
-        </p>
+        <h3 className="text-sm font-semibold">{t('admin.supportMode')}</h3>
+        <p className="text-xs text-muted-foreground">{t('admin.supportModeDescription')}</p>
       </header>
 
       <OpenSessionForm />
 
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Sessions
+          {t('admin.sessions')}
         </h4>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
           <input
@@ -72,7 +71,7 @@ export function SupportSessionsSection() {
             checked={includeEnded}
             onChange={(e) => setIncludeEnded(e.target.checked)}
           />
-          Include ended / expired
+          {t('admin.includeEndedExpired')}
         </label>
       </div>
       <SessionsTable includeEnded={includeEnded} />
@@ -81,6 +80,7 @@ export function SupportSessionsSection() {
 }
 
 function OpenSessionForm() {
+  const { t } = useI18n();
   const qc = useQueryClient();
   const [slug, setSlug] = useState('');
   const [justification, setJustification] = useState('');
@@ -109,7 +109,7 @@ function OpenSessionForm() {
       setSlug('');
       setJustification('');
     },
-    onError: (err: unknown) => setError(extractApiError(err) ?? 'Failed to open session.'),
+    onError: (err: unknown) => setError(extractApiError(err) ?? t('admin.failedOpenSession')),
   });
 
   const canSubmit = slug.trim().length > 0 && justification.trim().length >= 5;
@@ -126,7 +126,7 @@ function OpenSessionForm() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium mb-1" htmlFor="support-target">
-            Target customer
+            {t('admin.targetCustomer')}
           </label>
           <select
             id="support-target"
@@ -135,7 +135,7 @@ function OpenSessionForm() {
             className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
             required
           >
-            <option value="">Select a customer…</option>
+            <option value="">{t('admin.selectCustomer')}</option>
             {customers.map((c) => (
               <option key={c.id} value={c.slug}>
                 {c.name} ({c.slug})
@@ -145,13 +145,13 @@ function OpenSessionForm() {
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" htmlFor="support-just">
-            Justification (≥ 5 chars)
+            {t('admin.justification')}
           </label>
           <Input
             id="support-just"
             value={justification}
             onChange={(e) => setJustification(e.target.value)}
-            placeholder="Reported missing ingestion runs in ticket #1234"
+            placeholder={t('admin.justificationPlaceholder')}
             required
             minLength={5}
           />
@@ -164,12 +164,12 @@ function OpenSessionForm() {
           ) : (
             <ShieldCheck className="h-4 w-4" />
           )}
-          Open support session
+          {t('admin.openSupportSession')}
         </Button>
       </div>
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Couldn&apos;t open session</AlertTitle>
+          <AlertTitle>{t('admin.couldntOpenSession')}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -178,6 +178,7 @@ function OpenSessionForm() {
 }
 
 function SessionsTable({ includeEnded }: { includeEnded: boolean }) {
+  const { t, formatDate } = useI18n();
   const qc = useQueryClient();
   const query = useQuery({
     queryKey: ['platform', 'support-sessions', { includeEnded }],
@@ -194,24 +195,24 @@ function SessionsTable({ includeEnded }: { includeEnded: boolean }) {
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Target</TableHead>
-          <TableHead>Opened by</TableHead>
-          <TableHead>Justification</TableHead>
-          <TableHead>Started</TableHead>
-          <TableHead>Expires</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead aria-label="Actions" />
+          <TableHead>{t('admin.target')}</TableHead>
+          <TableHead>{t('admin.openedBy')}</TableHead>
+          <TableHead>{t('admin.justification')}</TableHead>
+          <TableHead>{t('admin.started')}</TableHead>
+          <TableHead>{t('admin.expires')}</TableHead>
+          <TableHead>{t('common.status')}</TableHead>
+          <TableHead aria-label={t('common.actions')} />
         </TableRow>
       </TableHeader>
       <TableBody>
-        {query.isLoading && <TableLoading message="Loading sessions…" rowSpan={7} />}
-        {query.isError && <TableError message="Failed to load sessions." rowSpan={7} />}
+        {query.isLoading && <TableLoading message={t('admin.loadingSessions')} rowSpan={7} />}
+        {query.isError && <TableError message={t('admin.failedLoadSessions')} rowSpan={7} />}
         {query.isSuccess && query.data.length === 0 && (
           <TableEmpty
             message={
               includeEnded
-                ? 'No support sessions on record.'
-                : 'No active sessions. Open one with the form above.'
+                ? t('admin.noSupportSessions')
+                : t('admin.noActiveSessions')
             }
             rowSpan={7}
           />
@@ -228,18 +229,18 @@ function SessionsTable({ includeEnded }: { includeEnded: boolean }) {
               <TableCell className="text-xs">{s.vendor_email}</TableCell>
               <TableCell className="text-xs max-w-sm">{s.justification}</TableCell>
               <TableCell className="text-xs text-muted-foreground">
-                {new Date(s.started_at).toLocaleString()}
+                {formatDate(s.started_at, { dateStyle: 'medium', timeStyle: 'short' })}
               </TableCell>
               <TableCell className="text-xs text-muted-foreground">
-                {new Date(s.expires_at).toLocaleString()}
+                {formatDate(s.expires_at, { dateStyle: 'medium', timeStyle: 'short' })}
               </TableCell>
               <TableCell>
                 {s.active ? (
-                  <Badge variant="default">active</Badge>
+                  <Badge variant="default">{t('admin.active')}</Badge>
                 ) : s.ended_at ? (
-                  <Badge variant="outline">ended</Badge>
+                  <Badge variant="outline">{t('admin.ended')}</Badge>
                 ) : (
-                  <Badge variant="secondary">expired</Badge>
+                  <Badge variant="secondary">{t('admin.expired')}</Badge>
                 )}
               </TableCell>
               <TableCell className="text-right">
@@ -252,7 +253,7 @@ function SessionsTable({ includeEnded }: { includeEnded: boolean }) {
                     disabled={endMutation.isPending}
                   >
                     <ShieldOff className="h-4 w-4" />
-                    End
+                    {t('admin.end')}
                   </Button>
                 )}
               </TableCell>

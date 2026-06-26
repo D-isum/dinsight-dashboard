@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/i18n/client';
 import {
   Table,
   TableBody,
@@ -40,6 +41,7 @@ interface PlatformDeviceRow {
 }
 
 export function PlatformDevicesSection() {
+  const { t, formatDate } = useI18n();
   const query = useQuery({
     queryKey: ['platform', 'devices'],
     queryFn: async () => (await api.platform.devices.list()).data.data as PlatformDeviceRow[],
@@ -47,27 +49,24 @@ export function PlatformDevicesSection() {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold">All devices (cross-org)</h3>
-      <p className="text-xs text-muted-foreground">
-        Every device on the platform. Read-only — switch into the owning org to manage a device, or
-        open a support session for explicit cross-org access.
-      </p>
+      <h3 className="text-sm font-semibold">{t('admin.allDevices')}</h3>
+      <p className="text-xs text-muted-foreground">{t('admin.allDevicesDescription')}</p>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Org</TableHead>
-            <TableHead>Device</TableHead>
-            <TableHead>Device identity</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Last ingested</TableHead>
-            <TableHead>Created</TableHead>
+            <TableHead>{t('admin.org')}</TableHead>
+            <TableHead>{t('admin.device')}</TableHead>
+            <TableHead>{t('admin.deviceIdentity')}</TableHead>
+            <TableHead>{t('common.status')}</TableHead>
+            <TableHead>{t('admin.lastIngested')}</TableHead>
+            <TableHead>{t('admin.created')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {query.isLoading && <TableLoading message="Loading devices…" rowSpan={6} />}
-          {query.isError && <TableError message="Failed to load devices." rowSpan={6} />}
+          {query.isLoading && <TableLoading message={t('admin.loadingDevices')} rowSpan={6} />}
+          {query.isError && <TableError message={t('admin.failedLoadDevices')} rowSpan={6} />}
           {query.isSuccess && query.data.length === 0 && (
-            <TableEmpty message="No devices on the platform yet." rowSpan={6} />
+            <TableEmpty message={t('admin.noDevices')} rowSpan={6} />
           )}
           {query.isSuccess &&
             query.data.map((d) => (
@@ -84,25 +83,36 @@ export function PlatformDevicesSection() {
                   {d.iot_hub_device_id ? (
                     <>
                       {d.iot_hub_device_id}
-                      {d.iot_hub_name && <div className="text-[10px]">hub: {d.iot_hub_name}</div>}
+                      {d.iot_hub_name && (
+                        <div className="text-[10px]">{t('admin.hub', { name: d.iot_hub_name })}</div>
+                      )}
                     </>
                   ) : (
-                    <span className="italic">(legacy / not linked)</span>
+                    <span className="italic">{t('admin.legacyNotLinked')}</span>
                   )}
                 </TableCell>
                 <TableCell>
                   <Badge variant={d.status === 'active' ? 'default' : 'secondary'}>
-                    {d.status}
+                    {d.status === 'active'
+                      ? t('admin.active')
+                      : d.status === 'paused'
+                        ? t('admin.paused')
+                        : t('admin.retired')}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {d.last_ingested_at ? new Date(d.last_ingested_at).toLocaleString() : '—'}
+                  {d.last_ingested_at
+                    ? formatDate(d.last_ingested_at, {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      })
+                    : '—'}
                   {d.last_ingest_error && (
                     <div className="text-danger-text">{d.last_ingest_error}</div>
                   )}
                 </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
-                  {new Date(d.created_at).toLocaleString()}
+                  {formatDate(d.created_at, { dateStyle: 'medium', timeStyle: 'short' })}
                 </TableCell>
               </TableRow>
             ))}

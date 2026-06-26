@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api-client';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/i18n/client';
 import {
   Table,
   TableBody,
@@ -39,6 +40,7 @@ interface AnalyticsRow {
 }
 
 export function PlatformAnalyticsSection() {
+  const { t, formatDate, formatNumber } = useI18n();
   const query = useQuery({
     queryKey: ['platform', 'analytics'],
     queryFn: async () => (await api.platform.analytics.list()).data.data as AnalyticsRow[],
@@ -56,24 +58,30 @@ export function PlatformAnalyticsSection() {
   return (
     <section className="space-y-4">
       <header>
-        <h3 className="text-sm font-semibold">Fleet analytics</h3>
+        <h3 className="text-sm font-semibold">{t('admin.fleetAnalytics')}</h3>
         <p className="text-xs text-muted-foreground">
-          Per-customer counts across devices, members, file uploads, and ingestion. Recomputed every
-          60 seconds. The vendor&apos;s own org (<code>default</code>) is included and marked
-          platform.
+          {t('admin.fleetAnalyticsDescription', { slug: 'default' })}
         </p>
       </header>
 
       {query.isSuccess && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <StatCard label="Customers" value={rows.length} />
-          <StatCard label="Devices" value={totals.devices} sub={`${totals.devicesActive} active`} />
-          <StatCard label="Members" value={totals.members} />
-          <StatCard label="Uploads" value={totals.uploads} />
+          <StatCard label={t('admin.customers')} value={rows.length} />
           <StatCard
-            label="Ingestion rows"
+            label={t('admin.devices')}
+            value={totals.devices}
+            sub={`${formatNumber(totals.devicesActive)} ${t('admin.active')}`}
+          />
+          <StatCard label={t('admin.members')} value={totals.members} />
+          <StatCard label={t('admin.uploads')} value={totals.uploads} />
+          <StatCard
+            label={t('admin.ingestionRows')}
             value={totals.ingestion}
-            sub={totals.ingestionFailed > 0 ? `${totals.ingestionFailed} failed` : 'all clean'}
+            sub={
+              totals.ingestionFailed > 0
+                ? `${formatNumber(totals.ingestionFailed)} ${t('admin.failed')}`
+                : t('admin.allClean')
+            }
             tone={totals.ingestionFailed > 0 ? 'warn' : 'ok'}
           />
         </div>
@@ -82,19 +90,19 @@ export function PlatformAnalyticsSection() {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Customer</TableHead>
-            <TableHead>Devices</TableHead>
-            <TableHead>Members</TableHead>
-            <TableHead>Uploads</TableHead>
-            <TableHead>Ingestion (ok/failed)</TableHead>
-            <TableHead>Last ingest</TableHead>
+            <TableHead>{t('admin.customer')}</TableHead>
+            <TableHead>{t('admin.devices')}</TableHead>
+            <TableHead>{t('admin.members')}</TableHead>
+            <TableHead>{t('admin.uploads')}</TableHead>
+            <TableHead>{t('admin.ingestionOkFailed')}</TableHead>
+            <TableHead>{t('admin.lastIngest')}</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {query.isLoading && <TableLoading message="Loading analytics…" rowSpan={6} />}
-          {query.isError && <TableError message="Failed to load analytics." rowSpan={6} />}
+          {query.isLoading && <TableLoading message={t('admin.loadingAnalytics')} rowSpan={6} />}
+          {query.isError && <TableError message={t('admin.failedLoadAnalytics')} rowSpan={6} />}
           {query.isSuccess && query.data.length === 0 && (
-            <TableEmpty message="No organizations on this platform yet." rowSpan={6} />
+            <TableEmpty message={t('admin.noOrganizations')} rowSpan={6} />
           )}
           {query.isSuccess &&
             query.data.map((row) => {
@@ -106,7 +114,7 @@ export function PlatformAnalyticsSection() {
                     {row.org_name}
                     {isDefault && (
                       <Badge variant="outline" className="ml-2">
-                        platform
+                        {t('admin.platform')}
                       </Badge>
                     )}
                     <div className="text-xs text-muted-foreground font-mono">{row.org_slug}</div>
@@ -114,14 +122,15 @@ export function PlatformAnalyticsSection() {
                   <TableCell>
                     <span className="font-medium">{row.device_count_total}</span>
                     <div className="text-xs text-muted-foreground">
-                      {row.device_count_active} active · {row.device_count_paused} paused ·{' '}
-                      {row.device_count_retired} retired
+                      {formatNumber(row.device_count_active)} {t('admin.active')} ·{' '}
+                      {formatNumber(row.device_count_paused)} {t('admin.paused')} ·{' '}
+                      {formatNumber(row.device_count_retired)} {t('admin.retired')}
                     </div>
                   </TableCell>
-                  <TableCell>{row.member_count}</TableCell>
-                  <TableCell>{row.file_uploads_total}</TableCell>
+                  <TableCell>{formatNumber(row.member_count)}</TableCell>
+                  <TableCell>{formatNumber(row.file_uploads_total)}</TableCell>
                   <TableCell>
-                    <span className="font-medium">{ingestionOk}</span>
+                    <span className="font-medium">{formatNumber(ingestionOk)}</span>
                     <span className="text-muted-foreground"> / </span>
                     <span
                       className={
@@ -130,11 +139,16 @@ export function PlatformAnalyticsSection() {
                           : 'text-muted-foreground'
                       }
                     >
-                      {row.ingestion_rows_failed}
+                      {formatNumber(row.ingestion_rows_failed)}
                     </span>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {row.last_ingestion_at ? new Date(row.last_ingestion_at).toLocaleString() : '—'}
+                    {row.last_ingestion_at
+                      ? formatDate(row.last_ingestion_at, {
+                          dateStyle: 'medium',
+                          timeStyle: 'short',
+                        })
+                      : '—'}
                   </TableCell>
                 </TableRow>
               );
@@ -156,10 +170,11 @@ function StatCard({
   sub?: string;
   tone?: 'ok' | 'warn';
 }) {
+  const { formatNumber } = useI18n();
   return (
     <div className="rounded-lg border border-border bg-surface p-3">
       <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-      <div className="text-2xl font-semibold">{value.toLocaleString()}</div>
+      <div className="text-2xl font-semibold">{formatNumber(value)}</div>
       {sub && (
         <div
           className={tone === 'warn' ? 'text-xs text-danger-text' : 'text-xs text-muted-foreground'}

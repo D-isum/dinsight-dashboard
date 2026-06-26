@@ -457,22 +457,26 @@ export default function DashboardPage() {
     [t]
   );
 
+  const machineRecommendation = useMemo(
+    () => t(machineStatus.recommendationKey),
+    [machineStatus.recommendationKey, t]
+  );
   const machineReasons = useMemo(
     () =>
-      machineStatus.reasons && machineStatus.reasons.length > 0
-        ? machineStatus.reasons
-        : [machineStatus.recommendation],
-    [machineStatus.reasons, machineStatus.recommendation]
+      machineStatus.reasonsI18n && machineStatus.reasonsI18n.length > 0
+        ? machineStatus.reasonsI18n.map((reason) => t(reason.key, reason.values))
+        : [machineRecommendation],
+    [machineRecommendation, machineStatus.reasonsI18n, t]
   );
 
   useEffect(() => {
     setMachineHealthSnapshot({
       state: machineStatus.state,
-      recommendation: machineStatus.recommendation,
+      recommendation: machineRecommendation,
       reasons: machineReasons,
       updatedAt: new Date().toISOString(),
     });
-  }, [machineReasons, machineStatus.recommendation, machineStatus.state, setMachineHealthSnapshot]);
+  }, [machineReasons, machineRecommendation, machineStatus.state, setMachineHealthSnapshot]);
 
   const handleRefresh = async () => {
     try {
@@ -860,7 +864,7 @@ export default function DashboardPage() {
                     </Badge>
                   </div>
                   <p className="mt-2 max-w-3xl text-sm opacity-90">
-                    {machineStatus.recommendation}
+                    {machineRecommendation}
                   </p>
                 </div>
                 <Button

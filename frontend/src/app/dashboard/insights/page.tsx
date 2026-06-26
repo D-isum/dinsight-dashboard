@@ -1234,9 +1234,9 @@ export default function HealthInsightsPage() {
 
     const toPoint = (
       interval: DeteriorationInterval,
-      extraType: 'Baseline' | 'Monitoring' = interval.dataset_type === 'baseline'
-        ? 'Baseline'
-        : 'Monitoring'
+      extraType: string = interval.dataset_type === 'baseline'
+        ? baselineSeriesName
+        : monitoringSeriesName
     ) => [
       interval.sort_index,
       interval.distance_from_g0,
@@ -1284,7 +1284,7 @@ export default function HealthInsightsPage() {
       return label ? formatIntervalTick(label).replace('<br>', '\n') : `#${roundedValue}`;
     };
     const formatDistanceAxisLabel = (value: number) =>
-      Number(value).toLocaleString(undefined, {
+      formatNumber(Number(value), {
         maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
       });
 
@@ -1305,15 +1305,13 @@ export default function HealthInsightsPage() {
 
       if (
         item.seriesName === baselineRollingSeriesName ||
-        item.seriesName === monitoringRollingSeriesName ||
-        item.seriesName === 'Baseline rolling mean' ||
-        item.seriesName === 'Monitoring rolling mean'
+        item.seriesName === monitoringRollingSeriesName
       ) {
-        return `<b>${item.seriesName}</b><br/>Interval: ${value[3] ?? value[2]}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
+        return `<b>${item.seriesName}</b><br/>${t('insights.interval')}: ${value[3] ?? value[2]}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
       }
 
-      const pointCount = value[3] != null ? `<br/>${formatNumber(Number(value[3]))} pts` : '';
-      return `<b>${item.seriesName}</b><br/>Interval: ${value[2] ?? formatAxisLabel(value[0])}${pointCount}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
+      const pointCount = value[3] != null ? `<br/>${formatNumber(Number(value[3]))} ${t('common.points')}` : '';
+      return `<b>${item.seriesName}</b><br/>${t('insights.interval')}: ${value[2] ?? formatAxisLabel(value[0])}${pointCount}<br/>${t('insights.distanceFromBaseline')}: ${Number(value[1]).toFixed(4)}`;
     };
 
     const option: EChartsOption = {
@@ -1385,7 +1383,7 @@ export default function HealthInsightsPage() {
           name: baselineSeriesName,
           data: sorted
             .filter((interval) => interval.dataset_type === 'baseline')
-            .map((interval) => toPoint(interval, 'Baseline')),
+            .map((interval) => toPoint(interval, baselineSeriesName)),
           showSymbol: true,
           symbol: 'circle',
           symbolSize: 5.5,
@@ -1434,7 +1432,7 @@ export default function HealthInsightsPage() {
               (interval, index) =>
                 interval.dataset_type === 'monitoring' && !recentMonitoringIndexSet.has(index)
             )
-            .map((interval) => toPoint(interval, 'Monitoring')),
+            .map((interval) => toPoint(interval, monitoringSeriesName)),
           showSymbol: true,
           symbol: 'circle',
           symbolSize: 4.5,
@@ -1452,7 +1450,7 @@ export default function HealthInsightsPage() {
               (interval, index) =>
                 interval.dataset_type === 'monitoring' && recentMonitoringIndexSet.has(index)
             )
-            .map((interval) => toPoint(interval, 'Monitoring')),
+            .map((interval) => toPoint(interval, monitoringSeriesName)),
           showSymbol: true,
           symbol: 'circle',
           symbolSize: 5.5,
@@ -1477,7 +1475,7 @@ export default function HealthInsightsPage() {
               {
                 type: 'scatter',
                 name: t('common.latest'),
-                data: [toPoint(latestInterval, 'Monitoring')],
+                data: [toPoint(latestInterval, monitoringSeriesName)],
                 symbolSize: 14,
                 itemStyle: {
                   color: plotTheme.latest,
@@ -1494,9 +1492,9 @@ export default function HealthInsightsPage() {
                 type: 'scatter',
                 name:
                   crossingTone === 'danger'
-                    ? `${t('common.danger')} crossing`
-                    : `${t('common.warning')} crossing`,
-                data: [toPoint(crossingInterval, 'Monitoring')],
+                    ? `${t('common.danger')} ${t('insights.transition')}`
+                    : `${t('common.warning')} ${t('insights.transition')}`,
+                data: [toPoint(crossingInterval, monitoringSeriesName)],
                 symbol: 'diamond',
                 symbolSize: 14,
                 itemStyle: {
@@ -1565,20 +1563,20 @@ export default function HealthInsightsPage() {
       ...(baselineTransitionMean != null
         ? [
             {
-              name: `Baseline mean ${baselineTransitionMean.toFixed(3)}`,
+              name: `${t('insights.baselineMean')} ${baselineTransitionMean.toFixed(3)}`,
               yAxis: baselineTransitionMean,
               lineStyle: { color: plotTheme.baseline, type: 'dotted', width: 2 },
-              label: { formatter: 'Baseline mean' },
+              label: { formatter: t('insights.baselineMean') },
             },
           ]
         : []),
       ...(monitoringTransitionMean != null
         ? [
             {
-              name: `Monitoring mean ${monitoringTransitionMean.toFixed(3)}`,
+              name: `${t('insights.monitoringMean')} ${monitoringTransitionMean.toFixed(3)}`,
               yAxis: monitoringTransitionMean,
               lineStyle: { color: plotTheme.monitoring, type: 'dashed', width: 2 },
-              label: { formatter: 'Monitoring mean' },
+              label: { formatter: t('insights.monitoringMean') },
             },
           ]
         : []),
@@ -1632,23 +1630,23 @@ export default function HealthInsightsPage() {
       value,
       transition.from_label,
       transition.to_label,
-      transition.from_dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
-      transition.to_dataset_type === 'baseline' ? 'Baseline' : 'Monitoring',
+      transition.from_dataset_type === 'baseline' ? t('common.baseline') : t('common.monitoring'),
+      transition.to_dataset_type === 'baseline' ? t('common.baseline') : t('common.monitoring'),
       label,
     ];
     const transitionTooltip = (params: any) => {
       const value = params?.data?.value ?? params?.data;
       if (!Array.isArray(value)) {
-        return `<b>${params?.seriesName ?? 'Transition'}</b>`;
+        return `<b>${params?.seriesName ?? t('insights.transition')}</b>`;
       }
-      return `<b>${params.seriesName}</b><br/>Transition ${value[0]}: ${value[2]} → ${value[3]}<br/>Source ${value[4]} · Dest ${value[5]}<br/>Distance: ${Number(value[1]).toFixed(4)}`;
+      return `<b>${params.seriesName}</b><br/>${t('insights.transition')} ${value[0]}: ${value[2]} -> ${value[3]}<br/>${t('insights.source')} ${value[4]} · ${t('insights.destination')} ${value[5]}<br/>${t('insights.distance')}: ${Number(value[1]).toFixed(4)}`;
     };
     const transitionSeriesOptions: any[] = [
       {
         type: 'line',
-        name: 'Baseline',
+        name: t('common.baseline'),
         data: transitions.map((transition, index) =>
-          transitionPoint(transition, index, transitionSeries.baseline[index], 'Baseline')
+          transitionPoint(transition, index, transitionSeries.baseline[index], t('common.baseline'))
         ),
         showSymbol: true,
         symbol: 'circle',
@@ -1663,9 +1661,9 @@ export default function HealthInsightsPage() {
       },
       {
         type: 'line',
-        name: 'Handoff',
+        name: t('insights.handoff'),
         data: transitions.map((transition, index) =>
-          transitionPoint(transition, index, transitionSeries.handoff[index], 'Handoff')
+          transitionPoint(transition, index, transitionSeries.handoff[index], t('insights.handoff'))
         ),
         showSymbol: true,
         symbol: 'circle',
@@ -1676,9 +1674,14 @@ export default function HealthInsightsPage() {
       },
       {
         type: 'line',
-        name: 'Monitoring',
+        name: t('common.monitoring'),
         data: transitions.map((transition, index) =>
-          transitionPoint(transition, index, transitionSeries.monitoring[index], 'Monitoring')
+          transitionPoint(
+            transition,
+            index,
+            transitionSeries.monitoring[index],
+            t('common.monitoring')
+          )
         ),
         showSymbol: true,
         symbol: 'circle',
@@ -1692,9 +1695,9 @@ export default function HealthInsightsPage() {
     if (spikeTransitions.length > 0) {
       transitionSeriesOptions.push({
         type: 'scatter',
-        name: 'Spike',
+        name: t('insights.spike'),
         data: spikeTransitions.map(({ transition, index }) =>
-          transitionPoint(transition, index, transition.distance, 'Spike')
+          transitionPoint(transition, index, transition.distance, t('insights.spike'))
         ),
         symbol: 'diamond',
         symbolSize: 12,
@@ -1715,7 +1718,7 @@ export default function HealthInsightsPage() {
       return tickIndex >= 0 ? tickText[tickIndex] : `#${rounded}`;
     };
     const formatDistanceAxisLabel = (value: number) =>
-      Number(value).toLocaleString(undefined, {
+      formatNumber(Number(value), {
         maximumFractionDigits: Math.abs(value) >= 10 ? 1 : 2,
       });
     const option: EChartsOption = {
@@ -1757,8 +1760,8 @@ export default function HealthInsightsPage() {
         type: 'value',
         name:
           wearResult?.metadata_column != null
-            ? `${wearResult.metadata_column} interval transition`
-            : 'Interval transition',
+            ? `${wearResult.metadata_column} ${t('insights.intervalTransition')}`
+            : t('insights.intervalTransition'),
         nameLocation: 'middle',
         nameGap: 52,
         min: xAxisRange?.[0],
@@ -1768,7 +1771,7 @@ export default function HealthInsightsPage() {
       },
       yAxis: {
         type: 'value',
-        name: 'Step-to-step movement distance',
+        name: t('insights.stepMovementDistance'),
         nameLocation: 'middle',
         nameGap: 58,
         min: yAxisRange?.[0],
@@ -1801,34 +1804,59 @@ export default function HealthInsightsPage() {
           : 'success';
   const distanceThresholdMethodLabel =
     distanceSummary.thresholdSource === 'baseline-adaptive'
-      ? `Adaptive baseline ${distanceThresholdConfig.warningSpreadMultiplier}x/${distanceThresholdConfig.dangerSpreadMultiplier}x spread`
+      ? t('insights.adaptiveThresholdLabel', {
+          warning: distanceThresholdConfig.warningSpreadMultiplier,
+          danger: distanceThresholdConfig.dangerSpreadMultiplier,
+        })
       : distanceSummary.thresholdSource === 'baseline-statistical'
-        ? `Baseline p${distanceThresholdConfig.warningPercentile}/p${distanceThresholdConfig.dangerPercentile}`
+        ? t('insights.statisticalThresholdLabel', {
+            warning: distanceThresholdConfig.warningPercentile,
+            danger: distanceThresholdConfig.dangerPercentile,
+          })
         : distanceSummary.thresholdSource === 'baseline-relative'
-          ? `Baseline mean +${distanceThresholdConfig.warningRelativePercent}%/+${distanceThresholdConfig.dangerRelativePercent}%`
+          ? t('insights.relativeThresholdLabel', {
+              warning: distanceThresholdConfig.warningRelativePercent,
+              danger: distanceThresholdConfig.dangerRelativePercent,
+            })
           : distanceSummary.thresholdSource === 'baseline-relative-fallback'
-            ? 'Baseline-relative fallback'
-            : 'Fixed fallback';
+            ? t('insights.fallbackThresholdLabel')
+            : t('insights.fixedFallbackThresholdLabel');
   const warningThresholdDescription =
     distanceSummary.thresholdSource === 'baseline-adaptive'
-      ? `Adaptive baseline threshold: baseline median plus ${distanceThresholdConfig.warningSpreadMultiplier}x the selected baseline's robust spread.`
+      ? t('insights.adaptiveThresholdDescription', {
+          multiplier: distanceThresholdConfig.warningSpreadMultiplier,
+        })
       : distanceSummary.thresholdSource === 'baseline-statistical'
-        ? `Baseline statistical threshold: ${distanceThresholdConfig.warningPercentile}th percentile of selected healthy baseline distances.`
+        ? t('insights.statisticalThresholdDescription', {
+            percentile: distanceThresholdConfig.warningPercentile,
+          })
         : distanceSummary.thresholdSource === 'baseline-relative'
-          ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
+          ? t('insights.relativeThresholdDescription', {
+              percent: distanceThresholdConfig.warningRelativePercent,
+            })
           : distanceSummary.thresholdSource === 'baseline-relative-fallback'
-            ? `Fallback threshold: adaptive spread was unavailable, so warning uses selected baseline mean plus ${distanceThresholdConfig.warningRelativePercent}%.`
-            : 'Fixed fallback warning threshold used because a valid selected baseline distribution is unavailable.';
+            ? t('insights.relativeFallbackWarningDescription', {
+                percent: distanceThresholdConfig.warningRelativePercent,
+              })
+            : t('insights.fixedFallbackWarningDescription');
   const dangerThresholdDescription =
     distanceSummary.thresholdSource === 'baseline-adaptive'
-      ? `Adaptive baseline threshold: baseline median plus ${distanceThresholdConfig.dangerSpreadMultiplier}x the selected baseline's robust spread.`
+      ? t('insights.adaptiveThresholdDescription', {
+          multiplier: distanceThresholdConfig.dangerSpreadMultiplier,
+        })
       : distanceSummary.thresholdSource === 'baseline-statistical'
-        ? `Baseline statistical threshold: ${distanceThresholdConfig.dangerPercentile}th percentile of selected healthy baseline distances.`
+        ? t('insights.statisticalThresholdDescription', {
+            percentile: distanceThresholdConfig.dangerPercentile,
+          })
         : distanceSummary.thresholdSource === 'baseline-relative'
-          ? `Baseline-relative threshold: selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
+          ? t('insights.relativeThresholdDescription', {
+              percent: distanceThresholdConfig.dangerRelativePercent,
+            })
           : distanceSummary.thresholdSource === 'baseline-relative-fallback'
-            ? `Fallback threshold: adaptive spread was unavailable, so danger uses selected baseline mean plus ${distanceThresholdConfig.dangerRelativePercent}%.`
-            : 'Fixed fallback danger threshold used because a valid selected baseline distribution is unavailable.';
+            ? t('insights.relativeFallbackDangerDescription', {
+                percent: distanceThresholdConfig.dangerRelativePercent,
+              })
+            : t('insights.fixedFallbackDangerDescription');
 
   const insightsMachineState =
     latestMonitoringTone === 'danger'
@@ -1848,14 +1876,19 @@ export default function HealthInsightsPage() {
       state: insightsMachineState,
       recommendation:
         insightsMachineState === 'Failing'
-          ? 'Latest monitoring interval is beyond the danger threshold.'
+          ? t('insights.recommendationDanger')
           : insightsMachineState === 'Deteriorating'
-            ? 'Latest monitoring interval is beyond the warning threshold.'
-            : 'Latest monitoring interval remains within the selected baseline threshold model.',
+            ? t('insights.recommendationWarning')
+            : t('insights.recommendationWithinThreshold'),
       reasons: [
-        `Latest distance ${latestMonitoringInterval.distance_from_g0.toFixed(3)}.`,
-        `Warning ${distanceSummary.warningThreshold.toFixed(3)}, danger ${distanceSummary.dangerThreshold.toFixed(3)}.`,
-        `Threshold model: ${distanceThresholdMethodLabel}.`,
+        t('insights.latestDistance', {
+          value: latestMonitoringInterval.distance_from_g0.toFixed(3),
+        }),
+        t('insights.warningDangerSummary', {
+          warning: distanceSummary.warningThreshold.toFixed(3),
+          danger: distanceSummary.dangerThreshold.toFixed(3),
+        }),
+        t('insights.thresholdModelSummary', { label: distanceThresholdMethodLabel }),
       ],
       updatedAt: new Date().toISOString(),
     });
@@ -1866,6 +1899,7 @@ export default function HealthInsightsPage() {
     insightsMachineState,
     latestMonitoringInterval,
     setMachineHealthSnapshot,
+    t,
     wearResult,
   ]);
 
@@ -2212,7 +2246,7 @@ export default function HealthInsightsPage() {
                   <div>
                     <p className="text-sm font-medium">{t('insights.thresholdModel')}</p>
                     <p className="text-xs text-muted-foreground">
-                      Controls when monitoring distance becomes warning or danger.
+                      {t('insights.thresholdModelDescription')}
                     </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={resetDistanceThresholdConfig}>
@@ -2221,7 +2255,9 @@ export default function HealthInsightsPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground">Method</label>
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {t('insights.method')}
+                  </label>
                   <select
                     value={distanceThresholdConfig.mode}
                     onChange={(event) =>
@@ -2236,9 +2272,9 @@ export default function HealthInsightsPage() {
                     }
                     className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                   >
-                    <option value="adaptive">Adaptive baseline spread</option>
-                    <option value="statistical">Baseline statistical percentile</option>
-                    <option value="relative">Relative % above baseline mean</option>
+                    <option value="adaptive">{t('insights.adaptiveBaselineSpread')}</option>
+                    <option value="statistical">{t('insights.baselineStatisticalPercentile')}</option>
+                    <option value="relative">{t('insights.relativeAboveBaselineMean')}</option>
                   </select>
                 </div>
 
@@ -2246,7 +2282,7 @@ export default function HealthInsightsPage() {
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                        Warning spread x
+                        {t('insights.warningSpreadX')}
                         <Input
                           type="number"
                           min={0.1}
@@ -2261,7 +2297,7 @@ export default function HealthInsightsPage() {
                         />
                       </label>
                       <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                        Danger spread x
+                        {t('insights.dangerSpreadX')}
                         <Input
                           type="number"
                           min={0.2}
@@ -2277,15 +2313,14 @@ export default function HealthInsightsPage() {
                       </label>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Default 1.5x/2.5x: thresholds are relative to the selected baseline median and
-                      automatically widen or tighten with baseline spread.
+                      {t('insights.adaptiveModeDescription')}
                     </p>
                   </>
                 ) : distanceThresholdConfig.mode === 'statistical' ? (
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                        Warning percentile
+                        {t('insights.warningPercentile')}
                         <Input
                           type="number"
                           min={50}
@@ -2300,7 +2335,7 @@ export default function HealthInsightsPage() {
                         />
                       </label>
                       <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                        Danger percentile
+                        {t('insights.dangerPercentile')}
                         <Input
                           type="number"
                           min={50.1}
@@ -2316,15 +2351,14 @@ export default function HealthInsightsPage() {
                       </label>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Percentile mode: warning starts near the upper edge of selected healthy
-                      baseline behavior; danger starts farther into the healthy tail.
+                      {t('insights.statisticalModeDescription')}
                     </p>
                   </>
                 ) : (
                   <>
                     <div className="grid grid-cols-2 gap-2">
                       <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                        Warning above mean (%)
+                        {t('insights.warningAboveMeanPercent')}
                         <Input
                           type="number"
                           min={1}
@@ -2339,7 +2373,7 @@ export default function HealthInsightsPage() {
                         />
                       </label>
                       <label className="space-y-1 text-xs font-medium text-muted-foreground">
-                        Danger above mean (%)
+                        {t('insights.dangerAboveMeanPercent')}
                         <Input
                           type="number"
                           min={2}
@@ -2355,8 +2389,7 @@ export default function HealthInsightsPage() {
                       </label>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Relative mode: warning and danger are fixed percentages above the selected
-                      healthy baseline mean.
+                      {t('insights.relativeModeDescription')}
                     </p>
                   </>
                 )}
@@ -2560,12 +2593,11 @@ export default function HealthInsightsPage() {
                         </button>
                         {showDistanceGuide && (
                           <p className="mt-2">
-                            X-axis = interval order ({wearResult.metadata_column}). Y-axis =
-                            distance from the selected healthy baseline center. Blue = baseline
-                            intervals. Red = monitoring intervals. Green and violet solid lines show
-                            baseline and monitoring rolling means. Warning and danger thresholds use{' '}
-                            {distanceThresholdMethodLabel}. The vertical dashed guide marks the
-                            first warning or danger crossing.
+                            {t('insights.distanceGuide', {
+                              column: wearResult.metadata_column,
+                              label: distanceThresholdMethodLabel,
+                              crossing: t('insights.firstCrossingDescription'),
+                            })}
                           </p>
                         )}
                       </div>
@@ -2573,7 +2605,9 @@ export default function HealthInsightsPage() {
                       {distanceEChart ? (
                         <ChartFrame
                           title={t('insights.distanceFromBaseline')}
-                          description={`Monitoring movement from the selected healthy baseline cluster. Thresholds: ${distanceThresholdMethodLabel}.`}
+                          description={t('insights.deteriorationChartDescription', {
+                            label: distanceThresholdMethodLabel,
+                          })}
                           stats={
                             <>
                               <ChartStat
@@ -2583,7 +2617,7 @@ export default function HealthInsightsPage() {
                                     ? latestMonitoringInterval.distance_from_g0.toFixed(3)
                                     : '—'
                                 }
-                                description="Distance for the latest monitoring interval. Higher values are farther from the selected healthy baseline center."
+                                description={t('insights.latestDistanceDescription')}
                                 tone={latestMonitoringTone}
                               />
                               <ChartStat
@@ -2593,7 +2627,7 @@ export default function HealthInsightsPage() {
                                     ? distanceSummary.baseline.toFixed(3)
                                     : '—'
                                 }
-                                description="Average distance across the selected healthy baseline intervals. Thresholds are derived from this value."
+                                description={t('insights.baselineMeanDescription')}
                                 tone="baseline"
                               />
                               <ChartStat
@@ -2603,7 +2637,7 @@ export default function HealthInsightsPage() {
                                     ? distanceSummary.monitoring.toFixed(3)
                                     : '—'
                                 }
-                                description="Average distance across monitoring intervals. Compare this with the baseline mean."
+                                description={t('insights.monitoringMeanDescription')}
                                 tone="monitoring"
                               />
                               <ChartStat
@@ -2613,7 +2647,7 @@ export default function HealthInsightsPage() {
                                     ? distanceSummary.delta.toFixed(3)
                                     : '—'
                                 }
-                                description="Monitoring mean minus baseline mean. Positive values indicate monitoring intervals are farther from the healthy baseline."
+                                description={t('insights.deltaDescription')}
                                 tone={
                                   distanceSummary.delta == null
                                     ? 'neutral'
@@ -2723,14 +2757,14 @@ export default function HealthInsightsPage() {
                             }
                           >
                             <Download className="mr-2 h-4 w-4" />
-                            Export interval CSV
+                            {t('insights.exportIntervalCsv')}
                           </Button>
                         </div>
 
                         {showIntervalTable && (
                           <div className="space-y-3">
                             <div className="flex items-center gap-2 text-sm">
-                              <span>Rows per page:</span>
+                              <span>{t('insights.rowsPerPage')}</span>
                               <select
                                 value={intervalPageSize}
                                 onChange={(event) => {
@@ -2750,11 +2784,11 @@ export default function HealthInsightsPage() {
                               <table className="min-w-full table-auto text-sm">
                                 <thead>
                                   <tr className="text-left">
-                                    <th className="pb-2 pr-4">Interval</th>
-                                    <th className="pb-2 pr-4">Type</th>
-                                    <th className="pb-2 pr-4">Points</th>
-                                    <th className="pb-2 pr-4">Distance from baseline</th>
-                                    <th className="pb-2 pr-4">In baseline cluster</th>
+                                    <th className="pb-2 pr-4">{t('insights.interval')}</th>
+                                    <th className="pb-2 pr-4">{t('data.type')}</th>
+                                    <th className="pb-2 pr-4">{t('common.points')}</th>
+                                    <th className="pb-2 pr-4">{t('insights.distanceFromBaseline')}</th>
+                                    <th className="pb-2 pr-4">{t('insights.inBaselineCluster')}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -2765,12 +2799,12 @@ export default function HealthInsightsPage() {
                                     >
                                       <td className="py-2 pr-4">{row.metadata_value}</td>
                                       <td className="py-2 pr-4">{row.dataset_type}</td>
-                                      <td className="py-2 pr-4">{row.point_count}</td>
+                                      <td className="py-2 pr-4">{formatNumber(row.point_count)}</td>
                                       <td className="py-2 pr-4">
                                         {row.distance_from_g0.toFixed(4)}
                                       </td>
                                       <td className="py-2 pr-4">
-                                        {row.is_baseline_cluster ? 'Yes' : 'No'}
+                                        {row.is_baseline_cluster ? t('common.yes') : t('common.no')}
                                       </td>
                                     </tr>
                                   ))}
@@ -2779,7 +2813,10 @@ export default function HealthInsightsPage() {
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span>
-                                Page {intervalPage} / {intervalTotalPages}
+                                {t('insights.pageSummary', {
+                                  page: intervalPage,
+                                  total: intervalTotalPages,
+                                })}
                               </span>
                               <div className="flex gap-2">
                                 <Button
@@ -2788,7 +2825,7 @@ export default function HealthInsightsPage() {
                                   onClick={() => setIntervalPage((page) => Math.max(1, page - 1))}
                                   disabled={intervalPage <= 1}
                                 >
-                                  Prev
+                                  {t('common.previous')}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -2800,7 +2837,7 @@ export default function HealthInsightsPage() {
                                   }
                                   disabled={intervalPage >= intervalTotalPages}
                                 >
-                                  Next
+                                  {t('common.next')}
                                 </Button>
                               </div>
                             </div>
@@ -2817,7 +2854,7 @@ export default function HealthInsightsPage() {
                           onClick={() => setShowTransitionGuide((prev) => !prev)}
                         >
                           <span className="font-medium text-foreground">
-                            How to read this chart
+                            {t('insights.howToRead')}
                           </span>
                           {showTransitionGuide ? (
                             <ChevronUp className="h-4 w-4" />
@@ -2827,30 +2864,28 @@ export default function HealthInsightsPage() {
                         </button>
                         {showTransitionGuide && (
                           <p className="mt-2">
-                            X-axis = consecutive transition order. Y-axis = centroid movement
-                            between one interval and the next. Spikes indicate abrupt behavior
-                            changes.
+                            {t('insights.transitionGuide')}
                           </p>
                         )}
                       </div>
 
                       {transitionPlot ? (
                         <ChartFrame
-                          title="Transition movement"
-                          description="Step-to-step movement split by baseline, handoff, and monitoring transition types."
+                          title={t('insights.transitionMovement')}
+                          description={t('insights.transitionMovementDescription')}
                           stats={
                             <>
                               <ChartStat
-                                label="Transitions"
-                                value={transitionRows.length.toLocaleString()}
+                                label={t('insights.transitions')}
+                                value={formatNumber(transitionRows.length)}
                               />
                               <ChartStat
-                                label="Spikes"
-                                value={(transitionPlot.spikeCount ?? 0).toLocaleString()}
+                                label={t('insights.spike')}
+                                value={formatNumber(transitionPlot.spikeCount ?? 0)}
                                 tone={transitionPlot.spikeCount ? 'warning' : 'success'}
                               />
                               <ChartStat
-                                label="Mean movement"
+                                label={t('insights.meanMovement')}
                                 value={wearResult.distances.gi_to_gi_plus_1_mean.toFixed(3)}
                                 tone="info"
                               />
@@ -2858,10 +2893,10 @@ export default function HealthInsightsPage() {
                           }
                           actions={
                             <>
-                              <ChartSwatch color={plotTheme.baseline} label="Baseline" />
-                              <ChartSwatch color={plotTheme.warning} label="Handoff" />
-                              <ChartSwatch color={plotTheme.monitoring} label="Monitoring" />
-                              <ChartSwatch color={plotTheme.danger} label="Spike" />
+                              <ChartSwatch color={plotTheme.baseline} label={t('common.baseline')} />
+                              <ChartSwatch color={plotTheme.warning} label={t('insights.handoff')} />
+                              <ChartSwatch color={plotTheme.monitoring} label={t('common.monitoring')} />
+                              <ChartSwatch color={plotTheme.danger} label={t('insights.spike')} />
                             </>
                           }
                           bodyClassName="p-2"
@@ -2876,8 +2911,8 @@ export default function HealthInsightsPage() {
                       ) : (
                         <WorkflowState
                           icon={<Activity className="h-5 w-5" aria-hidden="true" />}
-                          title="Transition plot is not ready"
-                          description="Enable monitoring intervals or choose a dataset with enough ordered baseline and monitoring intervals to calculate step-to-step movement."
+                          title={t('insights.transitionPlotNotReady')}
+                          description={t('insights.transitionPlotNotReadyDescription')}
                         />
                       )}
 
@@ -2888,7 +2923,9 @@ export default function HealthInsightsPage() {
                             size="sm"
                             onClick={() => setShowTransitionTable((prev) => !prev)}
                           >
-                            {showTransitionTable ? 'Hide' : 'Show'} transition summary
+                            {showTransitionTable
+                              ? t('insights.hideTransitionSummary')
+                              : t('insights.showTransitionSummary')}
                           </Button>
                           <Button
                             variant="outline"
@@ -2907,14 +2944,14 @@ export default function HealthInsightsPage() {
                             }
                           >
                             <Download className="mr-2 h-4 w-4" />
-                            Export transition CSV
+                            {t('insights.exportTransitionCsv')}
                           </Button>
                         </div>
 
                         {showTransitionTable && (
                           <div className="space-y-3">
                             <div className="flex items-center gap-2 text-sm">
-                              <span>Rows per page:</span>
+                              <span>{t('insights.rowsPerPage')}</span>
                               <select
                                 value={transitionPageSize}
                                 onChange={(event) => {
@@ -2934,11 +2971,11 @@ export default function HealthInsightsPage() {
                               <table className="min-w-full table-auto text-sm">
                                 <thead>
                                   <tr className="text-left">
-                                    <th className="pb-2 pr-4">From</th>
-                                    <th className="pb-2 pr-4">To</th>
-                                    <th className="pb-2 pr-4">From type</th>
-                                    <th className="pb-2 pr-4">To type</th>
-                                    <th className="pb-2 pr-4">Distance</th>
+                                    <th className="pb-2 pr-4">{t('insights.from')}</th>
+                                    <th className="pb-2 pr-4">{t('insights.to')}</th>
+                                    <th className="pb-2 pr-4">{t('insights.fromType')}</th>
+                                    <th className="pb-2 pr-4">{t('insights.toType')}</th>
+                                    <th className="pb-2 pr-4">{t('insights.distance')}</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -2959,7 +2996,10 @@ export default function HealthInsightsPage() {
                             </div>
                             <div className="flex items-center justify-between text-sm">
                               <span>
-                                Page {transitionPage} / {transitionTotalPages}
+                                {t('insights.pageSummary', {
+                                  page: transitionPage,
+                                  total: transitionTotalPages,
+                                })}
                               </span>
                               <div className="flex gap-2">
                                 <Button
@@ -2968,7 +3008,7 @@ export default function HealthInsightsPage() {
                                   onClick={() => setTransitionPage((page) => Math.max(1, page - 1))}
                                   disabled={transitionPage <= 1}
                                 >
-                                  Prev
+                                  {t('common.previous')}
                                 </Button>
                                 <Button
                                   size="sm"
@@ -2980,7 +3020,7 @@ export default function HealthInsightsPage() {
                                   }
                                   disabled={transitionPage >= transitionTotalPages}
                                 >
-                                  Next
+                                  {t('common.next')}
                                 </Button>
                               </div>
                             </div>
@@ -2992,7 +3032,7 @@ export default function HealthInsightsPage() {
                 </>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Run wear trend to populate this section.
+                  {t('insights.runWearTrendToPopulate')}
                 </p>
               )}
             </CardContent>
@@ -3004,12 +3044,12 @@ export default function HealthInsightsPage() {
         <CardContent className="flex flex-wrap gap-3 py-4">
           <Button asChild>
             <Link href="/dashboard/live">
-              Open live monitor
+              {t('nav.openLiveMonitor')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Link>
           </Button>
           <Button variant="outline" asChild>
-            <Link href="/dashboard/account">Open account & security</Link>
+            <Link href="/dashboard/account">{t('settings.title')}</Link>
           </Button>
         </CardContent>
       </Card>

@@ -37,6 +37,7 @@ import { ValidationRulesPanel } from '@/components/datasets/validation-rules-pan
 import { AuditLogSection } from '@/components/audit/audit-log-section';
 import { usePermission } from '@/components/auth/require-permission';
 import { Actions } from '@/lib/permissions';
+import { useI18n } from '@/i18n/client';
 
 // Settings is the consolidated settings surface. Sub-sections
 // are tabs so the page stays a single route (deep-linkable via
@@ -113,49 +114,50 @@ function AccountSecurityView() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, refreshUser } = useAuth();
+  const { t, formatDate, formatNumber } = useI18n();
   const queryClient = useQueryClient();
   const canReadAudit = usePermission(Actions.AuditRead);
   const sectionGroups = useMemo(
     () => [
       {
-        label: 'Account',
-        description: 'Identity and sign-in',
+        label: t('settings.account'),
+        description: t('settings.identity'),
         sections: [
-          { value: 'profile' as const, label: 'Profile', icon: User },
-          { value: 'security' as const, label: 'Security', icon: Shield },
-          { value: 'notifications' as const, label: 'Notifications', icon: Bell },
+          { value: 'profile' as const, label: t('settings.profile'), icon: User },
+          { value: 'security' as const, label: t('settings.security'), icon: Shield },
+          { value: 'notifications' as const, label: t('settings.notifications'), icon: Bell },
         ],
       },
       {
-        label: 'Organization',
-        description: 'People and devices',
+        label: t('settings.organization'),
+        description: t('settings.peopleAndDevices'),
         sections: [
-          { value: 'organizations' as const, label: 'Organizations', icon: Building2 },
-          { value: 'members' as const, label: 'Members', icon: Users },
-          { value: 'devices' as const, label: 'Devices', icon: Monitor },
+          { value: 'organizations' as const, label: t('settings.organizations'), icon: Building2 },
+          { value: 'members' as const, label: t('settings.members'), icon: Users },
+          { value: 'devices' as const, label: t('settings.devices'), icon: Monitor },
         ],
       },
       {
-        label: 'Operations',
-        description: 'Alerts and validation',
+        label: t('settings.operations'),
+        description: t('settings.alertsAndValidation'),
         sections: [
-          { value: 'active-alerts' as const, label: 'Active alerts', icon: AlertOctagon },
-          { value: 'alert-rules' as const, label: 'Alert rules', icon: ShieldAlert },
-          { value: 'validation' as const, label: 'Validation rules', icon: ShieldCheck },
+          { value: 'active-alerts' as const, label: t('settings.activeAlerts'), icon: AlertOctagon },
+          { value: 'alert-rules' as const, label: t('settings.alertRules'), icon: ShieldAlert },
+          { value: 'validation' as const, label: t('settings.validationRules'), icon: ShieldCheck },
         ],
       },
       {
-        label: 'System',
-        description: 'License and audit',
+        label: t('settings.system'),
+        description: t('settings.licenseAndAudit'),
         sections: [
-          { value: 'license' as const, label: 'License', icon: ScrollText },
+          { value: 'license' as const, label: t('settings.license'), icon: ScrollText },
           ...(canReadAudit
-            ? [{ value: 'audit-log' as const, label: 'Audit log', icon: ClipboardList }]
+            ? [{ value: 'audit-log' as const, label: t('settings.auditLog'), icon: ClipboardList }]
             : []),
         ],
       },
     ],
-    [canReadAudit]
+    [canReadAudit, t]
   );
 
   // Active section from URL — keeps the page deep-linkable and lets
@@ -255,9 +257,9 @@ function AccountSecurityView() {
         await api.users.updateProfile(payload);
         await refreshUser();
       }
-      setProfileMessage('Account settings saved.');
+      setProfileMessage(t('settings.accountSettingsSaved'));
     } catch (error: any) {
-      setProfileMessage(error?.response?.data?.message || 'Failed to save account settings.');
+      setProfileMessage(error?.response?.data?.message || t('settings.failedSaveAccountSettings'));
     } finally {
       setIsSavingProfile(false);
     }
@@ -267,15 +269,15 @@ function AccountSecurityView() {
     setPasswordError(null);
     setPasswordMessage(null);
     if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError('Fill in all password fields.');
+      setPasswordError(t('settings.fillPasswordFields'));
       return;
     }
     if (newPassword.length < 8) {
-      setPasswordError('New password must be at least 8 characters.');
+      setPasswordError(t('settings.passwordTooShort'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordError('New password and confirmation do not match.');
+      setPasswordError(t('settings.passwordsDoNotMatch'));
       return;
     }
     setIsChangingPassword(true);
@@ -284,9 +286,9 @@ function AccountSecurityView() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setPasswordMessage('Password updated successfully.');
+      setPasswordMessage(t('settings.passwordUpdated'));
     } catch (error: any) {
-      setPasswordError(error?.response?.data?.message || 'Failed to change password.');
+      setPasswordError(error?.response?.data?.message || t('settings.failedChangePassword'));
     } finally {
       setIsChangingPassword(false);
     }
@@ -329,18 +331,17 @@ function AccountSecurityView() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-2xl">
             <UserCog className="h-6 w-6" />
-            Settings
+            {t('settings.title')}
           </CardTitle>
           <CardDescription>
-            Manage your account, organization, devices, alerts, validation rules, license, and audit
-            settings.
+            {t('settings.description')}
           </CardDescription>
         </CardHeader>
       </Card>
 
       <Tabs value={section} onValueChange={handleSectionChange} className="space-y-4">
         <TabsList
-          aria-label="Settings sections"
+          aria-label={t('settings.title')}
           className="grid h-auto w-full items-stretch justify-stretch gap-3 bg-transparent p-0 text-left md:grid-cols-2 xl:grid-cols-4"
         >
           {sectionGroups.map((group) => (
@@ -374,13 +375,13 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <User className="h-5 w-5" />
-                Profile
+                {t('settings.profile')}
               </CardTitle>
-              <CardDescription>Update your name and email.</CardDescription>
+              <CardDescription>{t('settings.updateNameEmail')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="fullName">Full name</Label>
+                <Label htmlFor="fullName">{t('settings.fullName')}</Label>
                 <Input
                   id="fullName"
                   value={fullName}
@@ -388,7 +389,7 @@ function AccountSecurityView() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('settings.email')}</Label>
                 <Input
                   id="email"
                   value={email}
@@ -397,21 +398,21 @@ function AccountSecurityView() {
               </div>
               <div>
                 <Label className="text-xs uppercase tracking-wide text-fg-muted">
-                  Sign-in method
+                  {t('settings.signInMethod')}
                 </Label>
                 <p className="mt-1 text-sm text-fg">
                   {authProvider === 'oidc' ? (
                     <>
-                      Single sign-on{' '}
+                      {t('settings.singleSignOn')}{' '}
                       <Badge variant="secondary" className="ml-1">
                         OIDC
                       </Badge>
                     </>
                   ) : (
                     <>
-                      Password{' '}
+                      {t('settings.password')}{' '}
                       <Badge variant="outline" className="ml-1">
-                        Local
+                        {t('settings.local')}
                       </Badge>
                     </>
                   )}
@@ -421,10 +422,10 @@ function AccountSecurityView() {
                 {isSavingProfile ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving
+                    {t('settings.saving')}
                   </>
                 ) : (
-                  'Save account settings'
+                  t('settings.saveAccountSettings')
                 )}
               </Button>
               {profileMessage && (
@@ -441,24 +442,23 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <KeyRound className="h-5 w-5" />
-                Password
+                {t('settings.password')}
               </CardTitle>
               <CardDescription>
                 {authProvider === 'oidc'
-                  ? 'Your account signs in via SSO. Password changes happen at your identity provider.'
-                  : 'Change your password and secure your account.'}
+                  ? t('settings.ssoPasswordDescription')
+                  : t('settings.passwordDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {authProvider === 'oidc' ? (
                 <p className="text-sm text-fg-muted">
-                  Local password changes are disabled for SSO accounts. Sign in via your IdP to
-                  update credentials.
+                  {t('settings.ssoPasswordDisabled')}
                 </p>
               ) : (
                 <>
                   <div className="space-y-2">
-                    <Label htmlFor="currentPassword">Current password</Label>
+                    <Label htmlFor="currentPassword">{t('settings.currentPassword')}</Label>
                     <Input
                       id="currentPassword"
                       type="password"
@@ -467,7 +467,7 @@ function AccountSecurityView() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="newPassword">New password</Label>
+                    <Label htmlFor="newPassword">{t('settings.newPassword')}</Label>
                     <Input
                       id="newPassword"
                       type="password"
@@ -476,7 +476,7 @@ function AccountSecurityView() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm new password</Label>
+                    <Label htmlFor="confirmPassword">{t('settings.confirmNewPassword')}</Label>
                     <Input
                       id="confirmPassword"
                       type="password"
@@ -488,10 +488,10 @@ function AccountSecurityView() {
                     {isChangingPassword ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Updating password
+                        {t('settings.updatingPassword')}
                       </>
                     ) : (
-                      'Change password'
+                      t('settings.changePassword')
                     )}
                   </Button>
                   {passwordError && (
@@ -517,13 +517,13 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Shield className="h-5 w-5" />
-                Active sessions
+                {t('settings.activeSessions')}
               </CardTitle>
-              <CardDescription>Review and revoke active sign-in sessions.</CardDescription>
+              <CardDescription>{t('settings.activeSessionsDescription')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {sessionsLoading ? (
-                <p className="text-sm text-muted-foreground">Loading sessions...</p>
+                <p className="text-sm text-muted-foreground">{t('settings.loadingSessions')}</p>
               ) : sessions && sessions.length > 0 ? (
                 <div className="space-y-3">
                   {sessions.map((session) => (
@@ -533,14 +533,14 @@ function AccountSecurityView() {
                     >
                       <div className="text-sm">
                         <p className="font-medium">
-                          {session.device || session.browser || 'Session'}
-                          {session.current ? ' (Current)' : ''}
+                          {session.device || session.browser || t('settings.session')}
+                          {session.current ? ` (${t('settings.currentSession')})` : ''}
                         </p>
                         <p className="text-muted-foreground">
-                          {session.location || session.ipAddress || 'Unknown location'}
+                          {session.location || session.ipAddress || t('settings.unknownLocation')}
                         </p>
                         <p className="text-muted-foreground">
-                          {session.lastActive || 'Recently active'}
+                          {session.lastActive || t('settings.recentlyActive')}
                         </p>
                       </div>
                       {!session.current && (
@@ -549,17 +549,17 @@ function AccountSecurityView() {
                           size="sm"
                           onClick={() => void revokeSession(session.id)}
                         >
-                          Revoke
+                          {t('settings.revoke')}
                         </Button>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No active sessions reported.</p>
+                <p className="text-sm text-muted-foreground">{t('settings.noActiveSessions')}</p>
               )}
               <Button variant="outline" onClick={() => void revokeAllSessions()}>
-                Revoke all other sessions
+                {t('settings.revokeAllOtherSessions')}
               </Button>
             </CardContent>
           </Card>
@@ -570,17 +570,15 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Building2 className="h-5 w-5" />
-                Organization memberships
+                {t('settings.organizationMemberships')}
               </CardTitle>
               <CardDescription>
-                Organizations you belong to and your role in each. Switch the active org via the
-                sidebar switcher. For inviting new people, changing roles, or removing members of
-                the active org, see the Members tab.
+                {t('settings.organizationMembershipsDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               {(user?.organizations ?? []).length === 0 ? (
-                <p className="text-sm text-fg-muted">No organization memberships on record.</p>
+                <p className="text-sm text-fg-muted">{t('settings.noOrganizationMemberships')}</p>
               ) : (
                 user?.organizations?.map((org) => (
                   <div
@@ -589,7 +587,9 @@ function AccountSecurityView() {
                   >
                     <div>
                       <p className="font-medium text-fg">{org.name}</p>
-                      <p className="text-xs text-fg-muted">slug: {org.slug}</p>
+                      <p className="text-xs text-fg-muted">
+                        {t('settings.slug')}: {org.slug}
+                      </p>
                     </div>
                     <Badge
                       variant={
@@ -630,22 +630,21 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <ScrollText className="h-5 w-5" />
-                License
+                {t('settings.license')}
               </CardTitle>
               <CardDescription>
-                Deployment-level license details. The license is provisioned by your administrator
-                at install time and isn&apos;t mutable from this page.
+                {t('settings.licenseDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent>
               {licenseLoading ? (
                 <div className="flex items-center gap-2 text-sm text-fg-muted">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading license details
+                  {t('settings.loadingLicenseDetails')}
                 </div>
               ) : !licenseInfo ? (
                 <p className="text-sm text-fg-muted">
-                  License details are unavailable. Contact your administrator if this persists.
+                  {t('settings.licenseUnavailable')}
                 </p>
               ) : (
                 <div className="space-y-4">
@@ -653,17 +652,16 @@ function AccountSecurityView() {
                     <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
                       <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" aria-hidden="true" />
                       <div>
-                        <p className="font-medium text-fg">Development license extension active</p>
+                        <p className="font-medium text-fg">{t('license.devExtensionActive')}</p>
                         <p className="text-fg-muted">
-                          The signed license expired on{' '}
-                          {licenseOriginalExpiresAt
-                            ? new Date(licenseOriginalExpiresAt).toLocaleDateString()
-                            : 'an unknown date'}
-                          . Dev access is extended until{' '}
-                          {licenseDisplayExpiresAt
-                            ? new Date(licenseDisplayExpiresAt).toLocaleDateString()
-                            : 'an unknown date'}
-                          . Keep this flag disabled in production.
+                          {t('license.devExtensionMessage', {
+                            originalDate: licenseOriginalExpiresAt
+                              ? formatDate(licenseOriginalExpiresAt)
+                              : t('common.unknown'),
+                            effectiveDate: licenseDisplayExpiresAt
+                              ? formatDate(licenseDisplayExpiresAt)
+                              : t('common.unknown'),
+                          })}
                         </p>
                       </div>
                     </div>
@@ -672,14 +670,14 @@ function AccountSecurityView() {
                     <div className="flex items-start gap-2 rounded-md border border-danger/40 bg-danger/10 p-3 text-sm">
                       <AlertTriangle className="mt-0.5 h-4 w-4 text-danger" aria-hidden="true" />
                       <div>
-                        <p className="font-medium text-fg">License expires soon</p>
+                        <p className="font-medium text-fg">{t('license.expiringSoon')}</p>
                         <p className="text-fg-muted">
                           {licenseInfo.days_until_expiry <= 0
-                            ? 'This license has expired.'
-                            : `Expires in ${licenseInfo.days_until_expiry} day${
-                                licenseInfo.days_until_expiry === 1 ? '' : 's'
-                              }.`}{' '}
-                          Contact your administrator to renew before access is interrupted.
+                            ? t('license.hasExpired')
+                            : t('license.expiresInDays', {
+                                days: formatNumber(licenseInfo.days_until_expiry),
+                              })}{' '}
+                          {t('license.contactAdminRenew')}
                         </p>
                       </div>
                     </div>
@@ -690,9 +688,11 @@ function AccountSecurityView() {
                       <div className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm">
                         <AlertTriangle className="mt-0.5 h-4 w-4 text-warning" aria-hidden="true" />
                         <div>
-                          <p className="font-medium text-fg">License renewal coming up</p>
+                          <p className="font-medium text-fg">{t('license.renewalComingUp')}</p>
                           <p className="text-fg-muted">
-                            Expires in {licenseInfo.days_until_expiry} days.
+                            {t('license.expiresInDays', {
+                              days: formatNumber(licenseInfo.days_until_expiry),
+                            })}
                           </p>
                         </div>
                       </div>
@@ -700,61 +700,67 @@ function AccountSecurityView() {
                   <div className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm md:grid-cols-2">
                     <div>
                       <Label className="text-xs uppercase tracking-wide text-fg-muted">
-                        Customer
+                        {t('license.customer')}
                       </Label>
                       <p className="mt-1 font-mono text-fg">{licenseInfo.customer_id || '—'}</p>
                     </div>
                     <div>
                       <Label className="text-xs uppercase tracking-wide text-fg-muted">
-                        Version
+                        {t('license.version')}
                       </Label>
                       <p className="mt-1 text-fg">{licenseInfo.version || '—'}</p>
                     </div>
                     <div>
                       <Label className="text-xs uppercase tracking-wide text-fg-muted">
-                        Expires
+                        {t('license.expires')}
                       </Label>
                       <p className="mt-1 text-fg">
                         {licenseDisplayExpiresAt
-                          ? new Date(licenseDisplayExpiresAt).toLocaleDateString(undefined, {
+                          ? formatDate(licenseDisplayExpiresAt, {
+                              dateStyle: undefined,
                               year: 'numeric',
                               month: 'long',
                               day: 'numeric',
                             })
                           : '—'}{' '}
                         <span className="text-fg-muted">
-                          ({licenseDisplayDaysUntilExpiry} day
-                          {licenseDisplayDaysUntilExpiry === 1 ? '' : 's'} from now)
+                          ({t('settings.daysFromNow', {
+                            days: formatNumber(licenseDisplayDaysUntilExpiry ?? 0),
+                          })})
                         </span>
                       </p>
                       {isDevLicenseExtensionActive && licenseOriginalExpiresAt && (
                         <p className="mt-1 text-xs text-fg-muted">
-                          Original expiry:{' '}
-                          {new Date(licenseOriginalExpiresAt).toLocaleDateString(undefined, {
+                          {t('settings.originalExpiry', {
+                            date: formatDate(licenseOriginalExpiresAt, {
+                              dateStyle: undefined,
                             year: 'numeric',
                             month: 'long',
                             day: 'numeric',
+                            }),
                           })}
                         </p>
                       )}
                     </div>
                     <div>
                       <Label className="text-xs uppercase tracking-wide text-fg-muted">
-                        Device usage
+                        {t('license.deviceUsage')}
                       </Label>
                       <p className="mt-1 text-fg">
-                        {licenseInfo.registered_devices} /{' '}
-                        {licenseInfo.max_devices < 0 ? '∞' : licenseInfo.max_devices}{' '}
-                        <span className="text-fg-muted">
-                          device{licenseInfo.registered_devices === 1 ? '' : 's'} registered
-                        </span>
+                        {t('license.devicesRegistered', {
+                          registered: formatNumber(licenseInfo.registered_devices),
+                          max:
+                            licenseInfo.max_devices < 0
+                              ? '∞'
+                              : formatNumber(licenseInfo.max_devices),
+                        })}
                       </p>
                     </div>
                   </div>
                   {licenseInfo.features?.length > 0 && (
                     <div>
                       <Label className="text-xs uppercase tracking-wide text-fg-muted">
-                        Features
+                        {t('license.features')}
                       </Label>
                       <div className="mt-2 flex flex-wrap gap-1.5">
                         {licenseInfo.features.map((feature) => (
@@ -766,18 +772,22 @@ function AccountSecurityView() {
                     </div>
                   )}
                   <p className="text-xs text-fg-muted">
-                    Last validated{' '}
-                    {new Date(licenseInfo.last_validated_at).toLocaleString(undefined, {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                    })}{' '}
-                    · Status:{' '}
-                    {isDevLicenseExtensionActive
-                      ? 'Dev extension active'
-                      : licenseInfo.is_valid
-                        ? 'Valid'
-                        : 'Invalid'}
-                    {licenseInfo.environment ? ` · Environment: ${licenseInfo.environment}` : ''}
+                    {t('license.lastValidatedStatus', {
+                      date: formatDate(licenseInfo.last_validated_at, {
+                        dateStyle: 'medium',
+                        timeStyle: 'short',
+                      }),
+                      status: isDevLicenseExtensionActive
+                        ? t('license.devExtensionStatus')
+                        : licenseInfo.is_valid
+                          ? t('common.valid')
+                          : t('common.invalid'),
+                    })}
+                    {licenseInfo.environment
+                      ? ` · ${t('license.environment', {
+                          environment: licenseInfo.environment,
+                        })}`
+                      : ''}
                   </p>
                 </div>
               )}
@@ -790,22 +800,17 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Bell className="h-5 w-5" />
-                Email notifications
+                {t('settings.emailNotifications')}
               </CardTitle>
               <CardDescription>
-                Control whether emails are sent to your account address. Per-rule recipient lists
-                are configured by the rule&apos;s author; these toggles let you opt out of receiving
-                messages even when you&apos;re named as a recipient.
+                {t('settings.emailNotificationsDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <label className="flex items-center justify-between gap-3 rounded-md border border-strong p-3">
                 <div>
-                  <p className="text-sm font-medium text-fg">Alert emails</p>
-                  <p className="text-xs text-fg-muted">
-                    Emails sent when a configured alert rule fires against a dataset you&apos;re
-                    listed on.
-                  </p>
+                  <p className="text-sm font-medium text-fg">{t('settings.alertEmails')}</p>
+                  <p className="text-xs text-fg-muted">{t('settings.alertEmailsDescription')}</p>
                 </div>
                 <input
                   type="checkbox"
@@ -813,17 +818,13 @@ function AccountSecurityView() {
                   onChange={(e) => updatePrefsMutation.mutate({ email_alerts: e.target.checked })}
                   disabled={updatePrefsMutation.isPending}
                   className="h-5 w-5 rounded border-strong text-accent focus:ring-focus"
-                  aria-label="Receive alert emails"
+                  aria-label={t('settings.receiveAlertEmails')}
                 />
               </label>
               <label className="flex items-center justify-between gap-3 rounded-md border border-strong p-3">
                 <div>
-                  <p className="text-sm font-medium text-fg">System emails</p>
-                  <p className="text-xs text-fg-muted">
-                    Reserved for account-event notifications (password changes, new-device logins).
-                    No dispatch path consumes this yet — the preference is saved so it applies the
-                    moment we wire one.
-                  </p>
+                  <p className="text-sm font-medium text-fg">{t('settings.systemEmails')}</p>
+                  <p className="text-xs text-fg-muted">{t('settings.systemEmailsDescription')}</p>
                 </div>
                 <input
                   type="checkbox"
@@ -831,12 +832,12 @@ function AccountSecurityView() {
                   onChange={(e) => updatePrefsMutation.mutate({ email_system: e.target.checked })}
                   disabled={updatePrefsMutation.isPending}
                   className="h-5 w-5 rounded border-strong text-accent focus:ring-focus"
-                  aria-label="Receive system emails"
+                  aria-label={t('settings.receiveSystemEmails')}
                 />
               </label>
               {updatePrefsMutation.isError && (
                 <p className="text-sm text-danger-text" role="alert">
-                  Failed to save preference. Try again.
+                  {t('settings.failedSavePreference')}
                 </p>
               )}
             </CardContent>
@@ -848,12 +849,10 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <AlertOctagon className="h-5 w-5" />
-                Active alerts
+                {t('settings.activeAlerts')}
               </CardTitle>
               <CardDescription>
-                Rows fired by alert rules against stored anomaly classifications. Acknowledge or
-                resolve to keep the operational view clean. To manage the rules themselves, switch
-                to the Alert rules tab.
+                {t('settings.activeAlertsDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -867,11 +866,10 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <ShieldAlert className="h-5 w-5" />
-                Alert rules
+                {t('settings.alertRules')}
               </CardTitle>
               <CardDescription>
-                Rules drive alert generation when a stored anomaly classification crosses the
-                threshold. Active alerts fired by these rules live in the Active alerts tab.
+                {t('settings.alertRulesDescription')}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -885,19 +883,9 @@ function AccountSecurityView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-lg">
                 <ShieldCheck className="h-5 w-5" />
-                Validation rules
+                {t('settings.validationRules')}
               </CardTitle>
-              <CardDescription>
-                Org-wide rules that can be run against any dataset to check data quality. To run a
-                rule against a specific dataset, open the dataset in the{' '}
-                <a
-                  href="/dashboard/data?catalog=open"
-                  className="font-medium text-accent hover:underline"
-                >
-                  catalog
-                </a>{' '}
-                and use the inline Run button.
-              </CardDescription>
+              <CardDescription>{t('settings.validationRulesDescription')}</CardDescription>
             </CardHeader>
             <CardContent>
               <ValidationRulesPanel />
@@ -911,11 +899,10 @@ function AccountSecurityView() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <ClipboardList className="h-5 w-5" />
-                  Audit log
+                  {t('settings.auditLog')}
                 </CardTitle>
                 <CardDescription>
-                  Every change made in this organization, ordered by newest first. Read-only page
-                  views are not listed. Admin-only.
+                  {t('settings.auditLogDescription')}
                 </CardDescription>
               </CardHeader>
               <CardContent>

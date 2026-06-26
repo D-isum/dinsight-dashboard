@@ -29,7 +29,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { formatDatasetOptionLabel } from '@/lib/dataset-source-groups';
+import { formatDatasetOptionLabelLocalized } from '@/lib/dataset-source-groups';
 import { cn } from '@/utils/cn';
 
 interface HeaderProps {
@@ -110,7 +110,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             </option>
             {filteredDatasets.map((dataset) => (
               <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                {formatDatasetOptionLabel(dataset)}
+                {formatDatasetOptionLabelLocalized(dataset, t)}
               </option>
             ))}
           </select>
@@ -139,7 +139,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             </option>
             {filteredDatasets.map((dataset) => (
               <option key={dataset.dinsight_id} value={dataset.dinsight_id}>
-                {formatDatasetOptionLabel(dataset)}
+                {formatDatasetOptionLabelLocalized(dataset, t)}
               </option>
             ))}
           </select>

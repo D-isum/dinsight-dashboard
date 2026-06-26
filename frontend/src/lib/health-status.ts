@@ -16,6 +16,8 @@ export interface MachineHealthResult {
   state: MachineHealthState;
   recommendation: string;
   reasons: string[];
+  recommendationKey: string;
+  reasonsI18n: Array<{ key: string; values?: Record<string, string> }>;
 }
 
 export const DEFAULT_MACHINE_HEALTH_THRESHOLDS: MachineHealthThresholds = {
@@ -51,6 +53,15 @@ export const deriveMachineHealthStatus = (
       state: 'Failing',
       recommendation: 'Escalate to maintenance immediately and inspect machine condition.',
       reasons,
+      recommendationKey: 'health.recommendationFailing',
+      reasonsI18n: [
+        ...(isAnomalyFailing
+          ? [{ key: 'health.reasonHighAbnormal', values: { value: anomaly!.toFixed(1) } }]
+          : []),
+        ...(isWearFailing
+          ? [{ key: 'health.reasonAcceleratingWear', values: { value: wear!.toFixed(2) } }]
+          : []),
+      ],
     };
   }
 
@@ -69,6 +80,15 @@ export const deriveMachineHealthStatus = (
       state: 'Deteriorating',
       recommendation: 'Schedule maintenance window soon and continue close monitoring.',
       reasons,
+      recommendationKey: 'health.recommendationDeteriorating',
+      reasonsI18n: [
+        ...(isAnomalyDeteriorating
+          ? [{ key: 'health.reasonElevatedAbnormal', values: { value: anomaly!.toFixed(1) } }]
+          : []),
+        ...(isWearDeteriorating
+          ? [{ key: 'health.reasonWearRising', values: { value: wear!.toFixed(2) } }]
+          : []),
+      ],
     };
   }
 
@@ -76,5 +96,7 @@ export const deriveMachineHealthStatus = (
     state: 'OK',
     recommendation: 'Continue normal operation and monitor routinely.',
     reasons: ['Machine behavior is within normal range.'],
+    recommendationKey: 'health.recommendationOk',
+    reasonsI18n: [{ key: 'health.reasonNormal' }],
   };
 };

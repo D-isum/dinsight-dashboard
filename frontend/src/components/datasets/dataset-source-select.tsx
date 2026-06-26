@@ -1,6 +1,9 @@
 'use client';
 
-import type { DatasetSourceGroup } from '@/lib/dataset-source-groups';
+import {
+  formatDatasetSourceGroupLabel,
+  type DatasetSourceGroup,
+} from '@/lib/dataset-source-groups';
 import { useI18n } from '@/i18n/client';
 
 interface DatasetSourceSelectProps {
@@ -36,7 +39,7 @@ export function DatasetSourceSelect({
       </option>
       {groups.map((group) => (
         <option key={group.key} value={group.key}>
-          {group.label} ({formatNumber(group.datasets.length)})
+          {formatDatasetSourceGroupLabel(group, t)} ({formatNumber(group.datasets.length)})
         </option>
       ))}
     </select>
