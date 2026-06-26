@@ -11,6 +11,7 @@ import { api } from '@/lib/api-client';
 import { useAuth } from '@/context/auth-context';
 import { cn } from '@/utils/cn';
 import { getPasswordStrength } from '@/utils/format';
+import { useI18n } from '@/i18n/client';
 
 // Pattern B (invite-only) registration. The accept-URL emailed to an
 // invitee is /register?invite=<token>; this page reads the token,
@@ -19,22 +20,20 @@ import { getPasswordStrength } from '@/utils/format';
 // the invitation and locked so an attacker who guesses or phishes a
 // token can't redeem it under a different identity.
 
-const registerSchema = z.object({
-  full_name: z.string().min(2, 'Full name must be at least 2 characters'),
-  email: z.string().email('Please enter a valid email address'),
-  password: z
-    .string()
-    .min(8, 'Password must be at least 8 characters')
-    .regex(
-      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-      'Password must contain at least one uppercase letter, one lowercase letter, and one number'
-    ),
-  agree_terms: z.boolean().refine((val) => val === true, {
-    message: 'You must agree to the terms of service',
-  }),
-});
+const createRegisterSchema = (t: (key: string) => string) =>
+  z.object({
+    full_name: z.string().min(2, t('auth.fullNameMinLength')),
+    email: z.string().email(t('auth.emailInvalid')),
+    password: z
+      .string()
+      .min(8, t('auth.passwordMinLength'))
+      .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, t('auth.passwordCompositionRequired')),
+    agree_terms: z.boolean().refine((val) => val === true, {
+      message: t('auth.termsRequired'),
+    }),
+  });
 
-type RegisterFormData = z.infer<typeof registerSchema>;
+type RegisterFormData = z.infer<ReturnType<typeof createRegisterSchema>>;
 
 interface InvitationContext {
   email: string;
@@ -58,6 +57,7 @@ export default function RegisterPage() {
 }
 
 function RegisterPageInner() {
+  const { t, formatDate } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get('invite')?.trim() ?? '';
@@ -69,6 +69,7 @@ function RegisterPageInner() {
   const [lookup, setLookup] = useState<LookupState>(
     inviteToken ? { kind: 'loading' } : { kind: 'no-token' }
   );
+  const registerSchema = createRegisterSchema(t);
 
   // Resolve the invitation before rendering the form. The public
   // /auth/invitations/redeem/:token endpoint returns 404 with a
@@ -137,27 +138,33 @@ function RegisterPageInner() {
       );
     } catch (err: unknown) {
       const e = err as { message?: string };
-      setError(e.message ?? 'Registration failed. Please try again.');
+      setError(e.message ?? t('auth.registrationFailed'));
     } finally {
       setIsLoading(false);
     }
   };
 
   const passwordRequirements = [
-    { met: password.length >= 8, text: 'At least 8 characters' },
-    { met: /[A-Z]/.test(password), text: 'One uppercase letter' },
-    { met: /[a-z]/.test(password), text: 'One lowercase letter' },
-    { met: /\d/.test(password), text: 'One number' },
+    { met: password.length >= 8, text: t('auth.requirementMinEight') },
+    { met: /[A-Z]/.test(password), text: t('auth.requirementUppercase') },
+    { met: /[a-z]/.test(password), text: t('auth.requirementLowercase') },
+    { met: /\d/.test(password), text: t('auth.requirementNumber') },
   ];
+  const passwordStrengthLabel =
+    passwordStrength.score <= 2
+      ? t('auth.passwordWeak')
+      : passwordStrength.score <= 4
+        ? t('auth.passwordMedium')
+        : t('auth.passwordStrong');
 
   // ------ Render gates ------
 
   if (lookup.kind === 'no-token') {
     return (
       <InvitePrompt
-        title="Registration is invite-only"
-        body="This deployment doesn't accept public sign-ups. Ask an admin of your organization to send you an invitation — they'll get a link that brings you back here ready to register."
-        cta={{ href: '/login', label: 'Back to sign in' }}
+        title={t('auth.inviteOnlyTitle')}
+        body={t('auth.inviteOnlyDescription')}
+        cta={{ href: '/login', label: t('auth.backToSignIn') }}
       />
     );
   }
@@ -166,7 +173,7 @@ function RegisterPageInner() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="flex items-center gap-2 text-fg-muted">
-          <Loader2 className="h-4 w-4 animate-spin" /> Checking invitation…
+          <Loader2 className="h-4 w-4 animate-spin" /> {t('auth.checkingInvitation')}
         </div>
       </div>
     );
@@ -175,9 +182,9 @@ function RegisterPageInner() {
   if (lookup.kind === 'invalid') {
     return (
       <InvitePrompt
-        title="This invitation is no longer valid"
-        body="The link you used has expired, been revoked, or has already been redeemed. Ask the admin who invited you to send a fresh invitation."
-        cta={{ href: '/login', label: 'Back to sign in' }}
+        title={t('auth.invitationInvalidTitle')}
+        body={t('auth.invitationInvalidDescription')}
+        cta={{ href: '/login', label: t('auth.backToSignIn') }}
       />
     );
   }
@@ -190,33 +197,29 @@ function RegisterPageInner() {
       <div className="hidden lg:flex lg:flex-1 bg-surface-muted border-r border-border">
         <div className="flex-1 flex items-center justify-center p-12">
           <div className="max-w-md text-fg">
-            <h2 className="text-2xl font-semibold mb-2">Set up your D'Insight account</h2>
-            <p className="text-sm mb-8 text-fg-muted">
-              You'll be monitoring real machine condition in three short steps.
-            </p>
+            <h2 className="text-2xl font-semibold mb-2">{t('auth.setupAccountTitle')}</h2>
+            <p className="text-sm mb-8 text-fg-muted">{t('auth.setupAccountDescription')}</p>
             <ol className="space-y-5">
               <li className="flex items-start gap-3">
                 <Check className="h-5 w-5 mt-0.5 text-success" aria-hidden="true" />
                 <div>
-                  <p className="font-semibold text-fg">Create your account</p>
-                  <p className="mt-1 text-sm text-fg-muted">Email + password. No credit card.</p>
+                  <p className="font-semibold text-fg">{t('auth.createYourAccount')}</p>
+                  <p className="mt-1 text-sm text-fg-muted">{t('auth.createYourAccountDetail')}</p>
                 </div>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="h-5 w-5 mt-0.5 text-success" aria-hidden="true" />
                 <div>
-                  <p className="font-semibold text-fg">Upload baseline or start streaming</p>
-                  <p className="mt-1 text-sm text-fg-muted">
-                    Bring CSV from healthy operation, or stream live from sensors.
-                  </p>
+                  <p className="font-semibold text-fg">{t('auth.uploadOrStream')}</p>
+                  <p className="mt-1 text-sm text-fg-muted">{t('auth.uploadOrStreamDetail')}</p>
                 </div>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="h-5 w-5 mt-0.5 text-success" aria-hidden="true" />
                 <div>
-                  <p className="font-semibold text-fg">Watch state + deterioration</p>
+                  <p className="font-semibold text-fg">{t('auth.watchStateDeterioration')}</p>
                   <p className="mt-1 text-sm text-fg-muted">
-                    OK / Deteriorating / Failing, plus the wear trend over time.
+                    {t('auth.watchStateDeteriorationDetail')}
                   </p>
                 </div>
               </li>
@@ -234,10 +237,8 @@ function RegisterPageInner() {
                 <span className="text-accent-contrast text-2xl font-bold">D</span>
               </div>
             </div>
-            <h2 className="text-3xl font-bold text-fg">Create Account</h2>
-            <p className="mt-2 text-sm text-fg-muted">
-              You&apos;ve been invited to join D&apos;Insight
-            </p>
+            <h2 className="text-3xl font-bold text-fg">{t('auth.createAccount')}</h2>
+            <p className="mt-2 text-sm text-fg-muted">{t('auth.invitedToJoin')}</p>
           </div>
 
           {/* Invitation banner */}
@@ -246,9 +247,11 @@ function RegisterPageInner() {
             <div className="text-sm">
               <p className="font-semibold text-fg">{inv.org_name}</p>
               <p className="text-fg-muted">
-                Joining as <span className="font-medium text-fg">{inv.role}</span>. The invitation
-                was issued to <span className="font-medium text-fg">{inv.email}</span> and expires{' '}
-                {new Date(inv.expires_at).toLocaleString()}.
+                {t('auth.joiningAs')}{' '}
+                <span className="font-medium text-fg">{formatInviteRole(inv.role, t)}</span>.{' '}
+                {t('auth.invitationIssuedTo')}{' '}
+                <span className="font-medium text-fg">{inv.email}</span> {t('auth.andExpires')}{' '}
+                {formatDate(inv.expires_at, { dateStyle: 'medium', timeStyle: 'short' })}.
               </p>
             </div>
           </div>
@@ -264,7 +267,7 @@ function RegisterPageInner() {
             <div className="space-y-4">
               <div>
                 <label htmlFor="full_name" className="block text-sm font-medium text-fg">
-                  Full Name
+                  {t('auth.fullName')}
                 </label>
                 <input
                   {...register('full_name')}
@@ -276,7 +279,7 @@ function RegisterPageInner() {
                     'transition-colors duration-200',
                     errors.full_name ? 'border-danger-border text-danger-text ' : 'border-strong'
                   )}
-                  placeholder="John Doe"
+                  placeholder={t('auth.fullNamePlaceholder')}
                 />
                 {errors.full_name && (
                   <p className="mt-1 text-sm text-danger-text">{errors.full_name.message}</p>
@@ -285,7 +288,7 @@ function RegisterPageInner() {
 
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-fg">
-                  Email Address
+                  {t('auth.emailAddress')}
                 </label>
                 <input
                   {...register('email')}
@@ -298,9 +301,7 @@ function RegisterPageInner() {
                     errors.email ? 'border-danger-border text-danger-text ' : 'border-strong'
                   )}
                 />
-                <p className="mt-1 text-xs text-fg-muted">
-                  Locked to the email this invitation was sent to.
-                </p>
+                <p className="mt-1 text-xs text-fg-muted">{t('auth.emailLockedToInvitation')}</p>
                 {errors.email && (
                   <p className="mt-1 text-sm text-danger-text">{errors.email.message}</p>
                 )}
@@ -308,7 +309,7 @@ function RegisterPageInner() {
 
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-fg">
-                  Password
+                  {t('auth.password')}
                 </label>
                 <div className="mt-1 relative">
                   <input
@@ -321,7 +322,7 @@ function RegisterPageInner() {
                       'transition-colors duration-200',
                       errors.password ? 'border-danger-border text-danger-text ' : 'border-strong'
                     )}
-                    placeholder="Create a strong password"
+                    placeholder={t('auth.createStrongPassword')}
                   />
                   <button
                     type="button"
@@ -356,7 +357,7 @@ function RegisterPageInner() {
                       ))}
                     </div>
                     <p className={cn('text-sm', passwordStrength.color)}>
-                      Password strength: {passwordStrength.label}
+                      {t('auth.passwordStrength', { strength: passwordStrengthLabel })}
                     </p>
                   </div>
                 )}
@@ -386,13 +387,13 @@ function RegisterPageInner() {
                 className="h-4 w-4 text-accent focus:ring-focus border-strong rounded mt-0.5"
               />
               <label htmlFor="agree-terms" className="ml-2 block text-sm text-fg">
-                I agree to the{' '}
+                {t('auth.agreeTo')}{' '}
                 <Link href="/terms" className="text-accent hover:text-accent">
-                  Terms of Service
+                  {t('auth.termsOfService')}
                 </Link>{' '}
-                and{' '}
+                {t('auth.and')}{' '}
                 <Link href="/privacy" className="text-accent hover:text-accent">
-                  Privacy Policy
+                  {t('auth.privacyPolicy')}
                 </Link>
               </label>
             </div>
@@ -415,19 +416,19 @@ function RegisterPageInner() {
                 {isLoading ? (
                   <>
                     <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                    Creating account...
+                    {t('auth.creatingAccount')}
                   </>
                 ) : (
-                  'Create Account'
+                  t('auth.createAccount')
                 )}
               </button>
             </div>
 
             <div className="text-center">
               <p className="text-sm text-fg-muted">
-                Already have an account?{' '}
+                {t('auth.alreadyHaveAccount')}{' '}
                 <Link href="/login" className="font-medium text-accent hover:text-accent">
-                  Sign in
+                  {t('auth.signIn')}
                 </Link>
               </p>
             </div>
@@ -471,4 +472,11 @@ function InvitePrompt({
       </div>
     </div>
   );
+}
+
+function formatInviteRole(role: InvitationContext['role'], t: (key: string) => string) {
+  if (role === 'admin') return t('common.admin');
+  if (role === 'operator') return t('settings.operator');
+  if (role === 'viewer') return t('settings.viewer');
+  return role;
 }

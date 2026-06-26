@@ -9,6 +9,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { formatRoleLabel } from '@/lib/role-labels';
+import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
 /**
@@ -29,6 +31,7 @@ import { cn } from '@/utils/cn';
  */
 export function OrgSwitcher() {
   const { user, currentOrg, setCurrentOrg, currentOrgRole } = useAuth();
+  const { t } = useI18n();
   const queryClient = useQueryClient();
 
   const orgs = user?.organizations ?? [];
@@ -50,7 +53,7 @@ export function OrgSwitcher() {
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-fg">{currentOrg.name}</p>
           {currentOrgRole && (
-            <p className="truncate text-xs text-fg-muted capitalize">{currentOrgRole}</p>
+            <p className="truncate text-xs text-fg-muted">{formatRoleLabel(currentOrgRole, t)}</p>
           )}
         </div>
       </div>
@@ -71,7 +74,7 @@ export function OrgSwitcher() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          aria-label="Switch organization"
+          aria-label={t('settings.switchOrganization')}
           className={cn(
             'group flex w-full items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm',
             'hover:bg-surface-hover transition-colors',
@@ -82,7 +85,7 @@ export function OrgSwitcher() {
           <div className="min-w-0 flex-1 text-left">
             <p className="truncate font-medium text-fg">{currentOrg.name}</p>
             {currentOrgRole && (
-              <p className="truncate text-xs text-fg-muted capitalize">{currentOrgRole}</p>
+              <p className="truncate text-xs text-fg-muted">{formatRoleLabel(currentOrgRole, t)}</p>
             )}
           </div>
           <ChevronsUpDown className="h-4 w-4 text-fg-subtle shrink-0" aria-hidden="true" />
@@ -90,7 +93,7 @@ export function OrgSwitcher() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="left" className="w-64">
         <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-fg-subtle">
-          Organizations
+          {t('settings.organizations')}
         </div>
         {orgs.map((org) => {
           const isActive = org.id === currentOrg.id;
@@ -102,7 +105,7 @@ export function OrgSwitcher() {
             >
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-fg">{org.name}</p>
-                <p className="truncate text-xs text-fg-muted capitalize">{org.role}</p>
+                <p className="truncate text-xs text-fg-muted">{formatRoleLabel(org.role, t)}</p>
               </div>
               {isActive && <Check className="h-4 w-4 shrink-0 text-accent" aria-hidden="true" />}
             </DropdownMenuItem>

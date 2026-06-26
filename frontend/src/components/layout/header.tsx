@@ -30,6 +30,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { formatDatasetOptionLabelLocalized } from '@/lib/dataset-source-groups';
+import { formatRoleLabel } from '@/lib/role-labels';
 import { cn } from '@/utils/cn';
 
 interface HeaderProps {
@@ -191,9 +192,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                       {user?.full_name || t('common.user')}
                     </span>
                     <span className="text-xs text-fg-muted">
-                      {user?.role
-                        ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-                        : t('header.member')}
+                      {formatRoleLabel(user?.role, t) || t('header.member')}
                     </span>
                   </div>
                   <ChevronDown className="h-4 w-4 text-fg-subtle" />

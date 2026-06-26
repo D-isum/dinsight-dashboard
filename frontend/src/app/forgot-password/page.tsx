@@ -8,6 +8,7 @@ import * as z from 'zod';
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, Mail } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { cn } from '@/utils/cn';
+import { useI18n } from '@/i18n/client';
 
 // Forgot-password is a one-step form: enter the email, get a reset link
 // in your inbox. The response is intentionally enumeration-resistant —
@@ -15,16 +16,19 @@ import { cn } from '@/utils/cn';
 // is registered, so this page does the same. The user can always retry
 // or contact support if no email arrives.
 
-const forgotPasswordSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-});
+const createForgotPasswordSchema = (t: (key: string) => string) =>
+  z.object({
+    email: z.string().email(t('auth.emailInvalid')),
+  });
 
-type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
+type ForgotPasswordFormData = z.infer<ReturnType<typeof createForgotPasswordSchema>>;
 
 export default function ForgotPasswordPage() {
+  const { t } = useI18n();
   const [isLoading, setIsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const forgotPasswordSchema = createForgotPasswordSchema(t);
 
   const {
     register,
@@ -45,10 +49,7 @@ export default function ForgotPasswordPage() {
       // The backend usually swallows enumeration errors and returns
       // success. The only realistic failure here is the server being
       // unreachable. Show a generic message either way.
-      setError(
-        e?.response?.data?.message ||
-          'We could not send the reset email right now. Please try again.'
-      );
+      setError(e?.response?.data?.message || t('auth.resetEmailFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -63,10 +64,8 @@ export default function ForgotPasswordPage() {
               <span className="text-accent-contrast text-2xl font-bold">D</span>
             </div>
           </div>
-          <h2 className="text-3xl font-bold text-fg">Reset your password</h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Enter the email tied to your account and we&apos;ll send you a reset link.
-          </p>
+          <h2 className="text-3xl font-bold text-fg">{t('auth.resetPasswordTitle')}</h2>
+          <p className="mt-2 text-sm text-fg-muted">{t('auth.resetPasswordDescription')}</p>
         </div>
 
         {submitted ? (
@@ -74,11 +73,8 @@ export default function ForgotPasswordPage() {
             <div className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" aria-hidden="true" />
               <div>
-                <p className="font-medium">Check your inbox</p>
-                <p className="mt-1">
-                  If an account exists for that email, we&apos;ve sent a password-reset link. The
-                  link is valid for a limited time; request a new one if it expires.
-                </p>
+                <p className="font-medium">{t('auth.checkYourInbox')}</p>
+                <p className="mt-1">{t('auth.resetEmailSentDescription')}</p>
               </div>
             </div>
           </div>
@@ -94,7 +90,7 @@ export default function ForgotPasswordPage() {
             <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-fg">
-                  Email address
+                  {t('auth.emailAddress')}
                 </label>
                 <div className="mt-1 relative">
                   <input
@@ -132,10 +128,10 @@ export default function ForgotPasswordPage() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Sending reset link
+                    {t('auth.sendingResetLink')}
                   </>
                 ) : (
-                  'Send reset link'
+                  t('auth.sendResetLink')
                 )}
               </button>
             </form>
@@ -148,7 +144,7 @@ export default function ForgotPasswordPage() {
             className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to sign in
+            {t('auth.backToSignIn')}
           </Link>
         </div>
       </div>

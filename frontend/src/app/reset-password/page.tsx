@@ -9,30 +9,33 @@ import * as z from 'zod';
 import { AlertCircle, ArrowLeft, CheckCircle2, Eye, EyeOff, KeyRound, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { cn } from '@/utils/cn';
+import { useI18n } from '@/i18n/client';
 
 // Reset-password consumes the token the user got via email
 // (?token=...). On success we redirect to /login?reset=true so the
 // login page can show a success banner; the user logs in fresh with
 // the new credentials.
 
-const resetPasswordSchema = z
-  .object({
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .regex(/[A-Z]/, 'Password must contain an uppercase letter')
-      .regex(/[a-z]/, 'Password must contain a lowercase letter')
-      .regex(/[0-9]/, 'Password must contain a number'),
-    confirm: z.string(),
-  })
-  .refine((data) => data.password === data.confirm, {
-    message: 'Passwords do not match',
-    path: ['confirm'],
-  });
+const createResetPasswordSchema = (t: (key: string) => string) =>
+  z
+    .object({
+      password: z
+        .string()
+        .min(8, t('auth.passwordMinLength'))
+        .regex(/[A-Z]/, t('auth.passwordUppercaseRequired'))
+        .regex(/[a-z]/, t('auth.passwordLowercaseRequired'))
+        .regex(/[0-9]/, t('auth.passwordNumberRequired')),
+      confirm: z.string(),
+    })
+    .refine((data) => data.password === data.confirm, {
+      message: t('auth.passwordsDoNotMatch'),
+      path: ['confirm'],
+    });
 
-type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
+type ResetPasswordFormData = z.infer<ReturnType<typeof createResetPasswordSchema>>;
 
 function ResetPasswordForm() {
+  const { t } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token') ?? '';
@@ -42,6 +45,7 @@ function ResetPasswordForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [succeeded, setSucceeded] = useState(false);
+  const resetPasswordSchema = createResetPasswordSchema(t);
 
   const {
     register,
@@ -54,7 +58,7 @@ function ResetPasswordForm() {
 
   const onSubmit = async (data: ResetPasswordFormData) => {
     if (!token) {
-      setError('This reset link is missing its token. Request a new email and try again.');
+      setError(t('auth.resetTokenMissing'));
       return;
     }
     setIsLoading(true);
@@ -68,11 +72,9 @@ function ResetPasswordForm() {
     } catch (e: any) {
       const code = e?.response?.data?.code as string | undefined;
       if (code === 'INVALID_TOKEN' || code === 'EXPIRED_TOKEN') {
-        setError(
-          'This reset link is invalid or has expired. Request a new one from the forgot-password page.'
-        );
+        setError(t('auth.resetLinkInvalidExpired'));
       } else {
-        setError(e?.response?.data?.message || 'Failed to reset password. Please try again.');
+        setError(e?.response?.data?.message || t('auth.resetPasswordFailed'));
       }
     } finally {
       setIsLoading(false);
@@ -88,21 +90,19 @@ function ResetPasswordForm() {
               <span className="text-accent-contrast text-2xl font-bold">D</span>
             </div>
           </div>
-          <h2 className="text-3xl font-bold text-fg">Set a new password</h2>
-          <p className="mt-2 text-sm text-fg-muted">
-            Choose a strong password. You&apos;ll be signed out everywhere else.
-          </p>
+          <h2 className="text-3xl font-bold text-fg">{t('auth.setNewPassword')}</h2>
+          <p className="mt-2 text-sm text-fg-muted">{t('auth.setNewPasswordDescription')}</p>
         </div>
 
         {!token && (
           <div className="bg-danger-bg border border-danger-border text-danger-text px-4 py-3 rounded-lg flex items-center gap-2">
             <AlertCircle className="h-5 w-5" />
             <p className="text-sm">
-              This page needs a reset token. Request a fresh link from{' '}
+              {t('auth.resetTokenRequiredPrefix')}
               <Link href="/forgot-password" className="underline">
-                forgot password
+                {t('auth.forgotPasswordPage')}
               </Link>
-              .
+              {t('auth.resetTokenRequiredSuffix')}
             </p>
           </div>
         )}
@@ -112,8 +112,8 @@ function ResetPasswordForm() {
             <div className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" />
               <div>
-                <p className="font-medium">Password reset</p>
-                <p className="mt-1">Redirecting you to sign in...</p>
+                <p className="font-medium">{t('auth.passwordReset')}</p>
+                <p className="mt-1">{t('auth.redirectingToSignIn')}</p>
               </div>
             </div>
           </div>
@@ -129,7 +129,7 @@ function ResetPasswordForm() {
             <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)} noValidate>
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-fg">
-                  New password
+                  {t('auth.newPassword')}
                 </label>
                 <div className="mt-1 relative">
                   <input
@@ -142,13 +142,13 @@ function ResetPasswordForm() {
                       'transition-colors duration-200',
                       errors.password ? 'border-danger-border text-danger-text' : 'border-strong'
                     )}
-                    placeholder="At least 8 characters"
+                    placeholder={t('auth.atLeastEightCharacters')}
                   />
                   <button
                     type="button"
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
                     {showPassword ? (
                       <EyeOff className="h-5 w-5 text-fg-subtle" />
@@ -164,7 +164,7 @@ function ResetPasswordForm() {
 
               <div>
                 <label htmlFor="confirm" className="block text-sm font-medium text-fg">
-                  Confirm new password
+                  {t('auth.confirmNewPassword')}
                 </label>
                 <div className="mt-1 relative">
                   <input
@@ -177,13 +177,13 @@ function ResetPasswordForm() {
                       'transition-colors duration-200',
                       errors.confirm ? 'border-danger-border text-danger-text' : 'border-strong'
                     )}
-                    placeholder="Re-enter your new password"
+                    placeholder={t('auth.reenterNewPassword')}
                   />
                   <button
                     type="button"
                     className="absolute inset-y-0 right-0 pr-3 flex items-center"
                     onClick={() => setShowConfirm(!showConfirm)}
-                    aria-label={showConfirm ? 'Hide password' : 'Show password'}
+                    aria-label={showConfirm ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
                     {showConfirm ? (
                       <EyeOff className="h-5 w-5 text-fg-subtle" />
@@ -210,12 +210,12 @@ function ResetPasswordForm() {
                 {isLoading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Resetting
+                    {t('auth.resetting')}
                   </>
                 ) : (
                   <>
                     <KeyRound className="h-4 w-4" />
-                    Reset password
+                    {t('auth.resetPasswordButton')}
                   </>
                 )}
               </button>
@@ -229,7 +229,7 @@ function ResetPasswordForm() {
             className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to sign in
+            {t('auth.backToSignIn')}
           </Link>
         </div>
       </div>

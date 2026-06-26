@@ -22,6 +22,7 @@ import {
   TableLoading,
   TableRow,
 } from '@/components/ui/table';
+import { useI18n } from '@/i18n/client';
 
 // MembersSection is the Pattern B onboarding surface inside Account &
 // Security. Reads are open to every org member (so a viewer can see
@@ -53,16 +54,11 @@ interface InvitationRow {
   created_at: string;
 }
 
-const ROLE_LABELS: Record<OrgRole, string> = {
-  admin: 'Admin',
-  operator: 'Operator',
-  viewer: 'Viewer',
-};
-
 const ROLE_OPTIONS: OrgRole[] = ['admin', 'operator', 'viewer'];
 
 export function MembersSection() {
   const { user } = useAuth();
+  const { t } = useI18n();
   const canInvite = usePermission(Actions.OrgInvite);
   const canChangeRole = usePermission(Actions.OrgRoleChange);
   const canRemove = usePermission(Actions.OrgMemberRemove);
@@ -70,12 +66,8 @@ export function MembersSection() {
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <h2 className="text-2xl font-semibold">Members</h2>
-        <p className="text-sm text-muted-foreground">
-          Everyone who can access this organization. Admins can invite new members, change roles,
-          and remove people who shouldn&apos;t have access anymore. Registration on this deployment
-          is invite-only — there is no public sign-up.
-        </p>
+        <h2 className="text-2xl font-semibold">{t('settings.members')}</h2>
+        <p className="text-sm text-muted-foreground">{t('settings.membersDescription')}</p>
       </header>
 
       {canInvite && <InviteForm />}
@@ -91,6 +83,7 @@ export function MembersSection() {
 
 function InviteForm() {
   const qc = useQueryClient();
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<OrgRole>('operator');
   const [error, setError] = useState<string | null>(null);
@@ -99,24 +92,21 @@ function InviteForm() {
   const mutation = useMutation({
     mutationFn: () => api.invitations.create({ email: email.trim(), role }),
     onSuccess: () => {
-      setSuccess(`Invitation sent to ${email}.`);
+      setSuccess(t('settings.invitationSentTo', { email }));
       setError(null);
       setEmail('');
       qc.invalidateQueries({ queryKey: ['invitations'] });
     },
     onError: (err: unknown) => {
       setSuccess(null);
-      setError(extractApiError(err) ?? 'Failed to send invitation.');
+      setError(extractApiError(err) ?? t('settings.failedSendInvitation'));
     },
   });
 
   return (
     <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
-      <h3 className="text-sm font-semibold">Invite a member</h3>
-      <p className="text-xs text-muted-foreground">
-        The invitee receives an email with a link that lets them register and join this organization
-        at the role you pick. The invitation expires in 7 days.
-      </p>
+      <h3 className="text-sm font-semibold">{t('settings.inviteMember')}</h3>
+      <p className="text-xs text-muted-foreground">{t('settings.inviteMemberDescription')}</p>
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={(e) => {
@@ -127,7 +117,7 @@ function InviteForm() {
       >
         <div className="flex-1 min-w-[220px]">
           <label className="block text-xs font-medium mb-1" htmlFor="invite-email">
-            Email
+            {t('settings.email')}
           </label>
           <Input
             id="invite-email"
@@ -140,7 +130,7 @@ function InviteForm() {
         </div>
         <div>
           <label className="block text-xs font-medium mb-1" htmlFor="invite-role">
-            Role
+            {t('settings.role')}
           </label>
           <select
             id="invite-role"
@@ -150,25 +140,25 @@ function InviteForm() {
           >
             {ROLE_OPTIONS.map((r) => (
               <option key={r} value={r}>
-                {ROLE_LABELS[r]}
+                {formatOrgRole(r, t)}
               </option>
             ))}
           </select>
         </div>
         <Button type="submit" disabled={mutation.isPending || !email.trim()} className="gap-2">
           <MailPlus className="h-4 w-4" />
-          {mutation.isPending ? 'Sending…' : 'Send invite'}
+          {mutation.isPending ? t('settings.sending') : t('settings.sendInvite')}
         </Button>
       </form>
       {error && (
         <Alert variant="destructive">
-          <AlertTitle>Couldn&apos;t send invitation</AlertTitle>
+          <AlertTitle>{t('settings.couldntSendInvitation')}</AlertTitle>
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       {success && (
         <Alert>
-          <AlertTitle>Invitation sent</AlertTitle>
+          <AlertTitle>{t('settings.invitationSent')}</AlertTitle>
           <AlertDescription>{success}</AlertDescription>
         </Alert>
       )}
@@ -188,6 +178,7 @@ function MembersTable({
   canRemove: boolean;
 }) {
   const qc = useQueryClient();
+  const { t, formatDate } = useI18n();
   const query = useQuery({
     queryKey: ['memberships'],
     queryFn: async () => (await api.memberships.list()).data.data as MembershipRow[],
@@ -198,44 +189,39 @@ function MembersTable({
     mutationFn: ({ id, role }: { id: number; role: OrgRole }) =>
       api.memberships.updateRole(id, role),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['memberships'] }),
-    onError: (err) => setErrorMsg(extractApiError(err) ?? 'Failed to change role.'),
+    onError: (err) => setErrorMsg(extractApiError(err) ?? t('settings.failedChangeRole')),
   });
 
   const removeMutation = useMutation({
     mutationFn: (id: number) => api.memberships.remove(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['memberships'] }),
-    onError: (err) => setErrorMsg(extractApiError(err) ?? 'Failed to remove member.'),
+    onError: (err) => setErrorMsg(extractApiError(err) ?? t('settings.failedRemoveMember')),
   });
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold">Current members</h3>
+      <h3 className="text-sm font-semibold">{t('settings.currentMembers')}</h3>
       {errorMsg && (
         <Alert variant="destructive">
-          <AlertTitle>Action blocked</AlertTitle>
+          <AlertTitle>{t('settings.actionBlocked')}</AlertTitle>
           <AlertDescription>{errorMsg}</AlertDescription>
         </Alert>
       )}
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Joined</TableHead>
-            {(canChangeRole || canRemove) && <TableHead aria-label="Actions" />}
+            <TableHead>{t('settings.name')}</TableHead>
+            <TableHead>{t('settings.email')}</TableHead>
+            <TableHead>{t('settings.role')}</TableHead>
+            <TableHead>{t('settings.joined')}</TableHead>
+            {(canChangeRole || canRemove) && <TableHead aria-label={t('common.actions')} />}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {query.isLoading && <TableLoading message="Loading members…" rowSpan={5} />}
-          {query.isError && (
-            <TableError
-              message="Failed to load members. Refresh the page to try again."
-              rowSpan={5}
-            />
-          )}
+          {query.isLoading && <TableLoading message={t('settings.loadingMembers')} rowSpan={5} />}
+          {query.isError && <TableError message={t('settings.failedLoadMembers')} rowSpan={5} />}
           {query.isSuccess && query.data.length === 0 && (
-            <TableEmpty message="No members yet." rowSpan={5} />
+            <TableEmpty message={t('settings.noMembersYet')} rowSpan={5} />
           )}
           {query.isSuccess &&
             query.data.map((m) => (
@@ -255,27 +241,27 @@ function MembersTable({
                       className="h-8 rounded-md border border-border bg-background px-2 text-sm"
                       title={
                         m.is_last_admin && m.role === 'admin'
-                          ? 'Promote another member to admin before changing this role.'
+                          ? t('settings.promoteAnotherBeforeRoleChange')
                           : undefined
                       }
                     >
                       {ROLE_OPTIONS.map((r) => (
                         <option key={r} value={r}>
-                          {ROLE_LABELS[r]}
+                          {formatOrgRole(r, t)}
                         </option>
                       ))}
                     </select>
                   ) : (
-                    <Badge variant="outline">{ROLE_LABELS[m.role]}</Badge>
+                    <Badge variant="outline">{formatOrgRole(m.role, t)}</Badge>
                   )}
                   {m.is_last_admin && (
                     <Badge variant="outline" className="ml-2 gap-1">
-                      <ShieldAlert className="h-3 w-3" /> last admin
+                      <ShieldAlert className="h-3 w-3" /> {t('settings.lastAdmin')}
                     </Badge>
                   )}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {formatDate(m.joined_at)}
+                  {formatDate(m.joined_at, { dateStyle: 'medium', timeStyle: 'short' })}
                 </TableCell>
                 {(canChangeRole || canRemove) && (
                   <TableCell className="text-right">
@@ -289,21 +275,21 @@ function MembersTable({
                         }
                         title={
                           m.is_last_admin && m.role === 'admin'
-                            ? 'Promote another member to admin before removing this one.'
+                            ? t('settings.promoteAnotherBeforeRemove')
                             : m.user_id === currentUserId
-                              ? 'Leave this organization. You can be re-invited later.'
+                              ? t('settings.leaveOrganizationHint')
                               : undefined
                         }
                         onClick={() => {
                           const label =
                             m.user_id === currentUserId
-                              ? `Leave ${m.email}? You'll lose access to this org until invited back.`
-                              : `Remove ${m.email}? They'll lose access immediately.`;
+                              ? t('settings.leaveMemberConfirm', { email: m.email })
+                              : t('settings.removeMemberConfirm', { email: m.email });
                           if (window.confirm(label)) removeMutation.mutate(m.id);
                         }}
                       >
                         <UserMinus className="h-4 w-4" />
-                        {m.user_id === currentUserId ? 'Leave' : 'Remove'}
+                        {m.user_id === currentUserId ? t('settings.leave') : t('settings.remove')}
                       </Button>
                     )}
                   </TableCell>
@@ -320,6 +306,7 @@ function MembersTable({
 
 function PendingInvitationsTable() {
   const qc = useQueryClient();
+  const { t, formatDate } = useI18n();
   const query = useQuery({
     queryKey: ['invitations'],
     queryFn: async () => (await api.invitations.list('pending')).data.data as InvitationRow[],
@@ -331,44 +318,40 @@ function PendingInvitationsTable() {
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold">Pending invitations</h3>
-      <p className="text-xs text-muted-foreground">
-        Invitations that have been sent but not yet redeemed. Revoke an invite if it went to the
-        wrong address or if the person no longer needs access.
-      </p>
+      <h3 className="text-sm font-semibold">{t('settings.pendingInvitations')}</h3>
+      <p className="text-xs text-muted-foreground">{t('settings.pendingInvitationsDescription')}</p>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Email</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead>Invited by</TableHead>
-            <TableHead>Expires</TableHead>
-            <TableHead aria-label="Actions" />
+            <TableHead>{t('settings.email')}</TableHead>
+            <TableHead>{t('settings.role')}</TableHead>
+            <TableHead>{t('settings.invitedBy')}</TableHead>
+            <TableHead>{t('settings.expires')}</TableHead>
+            <TableHead aria-label={t('common.actions')} />
           </TableRow>
         </TableHeader>
         <TableBody>
-          {query.isLoading && <TableLoading message="Loading invitations…" rowSpan={5} />}
+          {query.isLoading && (
+            <TableLoading message={t('settings.loadingInvitations')} rowSpan={5} />
+          )}
           {query.isError && (
-            <TableError
-              message="Failed to load invitations. Refresh the page to try again."
-              rowSpan={5}
-            />
+            <TableError message={t('settings.failedLoadInvitations')} rowSpan={5} />
           )}
           {query.isSuccess && query.data.length === 0 && (
-            <TableEmpty message="No pending invitations." rowSpan={5} />
+            <TableEmpty message={t('settings.noPendingInvitations')} rowSpan={5} />
           )}
           {query.isSuccess &&
             query.data.map((inv) => (
               <TableRow key={inv.id}>
                 <TableCell>{inv.email}</TableCell>
                 <TableCell>
-                  <Badge variant="outline">{ROLE_LABELS[inv.role]}</Badge>
+                  <Badge variant="outline">{formatOrgRole(inv.role, t)}</Badge>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {inv.invited_by_name || `#${inv.invited_by}`}
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {formatDate(inv.expires_at)}
+                  {formatDate(inv.expires_at, { dateStyle: 'medium', timeStyle: 'short' })}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button
@@ -377,12 +360,14 @@ function PendingInvitationsTable() {
                     className="gap-2 text-destructive hover:text-destructive"
                     disabled={revokeMutation.isPending}
                     onClick={() => {
-                      if (window.confirm(`Revoke invitation for ${inv.email}?`))
+                      if (
+                        window.confirm(t('settings.revokeInvitationConfirm', { email: inv.email }))
+                      )
                         revokeMutation.mutate(inv.id);
                     }}
                   >
                     <Trash2 className="h-4 w-4" />
-                    Revoke
+                    {t('settings.revoke')}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -394,13 +379,6 @@ function PendingInvitationsTable() {
 }
 
 // ---------- Helpers ----------
-
-function formatDate(iso: string): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
-}
 
 interface ApiErrorShape {
   response?: {
@@ -417,4 +395,11 @@ function extractApiError(err: unknown): string | null {
   const msg = e?.response?.data?.error?.message;
   if (msg) return msg;
   return e?.message ?? null;
+}
+
+function formatOrgRole(role: OrgRole, t: (key: string) => string) {
+  if (role === 'admin') return t('common.admin');
+  if (role === 'operator') return t('settings.operator');
+  if (role === 'viewer') return t('settings.viewer');
+  return role;
 }

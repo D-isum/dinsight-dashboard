@@ -93,7 +93,12 @@ function LoginForm() {
         remember_me: data.remember_me,
       });
     } catch (err: any) {
-      setError(err.message || t('auth.invalidCredentials'));
+      const message = typeof err?.message === 'string' ? err.message : '';
+      if (/invalid email or password/i.test(message)) {
+        setError(t('auth.invalidCredentials'));
+      } else {
+        setError(message && message !== 'Login failed' ? message : t('auth.loginFailed'));
+      }
     } finally {
       setIsLoading(false);
     }

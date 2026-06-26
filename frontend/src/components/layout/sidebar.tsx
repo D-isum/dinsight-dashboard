@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { OrgSwitcher } from '@/components/layout/org-switcher';
 import { mainNavItems, bottomNavItems } from '@/lib/nav-config';
 import { can } from '@/lib/permissions';
+import { formatRoleLabel } from '@/lib/role-labels';
 import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
@@ -219,11 +220,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   <p className="text-sm font-medium text-fg truncate">
                     {user?.full_name || t('common.user')}
                   </p>
-                  <p className="text-xs text-fg-muted truncate">
-                    {user?.role
-                      ? user.role.charAt(0).toUpperCase() + user.role.slice(1)
-                      : t('common.user')}
-                  </p>
+                  <p className="text-xs text-fg-muted truncate">{formatRoleLabel(user?.role, t)}</p>
                 </div>
               </div>
             </div>

@@ -20,6 +20,7 @@ import {
   TableLoading,
   TableRow,
 } from '@/components/ui/table';
+import { useI18n } from '@/i18n/client';
 
 // DevicesSection is the customer-side Devices admin surface.
 //
@@ -64,28 +65,24 @@ interface DeviceRow {
 
 const STATUS_BADGE: Record<
   DeviceStatus,
-  { label: string; variant: 'default' | 'outline' | 'secondary' }
+  { labelKey: string; variant: 'default' | 'outline' | 'secondary' }
 > = {
-  active: { label: 'Active', variant: 'default' },
-  paused: { label: 'Paused', variant: 'secondary' },
-  retired: { label: 'Retired', variant: 'outline' },
+  active: { labelKey: 'settings.active', variant: 'default' },
+  paused: { labelKey: 'settings.paused', variant: 'secondary' },
+  retired: { labelKey: 'settings.retired', variant: 'outline' },
 };
 
 export function DevicesSection() {
+  const { t } = useI18n();
   const canUpdate = usePermission(Actions.DeviceUpdate);
   const canDelete = usePermission(Actions.DeviceDelete);
 
   return (
     <div className="space-y-6">
       <header className="space-y-2">
-        <h2 className="text-2xl font-semibold">Devices</h2>
-        <p className="text-sm text-muted-foreground">
-          Each device is one physical machine being monitored. From this page you can monitor
-          ingestion, pause a device for planned downtime, or trigger a manual sync.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Need to add a new device or rotate credentials? Contact support.
-        </p>
+        <h2 className="text-2xl font-semibold">{t('settings.devices')}</h2>
+        <p className="text-sm text-muted-foreground">{t('settings.devicesDescription')}</p>
+        <p className="text-xs text-muted-foreground">{t('settings.devicesSupportHint')}</p>
       </header>
 
       <DevicesTable canUpdate={canUpdate} canDelete={canDelete} />
@@ -106,26 +103,29 @@ interface DeviceAlert {
   message: string;
 }
 
-function classifyError(err: unknown, fallbackTitle: string): DeviceAlert {
+function classifyError(
+  err: unknown,
+  fallbackTitle: string,
+  t: (key: string, values?: Record<string, string | number>) => string
+): DeviceAlert {
   const { code, message } = extractApiErrorParts(err);
   if (code === 'BLOB_DISABLED' || code === 'INGESTION_CONTAINER_NOT_CONFIGURED') {
     return {
       kind: 'info',
-      title: 'Cloud sync not available here',
-      message:
-        message ??
-        'Cloud storage is not configured in this environment. Sync only runs against production Azure.',
+      title: t('settings.cloudSyncUnavailable'),
+      message: message ?? t('settings.cloudSyncUnavailableDescription'),
     };
   }
   return {
     kind: 'error',
     title: fallbackTitle,
-    message: message ?? `${fallbackTitle.toLowerCase()}.`,
+    message: message ?? t('settings.deviceActionFailed', { action: fallbackTitle.toLowerCase() }),
   };
 }
 
 function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete: boolean }) {
   const qc = useQueryClient();
+  const { t, formatDate } = useI18n();
   const query = useQuery({
     queryKey: ['devices'],
     queryFn: async () => (await api.devices.list()).data.data as DeviceRow[],
@@ -139,7 +139,7 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
       setAlert(null);
       qc.invalidateQueries({ queryKey: ['devices'] });
     },
-    onError: (err) => setAlert(classifyError(err, 'Failed to update device')),
+    onError: (err) => setAlert(classifyError(err, t('settings.failedUpdateDevice'), t)),
   });
 
   const deleteMutation = useMutation({
@@ -148,7 +148,7 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
       setAlert(null);
       qc.invalidateQueries({ queryKey: ['devices'] });
     },
-    onError: (err) => setAlert(classifyError(err, 'Failed to remove device')),
+    onError: (err) => setAlert(classifyError(err, t('settings.failedRemoveDevice'), t)),
   });
 
   const syncMutation = useMutation({
@@ -157,12 +157,12 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
       setAlert(null);
       qc.invalidateQueries({ queryKey: ['devices'] });
     },
-    onError: (err) => setAlert(classifyError(err, 'Sync failed')),
+    onError: (err) => setAlert(classifyError(err, t('settings.syncFailed'), t)),
   });
 
   return (
     <section className="space-y-3">
-      <h3 className="text-sm font-semibold">Current devices</h3>
+      <h3 className="text-sm font-semibold">{t('settings.currentDevices')}</h3>
 
       {alert && (
         <Alert variant={alert.kind === 'error' ? 'destructive' : 'default'}>
@@ -174,18 +174,18 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Device identity</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Last ingested</TableHead>
-            {(canUpdate || canDelete) && <TableHead aria-label="Actions" />}
+            <TableHead>{t('settings.name')}</TableHead>
+            <TableHead>{t('admin.deviceIdentity')}</TableHead>
+            <TableHead>{t('settings.status')}</TableHead>
+            <TableHead>{t('admin.lastIngested')}</TableHead>
+            {(canUpdate || canDelete) && <TableHead aria-label={t('common.actions')} />}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {query.isLoading && <TableLoading message="Loading devices…" rowSpan={5} />}
-          {query.isError && <TableError message="Failed to load devices." rowSpan={5} />}
+          {query.isLoading && <TableLoading message={t('settings.loadingDevices')} rowSpan={5} />}
+          {query.isError && <TableError message={t('settings.failedLoadDevices')} rowSpan={5} />}
           {query.isSuccess && query.data.length === 0 && (
-            <TableEmpty message="No devices yet. Contact support to provision one." rowSpan={5} />
+            <TableEmpty message={t('settings.noDevicesProvisioned')} rowSpan={5} />
           )}
           {query.isSuccess &&
             query.data.map((d) => {
@@ -203,17 +203,25 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
                     {hasIoTHub ? (
                       <>
                         {d.iot_hub_device_id}
-                        {d.iot_hub_name && <div className="text-[10px]">hub: {d.iot_hub_name}</div>}
+                        {d.iot_hub_name && (
+                          <div className="text-[10px]">
+                            {t('admin.hub', { name: d.iot_hub_name })}
+                          </div>
+                        )}
                       </>
                     ) : (
-                      <span className="italic text-muted-foreground">(not yet linked)</span>
+                      <span className="italic text-muted-foreground">
+                        {t('settings.notYetLinked')}
+                      </span>
                     )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+                    <Badge variant={statusInfo.variant}>{t(statusInfo.labelKey)}</Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground">
-                    {d.last_ingested_at ? formatDate(d.last_ingested_at) : '—'}
+                    {d.last_ingested_at
+                      ? formatDate(d.last_ingested_at, { dateStyle: 'medium', timeStyle: 'short' })
+                      : '—'}
                     {d.last_ingest_error && (
                       <div className="text-danger-text">{d.last_ingest_error}</div>
                     )}
@@ -229,12 +237,12 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
                             disabled={syncMutation.isPending || !hasIoTHub}
                             title={
                               hasIoTHub
-                                ? 'Trigger an immediate ingestion pass for this device'
-                                : 'Sync requires an IoT Hub-linked device'
+                                ? t('settings.syncNowHint')
+                                : t('settings.syncRequiresIotHub')
                             }
                             onClick={() => syncMutation.mutate(d.id)}
                           >
-                            <RefreshCcw className="h-4 w-4" /> Sync now
+                            <RefreshCcw className="h-4 w-4" /> {t('settings.syncNow')}
                           </Button>
                         )}
                         {canUpdate && d.status === 'active' && (
@@ -247,7 +255,7 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
                               updateMutation.mutate({ id: d.id, data: { status: 'paused' } })
                             }
                           >
-                            <PauseCircle className="h-4 w-4" /> Pause
+                            <PauseCircle className="h-4 w-4" /> {t('settings.pause')}
                           </Button>
                         )}
                         {canUpdate && d.status === 'paused' && (
@@ -260,7 +268,7 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
                               updateMutation.mutate({ id: d.id, data: { status: 'active' } })
                             }
                           >
-                            <PlayCircle className="h-4 w-4" /> Resume
+                            <PlayCircle className="h-4 w-4" /> {t('settings.resume')}
                           </Button>
                         )}
                         {canDelete && (
@@ -271,15 +279,13 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
                             disabled={deleteMutation.isPending}
                             onClick={() => {
                               if (
-                                window.confirm(
-                                  `Remove device ${d.name} from the dashboard? Historical data stays; the device is hidden from this list.`
-                                )
+                                window.confirm(t('settings.removeDeviceConfirm', { name: d.name }))
                               ) {
                                 deleteMutation.mutate(d.id);
                               }
                             }}
                           >
-                            <Trash2 className="h-4 w-4" /> Remove
+                            <Trash2 className="h-4 w-4" /> {t('settings.remove')}
                           </Button>
                         )}
                       </div>
@@ -295,13 +301,6 @@ function DevicesTable({ canUpdate, canDelete }: { canUpdate: boolean; canDelete:
 }
 
 // ---------- helpers ----------
-
-function formatDate(iso: string): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString();
-}
 
 interface ApiErrorShape {
   response?: {

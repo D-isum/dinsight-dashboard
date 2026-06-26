@@ -9,6 +9,7 @@ import * as z from 'zod';
 import { AlertCircle, ArrowLeft, CheckCircle2, Loader2, MailCheck } from 'lucide-react';
 import { api } from '@/lib/api-client';
 import { cn } from '@/utils/cn';
+import { useI18n } from '@/i18n/client';
 
 // Verify-email runs the verification call once on mount when a token is
 // present in the URL (?token=...) and renders the result. If the token
@@ -16,11 +17,12 @@ import { cn } from '@/utils/cn';
 // link) or expired, the "resend verification" form is shown so they can
 // re-trigger the email.
 
-const resendSchema = z.object({
-  email: z.string().email('Please enter a valid email address'),
-});
+const createResendSchema = (t: (key: string) => string) =>
+  z.object({
+    email: z.string().email(t('auth.emailInvalid')),
+  });
 
-type ResendFormData = z.infer<typeof resendSchema>;
+type ResendFormData = z.infer<ReturnType<typeof createResendSchema>>;
 
 type VerifyState =
   | { kind: 'idle' } // No token in URL; show resend form.
@@ -31,6 +33,7 @@ type VerifyState =
   | { kind: 'error'; message: string };
 
 function VerifyEmailContent() {
+  const { t } = useI18n();
   const searchParams = useSearchParams();
   const token = searchParams.get('token') ?? '';
 
@@ -38,6 +41,7 @@ function VerifyEmailContent() {
   const [resendSubmitted, setResendSubmitted] = useState(false);
   const [resendError, setResendError] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
+  const resendSchema = createResendSchema(t);
 
   const {
     register,
@@ -65,13 +69,13 @@ function VerifyEmailContent() {
         else
           setState({
             kind: 'error',
-            message: e?.response?.data?.message || 'Failed to verify email. Please try again.',
+            message: e?.response?.data?.message || t('auth.verifyEmailFailed'),
           });
       });
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [t, token]);
 
   const onResend = async (data: ResendFormData) => {
     setIsResending(true);
@@ -80,10 +84,7 @@ function VerifyEmailContent() {
       await api.auth.resendVerification(data.email);
       setResendSubmitted(true);
     } catch (e: any) {
-      setResendError(
-        e?.response?.data?.message ||
-          'We could not send the verification email right now. Please try again.'
-      );
+      setResendError(e?.response?.data?.message || t('auth.verificationEmailFailed'));
     } finally {
       setIsResending(false);
     }
@@ -98,13 +99,13 @@ function VerifyEmailContent() {
               <span className="text-accent-contrast text-2xl font-bold">D</span>
             </div>
           </div>
-          <h2 className="text-3xl font-bold text-fg">Verify your email</h2>
+          <h2 className="text-3xl font-bold text-fg">{t('auth.verifyEmailTitle')}</h2>
         </div>
 
         {state.kind === 'verifying' && (
           <div className="rounded-lg border border-strong bg-surface p-6 text-center text-sm">
             <Loader2 className="mx-auto h-6 w-6 animate-spin text-fg-muted" />
-            <p className="mt-2 text-fg">Verifying your email...</p>
+            <p className="mt-2 text-fg">{t('auth.verifyingEmail')}</p>
           </div>
         )}
 
@@ -113,13 +114,13 @@ function VerifyEmailContent() {
             <div className="flex items-start gap-2">
               <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" />
               <div>
-                <p className="font-medium">Email verified</p>
+                <p className="font-medium">{t('auth.emailVerified')}</p>
                 <p className="mt-1">
-                  Your email is now verified. You can{' '}
+                  {t('auth.emailVerifiedPrefix')}
                   <Link href="/login" className="underline">
-                    sign in
+                    {t('auth.signInLower')}
                   </Link>
-                  .
+                  {t('auth.emailVerifiedSuffix')}
                 </p>
               </div>
             </div>
@@ -131,10 +132,8 @@ function VerifyEmailContent() {
             <div className="flex items-start gap-2">
               <AlertCircle className="mt-0.5 h-5 w-5 text-warning" />
               <div>
-                <p className="font-medium text-fg">Verification link expired</p>
-                <p className="mt-1 text-fg-muted">
-                  Enter your email below and we&apos;ll send a fresh verification link.
-                </p>
+                <p className="font-medium text-fg">{t('auth.verificationLinkExpired')}</p>
+                <p className="mt-1 text-fg-muted">{t('auth.verificationLinkExpiredDescription')}</p>
               </div>
             </div>
           </div>
@@ -145,11 +144,8 @@ function VerifyEmailContent() {
             <div className="flex items-start gap-2">
               <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0" />
               <div>
-                <p className="font-medium">Invalid verification link</p>
-                <p className="mt-1">
-                  This link doesn&apos;t match an active verification request. If you need a new
-                  one, enter your email below.
-                </p>
+                <p className="font-medium">{t('auth.invalidVerificationLink')}</p>
+                <p className="mt-1">{t('auth.invalidVerificationLinkDescription')}</p>
               </div>
             </div>
           </div>
@@ -168,7 +164,7 @@ function VerifyEmailContent() {
           <div className="space-y-4">
             {state.kind === 'idle' && (
               <p className="text-center text-sm text-fg-muted">
-                Need a new verification email? Enter the address you registered with.
+                {t('auth.needNewVerificationEmail')}
               </p>
             )}
 
@@ -177,11 +173,8 @@ function VerifyEmailContent() {
                 <div className="flex items-start gap-2">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium">Check your inbox</p>
-                    <p className="mt-1">
-                      If an unverified account exists for that email, we&apos;ve sent a fresh
-                      verification link.
-                    </p>
+                    <p className="font-medium">{t('auth.checkYourInbox')}</p>
+                    <p className="mt-1">{t('auth.verificationEmailSentDescription')}</p>
                   </div>
                 </div>
               </div>
@@ -197,7 +190,7 @@ function VerifyEmailContent() {
                 <form className="space-y-4" onSubmit={handleSubmit(onResend)} noValidate>
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-fg">
-                      Email address
+                      {t('auth.emailAddress')}
                     </label>
                     <input
                       {...register('email')}
@@ -229,12 +222,12 @@ function VerifyEmailContent() {
                     {isResending ? (
                       <>
                         <Loader2 className="h-4 w-4 animate-spin" />
-                        Sending
+                        {t('auth.sending')}
                       </>
                     ) : (
                       <>
                         <MailCheck className="h-4 w-4" />
-                        Send verification email
+                        {t('auth.sendVerificationEmail')}
                       </>
                     )}
                   </button>
@@ -250,7 +243,7 @@ function VerifyEmailContent() {
             className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to sign in
+            {t('auth.backToSignIn')}
           </Link>
         </div>
       </div>
