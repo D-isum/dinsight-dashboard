@@ -23,9 +23,85 @@ interface EChartsCanvasProps {
   renderer?: 'canvas' | 'svg';
   notMerge?: boolean;
   lazyUpdate?: boolean;
+  preserveDataZoom?: boolean;
+  dataZoomStorageKey?: string;
   onEvents?: Record<string, EChartsEventHandler>;
   onReady?: (chart: ECharts) => void;
   onOptionApplied?: (chart: ECharts) => void;
+}
+
+type DataZoomSnapshot = Array<Record<string, unknown>>;
+
+const DATA_ZOOM_KEYS = [
+  'id',
+  'xAxisIndex',
+  'yAxisIndex',
+  'start',
+  'end',
+  'startValue',
+  'endValue',
+] as const;
+
+function extractDataZoomSnapshot(chart: ECharts): DataZoomSnapshot | null {
+  const option = chart.getOption() as { dataZoom?: Array<Record<string, unknown>> };
+  const dataZoom = option?.dataZoom;
+  if (!Array.isArray(dataZoom) || dataZoom.length === 0) {
+    return null;
+  }
+
+  const snapshot = dataZoom
+    .map((zoom) => {
+      const entry: Record<string, unknown> = {};
+      DATA_ZOOM_KEYS.forEach((key) => {
+        const value = zoom[key];
+        if (value != null) {
+          entry[key] = value;
+        }
+      });
+      return entry;
+    })
+    .filter((entry) => Object.keys(entry).length > 0);
+
+  return snapshot.length > 0 ? snapshot : null;
+}
+
+function readDataZoomSnapshot(storageKey?: string): DataZoomSnapshot | null {
+  if (!storageKey || typeof window === 'undefined') {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? (parsed as DataZoomSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDataZoomSnapshot(storageKey: string | undefined, snapshot: DataZoomSnapshot | null) {
+  if (!storageKey || typeof window === 'undefined') {
+    return;
+  }
+  try {
+    if (snapshot) {
+      window.localStorage.setItem(storageKey, JSON.stringify(snapshot));
+    } else {
+      window.localStorage.removeItem(storageKey);
+    }
+  } catch {
+    // Ignore storage failures; in-memory preservation still applies.
+  }
+}
+
+function applyDataZoomSnapshot(chart: ECharts, snapshot: DataZoomSnapshot | null) {
+  if (!snapshot || snapshot.length === 0) {
+    return;
+  }
+  chart.setOption({ dataZoom: snapshot } as EChartsOption, {
+    notMerge: false,
+    lazyUpdate: false,
+  });
 }
 
 function EChartsSurface({
@@ -35,6 +111,8 @@ function EChartsSurface({
   renderer = 'canvas',
   notMerge = true,
   lazyUpdate = true,
+  preserveDataZoom = false,
+  dataZoomStorageKey,
   onEvents,
   onReady,
   onOptionApplied,
@@ -44,6 +122,8 @@ function EChartsSurface({
   const optionRef = useRef(option);
   const onReadyRef = useRef(onReady);
   const onOptionAppliedRef = useRef(onOptionApplied);
+  const dataZoomSnapshotRef = useRef<DataZoomSnapshot | null>(null);
+  const dataZoomStorageKeyRef = useRef<string | undefined>(dataZoomStorageKey);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [chartReadyRevision, setChartReadyRevision] = useState(0);
 
@@ -62,6 +142,10 @@ function EChartsSurface({
 
         chartRef.current = echarts.init(containerRef.current, undefined, { renderer });
         chartRef.current.setOption(optionRef.current, { notMerge, lazyUpdate });
+        if (preserveDataZoom) {
+          dataZoomSnapshotRef.current = readDataZoomSnapshot(dataZoomStorageKey);
+          applyDataZoomSnapshot(chartRef.current, dataZoomSnapshotRef.current);
+        }
         onReadyRef.current?.(chartRef.current);
         onOptionAppliedRef.current?.(chartRef.current);
         setChartReadyRevision((revision) => revision + 1);
@@ -86,9 +170,44 @@ function EChartsSurface({
       return;
     }
 
+    if (dataZoomStorageKeyRef.current !== dataZoomStorageKey) {
+      dataZoomStorageKeyRef.current = dataZoomStorageKey;
+      dataZoomSnapshotRef.current = preserveDataZoom
+        ? readDataZoomSnapshot(dataZoomStorageKey)
+        : null;
+    }
+
     chartRef.current.setOption(option, { notMerge, lazyUpdate });
+    if (preserveDataZoom) {
+      applyDataZoomSnapshot(chartRef.current, dataZoomSnapshotRef.current);
+    }
     onOptionAppliedRef.current?.(chartRef.current);
-  }, [chartReadyRevision, lazyUpdate, notMerge, option]);
+  }, [chartReadyRevision, dataZoomStorageKey, lazyUpdate, notMerge, option, preserveDataZoom]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !preserveDataZoom) {
+      return;
+    }
+
+    const handleDataZoom = () => {
+      const snapshot = extractDataZoomSnapshot(chart);
+      dataZoomSnapshotRef.current = snapshot;
+      writeDataZoomSnapshot(dataZoomStorageKeyRef.current, snapshot);
+    };
+    const handleRestore = () => {
+      dataZoomSnapshotRef.current = null;
+      writeDataZoomSnapshot(dataZoomStorageKeyRef.current, null);
+    };
+
+    chart.on('datazoom', handleDataZoom);
+    chart.on('restore', handleRestore);
+
+    return () => {
+      chart.off('datazoom', handleDataZoom);
+      chart.off('restore', handleRestore);
+    };
+  }, [chartReadyRevision, preserveDataZoom]);
 
   useEffect(() => {
     const chart = chartRef.current;

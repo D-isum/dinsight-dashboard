@@ -59,6 +59,8 @@ import { cn } from '@/utils/cn';
 
 import type { EChartsOption } from 'echarts';
 const INSIGHTS_UI_PREFS_KEY = 'insights-ui-prefs-v1';
+const INSIGHTS_ACTIVE_STATUS_REFRESH_MS = 3_000;
+const INSIGHTS_IDLE_STATUS_REFRESH_MS = 15_000;
 const DISTANCE_AXIS_BASE_MAX = 2;
 const DISTANCE_WARNING_FALLBACK = 0.8;
 const DISTANCE_DANGER_FALLBACK = 1.2;
@@ -506,7 +508,10 @@ export default function HealthInsightsPage() {
       }
     },
     staleTime: 3_000,
-    refetchInterval: 3_000,
+    refetchInterval: (query) =>
+      (query.state.data as StreamingStatus | null | undefined)?.is_active
+        ? INSIGHTS_ACTIVE_STATUS_REFRESH_MS
+        : INSIGHTS_IDLE_STATUS_REFRESH_MS,
     retry: false,
   });
 
@@ -758,6 +763,34 @@ export default function HealthInsightsPage() {
   const deferredRangeSignature = useDeferredValue(appliedRangeSignature);
   const shouldLiveRefreshWearTrend =
     hasAppliedWearTrendRun && Boolean(datasetId && deferredMetadataColumn);
+  const distanceChartZoomStorageKey = useMemo(
+    () =>
+      datasetId
+        ? `dinsight:chart-zoom:insights-distance:${userId ?? 'anon'}:${datasetId}:${deferredMetadataColumn}:${deferredIncludeMonitoring}:${deferredClusterSignature}:${deferredRangeSignature}`
+        : undefined,
+    [
+      datasetId,
+      deferredClusterSignature,
+      deferredIncludeMonitoring,
+      deferredMetadataColumn,
+      deferredRangeSignature,
+      userId,
+    ]
+  );
+  const transitionChartZoomStorageKey = useMemo(
+    () =>
+      datasetId
+        ? `dinsight:chart-zoom:insights-transition:${userId ?? 'anon'}:${datasetId}:${deferredMetadataColumn}:${deferredIncludeMonitoring}:${deferredClusterSignature}:${deferredRangeSignature}`
+        : undefined,
+    [
+      datasetId,
+      deferredClusterSignature,
+      deferredIncludeMonitoring,
+      deferredMetadataColumn,
+      deferredRangeSignature,
+      userId,
+    ]
+  );
 
   const wearTrendQuery = useQuery<DeteriorationResult | null>({
     queryKey: [
@@ -1353,10 +1386,24 @@ export default function HealthInsightsPage() {
       },
       grid: { top: 88, right: 72, bottom: 104, left: 82, containLabel: true },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 24, bottom: 34 },
-        { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', yAxisIndex: 0, filterMode: 'none', width: 18, right: 18 },
+        { id: 'distance-x-inside', type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        {
+          id: 'distance-x-slider',
+          type: 'slider',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          height: 24,
+          bottom: 34,
+        },
+        { id: 'distance-y-inside', type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+        {
+          id: 'distance-y-slider',
+          type: 'slider',
+          yAxisIndex: 0,
+          filterMode: 'none',
+          width: 18,
+          right: 18,
+        },
       ],
       xAxis: {
         type: 'value',
@@ -1752,10 +1799,24 @@ export default function HealthInsightsPage() {
       },
       grid: { top: 88, right: 72, bottom: 106, left: 82, containLabel: true },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 24, bottom: 34 },
-        { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', yAxisIndex: 0, filterMode: 'none', width: 18, right: 18 },
+        { id: 'transition-x-inside', type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        {
+          id: 'transition-x-slider',
+          type: 'slider',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          height: 24,
+          bottom: 34,
+        },
+        { id: 'transition-y-inside', type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+        {
+          id: 'transition-y-slider',
+          type: 'slider',
+          yAxisIndex: 0,
+          filterMode: 'none',
+          width: 18,
+          right: 18,
+        },
       ],
       xAxis: {
         type: 'value',
@@ -2714,6 +2775,8 @@ export default function HealthInsightsPage() {
                           <div className="h-[clamp(560px,72vh,780px)]">
                             <EChartsCanvas
                               option={distanceEChart.option}
+                              preserveDataZoom
+                              dataZoomStorageKey={distanceChartZoomStorageKey}
                               style={{ width: '100%', height: '100%' }}
                             />
                           </div>
@@ -2923,6 +2986,8 @@ export default function HealthInsightsPage() {
                           <div className="h-[clamp(560px,72vh,780px)]">
                             <EChartsCanvas
                               option={transitionPlot.option}
+                              preserveDataZoom
+                              dataZoomStorageKey={transitionChartZoomStorageKey}
                               style={{ width: '100%', height: '100%' }}
                             />
                           </div>

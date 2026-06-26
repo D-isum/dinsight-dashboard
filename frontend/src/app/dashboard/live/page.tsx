@@ -147,6 +147,7 @@ const stateTone: Record<'OK' | 'Deteriorating' | 'Failing', string> = {
 const LIVE_MONITOR_PREFS_KEY = 'live-monitor:prefs:v1';
 const LIVE_MONITOR_DEVICE_ID_KEY = 'dinsight:live-monitor:device-id:v1';
 const LIVE_RECENT_WINDOW_POINTS = 500;
+const LIVE_IDLE_STATUS_REFRESH_MS = 15_000;
 
 type RenderDensity = 'fast' | 'balanced' | 'detailed';
 
@@ -598,6 +599,13 @@ export default function LiveMonitorPage() {
     if (streamSpeed === '0.5x') return 4000;
     return 2000;
   }, [streamSpeed]);
+  const liveChartZoomStorageKey = useMemo(
+    () =>
+      selectedId
+        ? `dinsight:chart-zoom:live:${user?.id ?? 'anon'}:${selectedId}:${monitorView}:${followLatest ? 'follow' : 'static'}`
+        : undefined,
+    [followLatest, monitorView, selectedId, user?.id]
+  );
   const renderMaxPoints = LIVE_RENDER_DENSITY[renderDensity].maxPoints;
   const activeSelectionConfig = SELECTION_MODE_CONFIG[selectionMode];
   const activeBrushType = activeSelectionConfig.brushType;
@@ -668,7 +676,12 @@ export default function LiveMonitorPage() {
       const response = await api.streaming.getStatus(selectedId);
       return response?.data?.success ? (response.data.data as StreamingStatus) : null;
     },
-    refetchInterval: autoRefresh && !isSelecting ? refreshIntervalMs : false,
+    refetchInterval:
+      autoRefresh && !isSelecting
+        ? isStreaming
+          ? refreshIntervalMs
+          : LIVE_IDLE_STATUS_REFRESH_MS
+        : false,
     retry: 1,
   });
 
@@ -1173,16 +1186,15 @@ export default function LiveMonitorPage() {
   }, [streamingStatus, selectedId]);
 
   useEffect(() => {
-    if (!autoRefresh || !selectedId || isSelecting) {
+    if (!autoRefresh || !selectedId || isSelecting || !isStreaming) {
       return;
     }
 
-    const smartInterval = isStreaming ? refreshIntervalMs : 10_000;
     const timer = window.setInterval(() => {
       void refetchDatasets();
       void refetchBaseline();
       void refetchMonitoring();
-    }, smartInterval);
+    }, refreshIntervalMs);
 
     return () => window.clearInterval(timer);
   }, [
@@ -1687,7 +1699,16 @@ export default function LiveMonitorPage() {
       });
     });
 
-    const monitoringRangeStart = (() => {
+    const monitoringAxisStart = (() => {
+      if (!effectiveMonitoringData) {
+        return 0;
+      }
+      if (monitorView === 'recent') {
+        return Math.max(0, effectiveMonitoringData.dinsight_x.length - LIVE_RECENT_WINDOW_POINTS);
+      }
+      return 0;
+    })();
+    const monitoringFocusStart = (() => {
       if (!effectiveMonitoringData) {
         return 0;
       }
@@ -1695,23 +1716,44 @@ export default function LiveMonitorPage() {
       if (followLatest) {
         return Math.max(0, count - Math.max(50, latestGlowCount + trailPoints + 25));
       }
-      if (monitorView === 'recent') {
-        return Math.max(0, count - LIVE_RECENT_WINDOW_POINTS);
-      }
-      return 0;
+      return monitoringAxisStart;
     })();
-    const monitoringRangeX = effectiveMonitoringData?.dinsight_x.slice(monitoringRangeStart) ?? [];
-    const monitoringRangeY = effectiveMonitoringData?.dinsight_y.slice(monitoringRangeStart) ?? [];
+    const monitoringAxisX = effectiveMonitoringData?.dinsight_x.slice(monitoringAxisStart) ?? [];
+    const monitoringAxisY = effectiveMonitoringData?.dinsight_y.slice(monitoringAxisStart) ?? [];
+    const monitoringFocusX = effectiveMonitoringData?.dinsight_x.slice(monitoringFocusStart) ?? [];
+    const monitoringFocusY = effectiveMonitoringData?.dinsight_y.slice(monitoringFocusStart) ?? [];
     const xAxisRange = buildPaddedAxisRange([
       ...baselineData.dinsight_x,
-      ...monitoringRangeX,
+      ...monitoringAxisX,
       ...(anomalyResult?.anomalous_points?.map((point) => point.x) ?? []),
     ]);
     const yAxisRange = buildPaddedAxisRange([
       ...baselineData.dinsight_y,
-      ...monitoringRangeY,
+      ...monitoringAxisY,
       ...(anomalyResult?.anomalous_points?.map((point) => point.y) ?? []),
     ]);
+    const focusedXAxisRange = followLatest
+      ? buildPaddedAxisRange([
+          ...baselineData.dinsight_x,
+          ...monitoringFocusX,
+          ...(anomalyResult?.anomalous_points?.map((point) => point.x) ?? []),
+        ])
+      : undefined;
+    const focusedYAxisRange = followLatest
+      ? buildPaddedAxisRange([
+          ...baselineData.dinsight_y,
+          ...monitoringFocusY,
+          ...(anomalyResult?.anomalous_points?.map((point) => point.y) ?? []),
+        ])
+      : undefined;
+    const xZoomDefaults =
+      followLatest && focusedXAxisRange
+        ? { startValue: focusedXAxisRange[0], endValue: focusedXAxisRange[1] }
+        : {};
+    const yZoomDefaults =
+      followLatest && focusedYAxisRange
+        ? { startValue: focusedYAxisRange[0], endValue: focusedYAxisRange[1] }
+        : {};
 
     const option: EChartsOption = {
       animation: false,
@@ -1777,10 +1819,38 @@ export default function LiveMonitorPage() {
       visualMap,
       grid: { top: 64, right: 84, bottom: 96, left: 78, containLabel: true },
       dataZoom: [
-        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 24, bottom: 30 },
-        { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
-        { type: 'slider', yAxisIndex: 0, filterMode: 'none', width: 18, right: 18 },
+        {
+          id: 'live-x-inside',
+          type: 'inside',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          ...xZoomDefaults,
+        },
+        {
+          id: 'live-x-slider',
+          type: 'slider',
+          xAxisIndex: 0,
+          filterMode: 'none',
+          height: 24,
+          bottom: 30,
+          ...xZoomDefaults,
+        },
+        {
+          id: 'live-y-inside',
+          type: 'inside',
+          yAxisIndex: 0,
+          filterMode: 'none',
+          ...yZoomDefaults,
+        },
+        {
+          id: 'live-y-slider',
+          type: 'slider',
+          yAxisIndex: 0,
+          filterMode: 'none',
+          width: 18,
+          right: 18,
+          ...yZoomDefaults,
+        },
       ],
       xAxis: {
         type: 'value',
@@ -2552,6 +2622,8 @@ export default function LiveMonitorPage() {
                       onEvents={liveEChartEvents}
                       onReady={syncLiveBrushCursor}
                       onOptionApplied={syncLiveBrushCursor}
+                      preserveDataZoom
+                      dataZoomStorageKey={liveChartZoomStorageKey}
                       style={{ width: '100%', height: 'clamp(560px, 74vh, 800px)' }}
                     />
                     <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
