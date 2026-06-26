@@ -1324,29 +1324,21 @@ export default function HealthInsightsPage() {
         type: 'scroll',
         top: 0,
         left: 4,
-        right: 150,
+        right: 8,
         itemWidth: 12,
         itemHeight: 8,
       },
       toolbox: {
         show: true,
         right: 8,
-        top: 0,
+        top: 28,
         feature: {
           dataZoom: { yAxisIndex: 'none' },
-          brush: { type: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'] },
           restore: {},
           saveAsImage: { pixelRatio: 2 },
         },
       },
-      brush: {
-        toolbox: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'],
-        xAxisIndex: 0,
-        brushMode: 'multiple',
-        throttleType: 'debounce',
-        throttleDelay: 250,
-      },
-      grid: { top: 64, right: 72, bottom: 104, left: 82, containLabel: true },
+      grid: { top: 88, right: 72, bottom: 104, left: 82, containLabel: true },
       dataZoom: [
         { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
         { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 24, bottom: 34 },
@@ -1723,30 +1715,21 @@ export default function HealthInsightsPage() {
         type: 'scroll',
         top: 0,
         left: 4,
-        right: 150,
+        right: 8,
         itemWidth: 12,
         itemHeight: 8,
       },
       toolbox: {
         show: true,
         right: 8,
-        top: 0,
+        top: 28,
         feature: {
           dataZoom: { yAxisIndex: 'none' },
-          brush: { type: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'] },
           restore: {},
           saveAsImage: { pixelRatio: 2 },
         },
       },
-      brush: {
-        toolbox: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'],
-        xAxisIndex: 0,
-        yAxisIndex: 0,
-        brushMode: 'multiple',
-        throttleType: 'debounce',
-        throttleDelay: 250,
-      },
-      grid: { top: 64, right: 72, bottom: 106, left: 82, containLabel: true },
+      grid: { top: 88, right: 72, bottom: 106, left: 82, containLabel: true },
       dataZoom: [
         { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
         { type: 'slider', xAxisIndex: 0, filterMode: 'none', height: 24, bottom: 34 },
@@ -2656,9 +2639,8 @@ export default function HealthInsightsPage() {
                             />
                           </div>
                           <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
-                            Interactions: use the ECharts toolbox for zoom, brush, restore, and
-                            image export; use the bottom/right sliders or mouse wheel to inspect
-                            dense ranges.
+                            Zoom, restore, and image export are available in the chart toolbar; use
+                            the bottom/right sliders or mouse wheel to inspect dense ranges.
                           </p>
                         </ChartFrame>
                       ) : (

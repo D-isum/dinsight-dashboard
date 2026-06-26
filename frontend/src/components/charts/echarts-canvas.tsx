@@ -24,6 +24,8 @@ interface EChartsCanvasProps {
   notMerge?: boolean;
   lazyUpdate?: boolean;
   onEvents?: Record<string, EChartsEventHandler>;
+  onReady?: (chart: ECharts) => void;
+  onOptionApplied?: (chart: ECharts) => void;
 }
 
 function EChartsSurface({
@@ -34,14 +36,20 @@ function EChartsSurface({
   notMerge = true,
   lazyUpdate = true,
   onEvents,
+  onReady,
+  onOptionApplied,
 }: EChartsCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<ECharts | null>(null);
   const optionRef = useRef(option);
+  const onReadyRef = useRef(onReady);
+  const onOptionAppliedRef = useRef(onOptionApplied);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [chartReadyRevision, setChartReadyRevision] = useState(0);
 
   optionRef.current = option;
+  onReadyRef.current = onReady;
+  onOptionAppliedRef.current = onOptionApplied;
 
   useEffect(() => {
     let cancelled = false;
@@ -54,6 +62,8 @@ function EChartsSurface({
 
         chartRef.current = echarts.init(containerRef.current, undefined, { renderer });
         chartRef.current.setOption(optionRef.current, { notMerge, lazyUpdate });
+        onReadyRef.current?.(chartRef.current);
+        onOptionAppliedRef.current?.(chartRef.current);
         setChartReadyRevision((revision) => revision + 1);
       })
       .catch((error: unknown) => {
@@ -72,7 +82,12 @@ function EChartsSurface({
   }, [renderer]);
 
   useEffect(() => {
-    chartRef.current?.setOption(option, { notMerge, lazyUpdate });
+    if (!chartRef.current) {
+      return;
+    }
+
+    chartRef.current.setOption(option, { notMerge, lazyUpdate });
+    onOptionAppliedRef.current?.(chartRef.current);
   }, [chartReadyRevision, lazyUpdate, notMerge, option]);
 
   useEffect(() => {

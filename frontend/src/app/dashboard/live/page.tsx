@@ -1,18 +1,23 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity,
   ArrowRight,
   Clock,
+  Circle,
   Database,
+  LassoSelect,
+  MousePointerClick,
   PanelLeftClose,
   PanelLeftOpen,
   Pause,
   Play,
   RefreshCw,
+  RectangleCircle,
+  RectangleHorizontal,
   ShieldAlert,
   SlidersHorizontal,
   Square,
@@ -42,9 +47,53 @@ import { useDashboardWorkspace } from '@/context/dashboard-workspace-context';
 import { cn } from '@/utils/cn';
 import { EChartsCanvas } from '@/components/charts/echarts-canvas';
 
-import type { EChartsOption } from 'echarts';
+import type { ECharts, EChartsOption } from 'echarts';
+import type { LucideIcon } from 'lucide-react';
 
 type SelectionMode = 'rectangle' | 'lasso' | 'circle' | 'oval';
+type EChartsBrushType = 'rect' | 'polygon';
+
+const SELECTION_MODE_ORDER: SelectionMode[] = ['rectangle', 'lasso', 'circle', 'oval'];
+
+const SELECTION_MODE_CONFIG: Record<
+  SelectionMode,
+  {
+    label: string;
+    Icon: LucideIcon;
+    brushType: EChartsBrushType;
+    drawAction: string;
+    helper: string;
+  }
+> = {
+  rectangle: {
+    label: 'Rectangle',
+    Icon: RectangleHorizontal,
+    brushType: 'rect',
+    drawAction: 'Drag a box on the chart.',
+    helper: 'Best when a healthy cluster fits inside a simple box.',
+  },
+  lasso: {
+    label: 'Lasso',
+    Icon: LassoSelect,
+    brushType: 'polygon',
+    drawAction: 'Drag around the healthy points.',
+    helper: 'Best for irregular healthy clusters.',
+  },
+  circle: {
+    label: 'Circle',
+    Icon: Circle,
+    brushType: 'rect',
+    drawAction: 'Drag a box; DInsight fits a circle inside it.',
+    helper: 'Best when the normal area should be evenly rounded.',
+  },
+  oval: {
+    label: 'Oval',
+    Icon: RectangleCircle,
+    brushType: 'rect',
+    drawAction: 'Drag a box; DInsight fits an oval inside it.',
+    helper: 'Best when the normal area is stretched in one direction.',
+  },
+};
 
 type Boundary = {
   id: string;
@@ -531,6 +580,8 @@ export default function LiveMonitorPage() {
   } | null>(null);
   const isApplyingPersistedPrefsRef = useRef(false);
   const boundariesByDatasetRef = useRef<Record<string, Boundary[]>>({});
+  const activeBoundariesDatasetRef = useRef<string | null>(null);
+  const boundariesRef = useRef<Boundary[]>([]);
   const serverSaveTimerRef = useRef<number | null>(null);
   const lastLoggedStreamingStateRef = useRef('');
   const deviceIdRef = useRef('');
@@ -546,6 +597,9 @@ export default function LiveMonitorPage() {
     return 2000;
   }, [streamSpeed]);
   const renderMaxPoints = LIVE_RENDER_DENSITY[renderDensity].maxPoints;
+  const activeSelectionConfig = SELECTION_MODE_CONFIG[selectionMode];
+  const activeBrushType = activeSelectionConfig.brushType;
+  boundariesRef.current = boundaries;
 
   const {
     baselineData,
@@ -959,15 +1013,28 @@ export default function LiveMonitorPage() {
     []
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     setAnomalyResult(null);
     setLiveMonitoringData(null);
-    if (!selectedId) {
+
+    const nextDatasetKey = selectedId ? String(selectedId) : null;
+    const previousDatasetKey = activeBoundariesDatasetRef.current;
+
+    if (previousDatasetKey && previousDatasetKey !== nextDatasetKey) {
+      boundariesByDatasetRef.current = {
+        ...boundariesByDatasetRef.current,
+        [previousDatasetKey]: boundariesRef.current,
+      };
+    }
+
+    activeBoundariesDatasetRef.current = nextDatasetKey;
+
+    if (!nextDatasetKey) {
       setBoundaries([]);
       return;
     }
 
-    const restored = boundariesByDatasetRef.current[String(selectedId)] ?? [];
+    const restored = boundariesByDatasetRef.current[nextDatasetKey] ?? [];
     setBoundaries(restored);
   }, [selectedId]);
 
@@ -1626,19 +1693,37 @@ export default function LiveMonitorPage() {
         top: 0,
         feature: {
           dataZoom: { yAxisIndex: 'none' },
-          brush: { type: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'] },
+          ...(manualSelectionEnabled
+            ? {
+                brush: {
+                  type: [activeBrushType, 'keep', 'clear'],
+                  title: {
+                    rect: 'Draw normal area',
+                    polygon: 'Draw lasso normal area',
+                    keep: 'Keep previous areas',
+                    clear: 'Clear chart brush',
+                  },
+                },
+              }
+            : {}),
           restore: {},
           saveAsImage: { pixelRatio: 2 },
         },
       },
-      brush: {
-        toolbox: ['rect', 'polygon', 'lineX', 'lineY', 'keep', 'clear'],
-        xAxisIndex: 0,
-        yAxisIndex: 0,
-        brushMode: enableMultipleSelections ? 'multiple' : 'single',
-        throttleType: 'debounce',
-        throttleDelay: 250,
-      },
+      brush: manualSelectionEnabled
+        ? {
+            toolbox: [activeBrushType, 'keep', 'clear'],
+            xAxisIndex: 0,
+            yAxisIndex: 0,
+            brushMode: enableMultipleSelections ? 'multiple' : 'single',
+            throttleType: 'debounce',
+            throttleDelay: 250,
+          }
+        : {
+            toolbox: [],
+            xAxisIndex: 0,
+            yAxisIndex: 0,
+          },
       visualMap,
       grid: { top: 64, right: 84, bottom: 96, left: 78, containLabel: true },
       dataZoom: [
@@ -1675,6 +1760,7 @@ export default function LiveMonitorPage() {
     return { option };
   }, [
     anomalyResult,
+    activeBrushType,
     baselineData,
     boundaries,
     buildHoverText,
@@ -1685,6 +1771,7 @@ export default function LiveMonitorPage() {
     latestGlowCount,
     latestIndices,
     manualClassification,
+    manualSelectionEnabled,
     monitorView,
     plotTheme,
     pointSize,
@@ -1704,6 +1791,28 @@ export default function LiveMonitorPage() {
       brushEnd: handleEChartsBrushEnd,
     }),
     [handleEChartsBrushEnd, manualSelectionEnabled]
+  );
+
+  const syncLiveBrushCursor = useCallback(
+    (chart: ECharts) => {
+      try {
+        chart.dispatchAction({
+          type: 'takeGlobalCursor',
+          key: 'brush',
+          brushOption: manualSelectionEnabled
+            ? {
+                brushType: activeBrushType,
+                brushMode: enableMultipleSelections ? 'multiple' : 'single',
+              }
+            : {
+                brushType: false,
+              },
+        } as any);
+      } catch {
+        // Some ECharts renderers defer brush setup until after first paint.
+      }
+    },
+    [activeBrushType, enableMultipleSelections, manualSelectionEnabled]
   );
 
   const refreshNow = useCallback(() => {
@@ -2125,23 +2234,50 @@ export default function LiveMonitorPage() {
                   setAnomalyResult(null);
                 }}
               >
-                {manualSelectionEnabled ? 'Manual selection ON' : 'Manual selection OFF'}
+                <MousePointerClick className="mr-2 h-4 w-4" aria-hidden="true" />
+                {manualSelectionEnabled ? 'Stop drawing normal areas' : 'Draw normal areas'}
               </Button>
 
               {manualSelectionEnabled && (
                 <div className="space-y-3 rounded-lg border border-input p-3">
-                  <p className="text-sm font-medium">Normal-area boundary shape</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium">Normal-area shape</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {activeSelectionConfig.drawAction}
+                      </p>
+                    </div>
+                    <Badge variant="info" className="shrink-0">
+                      {activeSelectionConfig.label}
+                    </Badge>
+                  </div>
                   <div className="grid grid-cols-2 gap-2">
-                    {(['rectangle', 'lasso', 'circle', 'oval'] as SelectionMode[]).map((mode) => (
-                      <Button
-                        key={mode}
-                        size="sm"
-                        variant={selectionMode === mode ? 'default' : 'outline'}
-                        onClick={() => setSelectionMode(mode)}
-                      >
-                        {mode}
-                      </Button>
-                    ))}
+                    {SELECTION_MODE_ORDER.map((mode) => {
+                      const config = SELECTION_MODE_CONFIG[mode];
+                      const ShapeIcon = config.Icon;
+
+                      return (
+                        <Button
+                          key={mode}
+                          size="sm"
+                          variant={selectionMode === mode ? 'default' : 'outline'}
+                          className="justify-start gap-2"
+                          onClick={() => setSelectionMode(mode)}
+                          title={config.helper}
+                        >
+                          <ShapeIcon className="h-4 w-4" aria-hidden="true" />
+                          {config.label}
+                        </Button>
+                      );
+                    })}
+                  </div>
+                  <div className="rounded-md border border-info-border bg-info-bg px-3 py-2 text-xs text-info-text">
+                    <p className="font-medium">{activeSelectionConfig.helper}</p>
+                    <p className="mt-1">
+                      {selectionMode === 'circle' || selectionMode === 'oval'
+                        ? `${activeSelectionConfig.label} boundaries are fitted from the selected chart bounds.`
+                        : `${activeSelectionConfig.label} brush is active on the coordinate map.`}
+                    </p>
                   </div>
 
                   <label className="flex items-center gap-2 text-sm">
@@ -2343,11 +2479,18 @@ export default function LiveMonitorPage() {
                     <EChartsCanvas
                       option={liveEChartOption.option}
                       onEvents={liveEChartEvents}
+                      onReady={syncLiveBrushCursor}
+                      onOptionApplied={syncLiveBrushCursor}
                       style={{ width: '100%', height: 'clamp(560px, 74vh, 800px)' }}
                     />
                     <p className="border-t border-border px-2 py-1 text-xs text-muted-foreground">
-                      Interactions: use the ECharts toolbox for zoom, brush, restore, and image
-                      export; use bottom/right sliders or mouse wheel to inspect dense ranges.
+                      {manualSelectionEnabled
+                        ? `Drawing ${activeSelectionConfig.label.toLowerCase()} normal areas. ${
+                            selectionMode === 'circle' || selectionMode === 'oval'
+                              ? 'The selected bounds are converted to the chosen rounded shape.'
+                              : 'The selected boundary is saved as drawn.'
+                          }`
+                        : 'Zoom, restore, and image export are available in the chart toolbar; use the sliders or mouse wheel to inspect dense ranges.'}
                       {showContours
                         ? ' Baseline density overlay is rendered natively in ECharts.'
                         : ''}
