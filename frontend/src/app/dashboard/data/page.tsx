@@ -314,17 +314,18 @@ export default function DataIngestionPage() {
 
   useEffect(() => {
     if (state.dinsightId && lastSourceSyncedWorkflowIdRef.current !== state.dinsightId) {
+      lastSourceSyncedWorkflowIdRef.current = state.dinsightId;
       const uploadedDataset = datasets.find((dataset) => dataset.dinsight_id === state.dinsightId);
       if (uploadedDataset) {
         setSelectedSourceKey(getDatasetSourceGroupKey(uploadedDataset));
-        lastSourceSyncedWorkflowIdRef.current = state.dinsightId;
       }
       setManualBaselineId(String(state.dinsightId));
       setSelectedBaselineDatasetId(state.dinsightId);
       setManualBaselineError(null);
       setUseManualBaselineId(false);
+      selectWorkspaceDataset(state.dinsightId);
     }
-  }, [datasets, setSelectedSourceKey, state.dinsightId]);
+  }, [datasets, selectWorkspaceDataset, setSelectedSourceKey, state.dinsightId]);
 
   useEffect(() => {
     const datasetId = state.dinsightId;
@@ -791,13 +792,6 @@ export default function DataIngestionPage() {
       : latestFilteredDatasetId;
   const previewDatasetId = previewMode === 'latest' ? latestProcessedPreviewId : savedPreviewId;
   const inlinePreviewDatasetId = latestProcessedPreviewId ?? savedPreviewId;
-
-  useEffect(() => {
-    const contextDatasetId = previewDatasetId ?? selectedBaselineDatasetId ?? null;
-    if (contextDatasetId && workspaceDatasetId !== contextDatasetId) {
-      selectWorkspaceDataset(contextDatasetId);
-    }
-  }, [previewDatasetId, selectedBaselineDatasetId, selectWorkspaceDataset, workspaceDatasetId]);
 
   const {
     baselineData: inlineBaselineData,
