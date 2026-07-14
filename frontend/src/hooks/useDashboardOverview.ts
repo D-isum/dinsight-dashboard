@@ -16,9 +16,16 @@ import {
   DashboardHistoryPoint,
   deriveDashboardMachineState,
   deriveWearDirection,
+  sortDashboardAlerts,
   summarizeAlerts,
   type AlertSeverity,
 } from '@/lib/dashboard-overview';
+import {
+  deriveDistanceThresholds,
+  INSIGHTS_DISTANCE_THRESHOLD_CONFIG_EVENT,
+  INSIGHTS_UI_PREFS_KEY,
+  parseDistanceThresholdConfigFromUiPrefs,
+} from '@/lib/distance-thresholds';
 import {
   AppliedWearTrendConfig,
   INSIGHTS_APPLIED_WEAR_CONFIG_EVENT,
@@ -50,6 +57,7 @@ interface DeteriorationResult {
     dataset_type: DatasetType;
     sort_index: number;
     distance_from_g0: number;
+    is_baseline_cluster?: boolean;
   }>;
   metadata_column: string;
   distances: {
@@ -289,9 +297,15 @@ export function useDashboardOverview() {
   const userId = user?.id;
   const [history, setHistory] = useState<DashboardHistoryPoint[]>([]);
   const [appliedWearConfig, setAppliedWearConfig] = useState<AppliedWearTrendConfig | null>(null);
-  const [finalizedAnomalyPercentage, setFinalizedAnomalyPercentage] = useState<number | null>(null);
+  const [finalizedAnomaly, setFinalizedAnomaly] = useState<{
+    contextKey: string;
+    percentage: number;
+  } | null>(null);
   const [lastKnownAnomalyPercentage, setLastKnownAnomalyPercentage] = useState<number | null>(null);
   const [localLivePrefs, setLocalLivePrefs] = useState<DashboardLivePrefs | null>(null);
+  const [distanceThresholdConfig, setDistanceThresholdConfig] = useState(() =>
+    parseDistanceThresholdConfigFromUiPrefs(null)
+  );
   const [localHistoryStore, setLocalHistoryStore] = useState<DashboardHistoryStore | null>(null);
   const [isLocalHistoryLoaded, setIsLocalHistoryLoaded] = useState(false);
   const hasHydratedTimelineHistoryRef = useRef(false);
@@ -316,6 +330,28 @@ export function useDashboardOverview() {
     return () => {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener(INSIGHTS_APPLIED_WEAR_CONFIG_EVENT, sync);
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    const sync = () =>
+      setDistanceThresholdConfig(
+        parseDistanceThresholdConfigFromUiPrefs(readScoped(INSIGHTS_UI_PREFS_KEY, userId))
+      );
+    sync();
+
+    const scopedPrefsKey = buildScopedKey(INSIGHTS_UI_PREFS_KEY, userId);
+    const onStorage = (event: StorageEvent) => {
+      if (event.key == null || event.key === scopedPrefsKey) {
+        sync();
+      }
+    };
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener(INSIGHTS_DISTANCE_THRESHOLD_CONFIG_EVENT, sync);
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener(INSIGHTS_DISTANCE_THRESHOLD_CONFIG_EVENT, sync);
     };
   }, [userId]);
 
@@ -420,7 +456,11 @@ export function useDashboardOverview() {
     [localLivePrefs, serverLivePrefs]
   );
   const liveRefreshMs = resolveRefreshMs(livePrefs?.streamSpeed);
-  const { activeStreamingDatasetId } = useActiveStreamingDataset(filteredDatasetIds, liveRefreshMs);
+  const { activeStreamingDatasetId } = useActiveStreamingDataset(
+    filteredDatasetIds,
+    liveRefreshMs,
+    selectedDatasetId == null
+  );
   const selectedLivePreferenceId =
     livePrefs?.selectedId && filteredDatasetIds.includes(livePrefs.selectedId)
       ? livePrefs.selectedId
@@ -440,7 +480,11 @@ export function useDashboardOverview() {
       ? resolvedWearConfig.datasetId
       : null;
   const wearDatasetId =
-    activeStreamingDatasetId ?? configuredWearDatasetId ?? latestFilteredDatasetId ?? null;
+    selectedDatasetId ??
+    activeStreamingDatasetId ??
+    configuredWearDatasetId ??
+    latestFilteredDatasetId ??
+    null;
   const wearColumn = resolvedWearConfig?.metadataColumn ?? '';
   const wearClusterValues = resolvedWearConfig?.baselineClusterValues ?? [];
   const wearRange = resolvedWearConfig?.baselineRange;
@@ -451,7 +495,7 @@ export function useDashboardOverview() {
     isLoading: isLoadingStreaming,
     refetch: refetchStreaming,
   } = useQuery<StreamingStatus | null>({
-    queryKey: ['dashboard-streaming-status', activeDatasetId],
+    queryKey: ['streaming-status', activeDatasetId],
     enabled: !!activeDatasetId,
     queryFn: async () => {
       if (!activeDatasetId) return null;
@@ -530,6 +574,13 @@ export function useDashboardOverview() {
 
   const manualModeEnabled = Boolean(
     livePrefs?.manualSelectionEnabled && activeBoundaries.length > 0
+  );
+  const anomalyContextKey = useMemo(
+    () =>
+      `${activeDatasetId ?? 'none'}:${
+        manualModeEnabled ? `manual:${JSON.stringify(activeBoundaries)}` : 'model'
+      }`,
+    [activeBoundaries, activeDatasetId, manualModeEnabled]
   );
 
   const { data: manualAnomaly, refetch: refetchManualAnomaly } = useQuery<{
@@ -618,19 +669,21 @@ export function useDashboardOverview() {
       : realtimeAnomaly?.anomalyPercentage;
 
     if (streamingStatus?.status === 'streaming') {
-      setFinalizedAnomalyPercentage(null);
+      setFinalizedAnomaly(null);
       return;
     }
 
     if (
       streamingStatus?.status === 'completed' &&
-      finalizedAnomalyPercentage == null &&
-      currentAnomaly != null
+      currentAnomaly != null &&
+      (finalizedAnomaly?.contextKey !== anomalyContextKey ||
+        finalizedAnomaly.percentage !== currentAnomaly)
     ) {
-      setFinalizedAnomalyPercentage(currentAnomaly);
+      setFinalizedAnomaly({ contextKey: anomalyContextKey, percentage: currentAnomaly });
     }
   }, [
-    finalizedAnomalyPercentage,
+    anomalyContextKey,
+    finalizedAnomaly,
     manualAnomaly?.anomalyPercentage,
     manualModeEnabled,
     realtimeAnomaly?.anomalyPercentage,
@@ -654,6 +707,7 @@ export function useDashboardOverview() {
       sortIndex: number;
       distance: number;
       datasetType: DatasetType;
+      isBaselineCluster: boolean;
     }>;
     monitoringDistance: {
       mean: number | null;
@@ -689,7 +743,7 @@ export function useDashboardOverview() {
 
       const response = await api.deterioration.analyze(wearDatasetId, {
         metadata_column: wearColumn,
-        include_monitoring: true,
+        include_monitoring: includeMonitoring,
         baseline_cluster: {
           values: wearClusterValues,
           ...(wearRange ? { range: wearRange } : {}),
@@ -708,6 +762,7 @@ export function useDashboardOverview() {
               sortIndex: Number(interval.sort_index ?? 0),
               distance: Number(interval.distance_from_g0 ?? 0),
               datasetType: interval.dataset_type,
+              isBaselineCluster: interval.is_baseline_cluster === true,
             }))
             .filter((entry) => Number.isFinite(entry.distance))
             .sort((a, b) => a.sortIndex - b.sortIndex)
@@ -772,9 +827,19 @@ export function useDashboardOverview() {
         status: string;
         anomaly_percentage: number;
         created_at: string;
+        classification?: {
+          baseline_dataset_id?: number;
+          comparison_dataset_id?: number;
+        };
       }>;
       return items.map((a) => ({
         id: a.id,
+        datasetId:
+          typeof a.classification?.comparison_dataset_id === 'number'
+            ? a.classification.comparison_dataset_id
+            : typeof a.classification?.baseline_dataset_id === 'number'
+              ? a.classification.baseline_dataset_id
+              : null,
         title: a.title,
         message: a.message,
         severity: (['low', 'medium', 'high', 'critical'].includes(a.severity)
@@ -789,6 +854,47 @@ export function useDashboardOverview() {
     retry: false,
   });
 
+  const wearThresholdSnapshot = useMemo(() => {
+    const baselineSeries =
+      wearSnapshot?.previewSeries.filter((entry) => entry.datasetType === 'baseline') ?? [];
+    const selectedBaselineDistances = baselineSeries
+      .filter((entry) => entry.isBaselineCluster)
+      .map((entry) => entry.distance)
+      .filter((value) => Number.isFinite(value));
+    const allBaselineDistances = baselineSeries
+      .map((entry) => entry.distance)
+      .filter((value) => Number.isFinite(value));
+    const thresholdBaselineDistances = selectedBaselineDistances.length
+      ? selectedBaselineDistances
+      : allBaselineDistances;
+    const baselineMean = thresholdBaselineDistances.length
+      ? thresholdBaselineDistances.reduce((sum, value) => sum + value, 0) /
+        thresholdBaselineDistances.length
+      : null;
+    const thresholds = deriveDistanceThresholds(
+      thresholdBaselineDistances,
+      baselineMean,
+      distanceThresholdConfig
+    );
+    const latest = wearSnapshot?.monitoringDistance.latest ?? null;
+    const state =
+      latest == null
+        ? null
+        : latest >= thresholds.danger
+          ? ('danger' as const)
+          : latest >= thresholds.warning
+            ? ('warning' as const)
+            : ('normal' as const);
+
+    return {
+      baselineMean,
+      warningThreshold: thresholds.warning,
+      dangerThreshold: thresholds.danger,
+      latest,
+      state,
+    };
+  }, [distanceThresholdConfig, wearSnapshot]);
+
   // Synthesized wear-trend advisories. These run on local data shape
   // (no backend involvement) so they keep working even before the
   // alert pipeline has any rules + classifications. Combined with
@@ -799,16 +905,25 @@ export function useDashboardOverview() {
       buildWearTrendAlerts({
         datasetId: wearSnapshot?.datasetId ?? null,
         metadataColumn: wearSnapshot?.metadataColumn ?? wearColumn,
+        baselineMean: wearThresholdSnapshot.baselineMean,
         monitoringMean: wearSnapshot?.monitoringDistance.mean ?? null,
         monitoringLatest: wearSnapshot?.monitoringDistance.latest ?? null,
         monitoringMax: wearSnapshot?.monitoringDistance.max ?? null,
         sampleCount: wearSnapshot?.monitoringDistance.sampleCount ?? 0,
+        warningThreshold: wearThresholdSnapshot.warningThreshold,
+        dangerThreshold: wearThresholdSnapshot.dangerThreshold,
       }),
-    [wearColumn, wearSnapshot]
+    [wearColumn, wearSnapshot, wearThresholdSnapshot]
   );
   const alerts = useMemo(
-    () => [...(backendAlertsQuery.data ?? []), ...wearTrendAlerts],
-    [backendAlertsQuery.data, wearTrendAlerts]
+    () =>
+      sortDashboardAlerts([
+        ...(backendAlertsQuery.data ?? []).filter(
+          (alert) => activeDatasetId != null && alert.datasetId === activeDatasetId
+        ),
+        ...wearTrendAlerts,
+      ]),
+    [activeDatasetId, backendAlertsQuery.data, wearTrendAlerts]
   );
   const alertSummary = useMemo(() => summarizeAlerts(alerts), [alerts]);
   const liveAnomalyPercentage = manualModeEnabled
@@ -823,7 +938,9 @@ export function useDashboardOverview() {
 
   const latestAnomalyPercentage =
     streamingStatus?.status === 'completed'
-      ? (finalizedAnomalyPercentage ?? liveAnomalyPercentage)
+      ? finalizedAnomaly?.contextKey === anomalyContextKey
+        ? finalizedAnomaly.percentage
+        : liveAnomalyPercentage
       : (liveAnomalyPercentage ?? lastKnownAnomalyPercentage);
 
   const machineStatus = useMemo(
@@ -831,8 +948,12 @@ export function useDashboardOverview() {
       deriveDashboardMachineState({
         anomalyPercentage: latestAnomalyPercentage,
         wearScore: wearSnapshot?.score ?? null,
+        wearThresholdState: wearThresholdSnapshot.state,
+        wearLatestDistance: wearThresholdSnapshot.latest,
+        wearWarningThreshold: wearThresholdSnapshot.warningThreshold,
+        wearDangerThreshold: wearThresholdSnapshot.dangerThreshold,
       }),
-    [latestAnomalyPercentage, wearSnapshot?.score]
+    [latestAnomalyPercentage, wearSnapshot?.score, wearThresholdSnapshot]
   );
 
   useEffect(() => {

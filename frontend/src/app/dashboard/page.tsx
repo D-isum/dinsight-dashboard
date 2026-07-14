@@ -537,7 +537,7 @@ export default function DashboardPage() {
           points: formatNumberValue(streamingStatus?.streamed_points),
         }),
         tone: hasStreamingData ? ('success' as Tone) : ('warning' as Tone),
-        href: '/dashboard/live',
+        href: '/dashboard/monitor?view=map',
       },
       {
         label: t('dashboard.anomalySignal'),
@@ -549,7 +549,7 @@ export default function DashboardPage() {
           realtimeAnomaly && realtimeAnomaly.totalPoints > 0
             ? ('success' as Tone)
             : ('warning' as Tone),
-        href: '/dashboard/live',
+        href: '/dashboard/monitor?view=map',
       },
       {
         label: t('dashboard.wearBaseline'),
@@ -561,7 +561,7 @@ export default function DashboardPage() {
               })
           : t('dashboard.configureInInsights'),
         tone: hasWearConfig ? ('success' as Tone) : ('warning' as Tone),
-        href: '/dashboard/insights',
+        href: '/dashboard/monitor?view=deterioration',
       },
       {
         label: t('dashboard.wearResult'),
@@ -575,7 +575,7 @@ export default function DashboardPage() {
           : wearSnapshot
             ? ('success' as Tone)
             : ('warning' as Tone),
-        href: '/dashboard/insights',
+        href: '/dashboard/monitor?view=deterioration',
       },
     ],
     [
@@ -698,7 +698,7 @@ export default function DashboardPage() {
       nextActions.push({
         title: t('dashboard.investigateAbnormal'),
         detail: t('dashboard.investigateAbnormalDetail'),
-        href: '/dashboard/live',
+        href: '/dashboard/monitor?view=map',
         label: t('dashboard.openLive'),
         tone: 'danger',
         icon: <ShieldAlert className="h-5 w-5" />,
@@ -709,7 +709,7 @@ export default function DashboardPage() {
       nextActions.push({
         title: t('dashboard.setHealthyBaseline'),
         detail: t('dashboard.setHealthyBaselineDetail'),
-        href: '/dashboard/insights',
+        href: '/dashboard/monitor?view=deterioration',
         label: t('common.configure'),
         tone: 'warning',
         icon: <Settings2 className="h-5 w-5" />,
@@ -720,7 +720,7 @@ export default function DashboardPage() {
       nextActions.push({
         title: t('dashboard.runDeterioration'),
         detail: t('dashboard.runDeteriorationDetail'),
-        href: '/dashboard/insights',
+        href: '/dashboard/monitor?view=deterioration',
         label: t('dashboard.runInsights'),
         tone: wearError ? 'danger' : 'info',
         icon: <Gauge className="h-5 w-5" />,
@@ -731,7 +731,7 @@ export default function DashboardPage() {
       nextActions.push({
         title: t('dashboard.startLiveVerification'),
         detail: t('dashboard.startLiveVerificationDetail'),
-        href: '/dashboard/live',
+        href: '/dashboard/monitor?view=map',
         label: t('dashboard.openLive'),
         tone: 'info',
         icon: <Radio className="h-5 w-5" />,
@@ -742,7 +742,7 @@ export default function DashboardPage() {
       nextActions.push({
         title: t('dashboard.reviewCurrentResult'),
         detail: t('dashboard.reviewCurrentResultDetail'),
-        href: '/dashboard/insights',
+        href: '/dashboard/monitor?view=deterioration',
         label: t('dashboard.openInsights'),
         tone: machineStatus.state === 'OK' ? 'success' : 'warning',
         icon: <Eye className="h-5 w-5" />,
@@ -759,14 +759,14 @@ export default function DashboardPage() {
 
     const hasCatalogAction = nextActions.some((action) => action.href.includes('/dashboard/data'));
     const hasInsightsAction = nextActions.some((action) =>
-      action.href.includes('/dashboard/insights')
+      action.href.includes('/dashboard/monitor?view=deterioration')
     );
 
     if (hasDatasets && nextActions.length < 3 && !hasInsightsAction) {
       nextActions.push({
         title: t('dashboard.reviewDeteriorationTrend'),
         detail: t('dashboard.reviewDeteriorationTrendDetail'),
-        href: '/dashboard/insights',
+        href: '/dashboard/monitor?view=deterioration',
         label: t('dashboard.openInsights'),
         tone: machineStatus.state === 'OK' ? 'info' : 'warning',
         icon: <Gauge className="h-5 w-5" />,
@@ -823,7 +823,7 @@ export default function DashboardPage() {
         }),
         datasetId: selectedLiveDatasetId ?? undefined,
         timestamp: new Date(lastTimelinePoint).toISOString(),
-        href: '/dashboard/live',
+        href: '/dashboard/monitor?view=map',
         status: 'success',
       });
     }

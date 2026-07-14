@@ -6,6 +6,7 @@ import {
   deriveDashboardMachineState,
   deriveWearDirection,
   getLatestAnomalyPercentage,
+  sortDashboardAlerts,
   summarizeAlerts,
   type DashboardAlert,
 } from '@/lib/dashboard-overview';
@@ -73,6 +74,31 @@ describe('dashboard overview helpers', () => {
     expect(anomaly).toBe(12);
   });
 
+  it('prioritizes alert severity before recency', () => {
+    const sorted = sortDashboardAlerts([
+      {
+        id: 1,
+        title: 'Recent warning',
+        message: '',
+        severity: 'medium',
+        status: 'active',
+        anomalyPercentage: 5,
+        createdAt: '2026-02-24T12:00:00.000Z',
+      },
+      {
+        id: 2,
+        title: 'Critical condition',
+        message: '',
+        severity: 'critical',
+        status: 'active',
+        anomalyPercentage: 20,
+        createdAt: '2026-02-24T10:00:00.000Z',
+      },
+    ]);
+
+    expect(sorted.map((alert) => alert.id)).toEqual([2, 1]);
+  });
+
   it('derives wear direction', () => {
     expect(deriveWearDirection(0.4, 0.7)).toBe('up');
     expect(deriveWearDirection(0.8, 0.5)).toBe('down');
@@ -115,31 +141,41 @@ describe('dashboard overview helpers', () => {
     const early = buildWearTrendAlerts({
       datasetId: 14,
       metadataColumn: 'interval',
+      baselineMean: 0.3,
       monitoringMean: 0.36,
       monitoringLatest: 0.46,
       monitoringMax: 0.52,
       sampleCount: 12,
+      warningThreshold: 0.6,
+      dangerThreshold: 0.9,
     });
     expect(early[0]?.severity).toBe('medium');
 
     const deteriorating = buildWearTrendAlerts({
       datasetId: 14,
       metadataColumn: 'interval',
+      baselineMean: 0.3,
       monitoringMean: 0.71,
-      monitoringLatest: 0.83,
+      monitoringLatest: 0.63,
       monitoringMax: 0.9,
       sampleCount: 12,
+      warningThreshold: 0.6,
+      dangerThreshold: 0.9,
     });
     expect(deteriorating[0]?.severity).toBe('high');
 
     const failing = buildWearTrendAlerts({
       datasetId: 14,
       metadataColumn: 'interval',
+      baselineMean: 0.3,
       monitoringMean: 1.01,
-      monitoringLatest: 1.24,
+      monitoringLatest: 0.94,
       monitoringMax: 1.6,
       sampleCount: 12,
+      warningThreshold: 0.6,
+      dangerThreshold: 0.9,
     });
     expect(failing[0]?.severity).toBe('critical');
+    expect(failing[0]?.id).toBeLessThan(0);
   });
 });

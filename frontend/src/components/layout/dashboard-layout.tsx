@@ -13,6 +13,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n/client';
 import { api, LicenseIssue, LICENSE_ISSUE_EVENT } from '@/lib/api-client';
+import { cn } from '@/utils/cn';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -90,11 +91,33 @@ function LicenseLockout({ issue }: { issue: LicenseIssue }) {
 
 function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [licenseIssue, setLicenseIssue] = useState<LicenseIssue | null>(null);
   const { isLoading } = useAuth();
   const { t } = useI18n();
   const pathname = usePathname();
   const showingAccountSettings = pathname === '/dashboard/account';
+  const showingAssetMonitor = pathname === '/dashboard/monitor';
+
+  useEffect(() => {
+    try {
+      setSidebarCollapsed(window.localStorage.getItem('dinsight:sidebar-collapsed:v1') === 'true');
+    } catch {
+      // Local persistence is optional.
+    }
+  }, []);
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem('dinsight:sidebar-collapsed:v1', String(next));
+      } catch {
+        // Local persistence is optional.
+      }
+      return next;
+    });
+  };
 
   // Handle responsive sidebar behavior
   useEffect(() => {
@@ -152,7 +175,12 @@ function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
     <DashboardWorkspaceProvider>
       <div className="h-screen flex min-w-0 bg-canvas">
         {/* Sidebar */}
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <Sidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+          isCollapsed={sidebarCollapsed}
+          onToggleCollapse={toggleSidebarCollapsed}
+        />
 
         {/* Main content */}
         <div className="min-w-0 flex-1 flex flex-col overflow-hidden">
@@ -162,7 +190,12 @@ function DashboardLayoutComponent({ children }: DashboardLayoutProps) {
           {/* Page content — wrapped so a render-time crash in one page surfaces
               the ErrorBoundary fallback instead of breaking the entire app shell. */}
           <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-canvas">
-            <div className="mx-auto w-full max-w-7xl min-w-0 px-4 py-6">
+            <div
+              className={cn(
+                'mx-auto w-full min-w-0',
+                showingAssetMonitor ? 'max-w-none px-3 py-3' : 'max-w-7xl px-4 py-6'
+              )}
+            >
               {licenseIssue && showingAccountSettings && (
                 <Alert variant="danger" className="mb-4">
                   <AlertTriangle aria-hidden="true" />

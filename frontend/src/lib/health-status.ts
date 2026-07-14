@@ -3,6 +3,10 @@ export type MachineHealthState = 'OK' | 'Deteriorating' | 'Failing';
 export interface MachineHealthInput {
   anomalyPercentage?: number | null;
   wearTrendScore?: number | null;
+  wearThresholdState?: 'normal' | 'warning' | 'danger' | null;
+  wearLatestDistance?: number | null;
+  wearWarningThreshold?: number | null;
+  wearDangerThreshold?: number | null;
 }
 
 export interface MachineHealthThresholds {
@@ -36,16 +40,30 @@ export const deriveMachineHealthStatus = (
 ): MachineHealthResult => {
   const anomaly = isFiniteNumber(input.anomalyPercentage) ? input.anomalyPercentage : null;
   const wear = isFiniteNumber(input.wearTrendScore) ? input.wearTrendScore : null;
+  const latestDistance = isFiniteNumber(input.wearLatestDistance) ? input.wearLatestDistance : null;
+  const warningThreshold = isFiniteNumber(input.wearWarningThreshold)
+    ? input.wearWarningThreshold
+    : null;
+  const dangerThreshold = isFiniteNumber(input.wearDangerThreshold)
+    ? input.wearDangerThreshold
+    : null;
+  const hasAdaptiveWearState = input.wearThresholdState != null;
 
   const reasons: string[] = [];
 
   const isAnomalyFailing = anomaly != null && anomaly >= thresholds.anomalyFailing;
-  const isWearFailing = wear != null && wear >= thresholds.wearFailing;
+  const isWearFailing = hasAdaptiveWearState
+    ? input.wearThresholdState === 'danger'
+    : wear != null && wear >= thresholds.wearFailing;
   if (isAnomalyFailing) {
     reasons.push(`High abnormal behavior (${anomaly.toFixed(1)}%).`);
   }
   if (isWearFailing) {
-    reasons.push(`Accelerating wear trend (${wear.toFixed(2)}).`);
+    reasons.push(
+      latestDistance != null && dangerThreshold != null
+        ? `Latest deterioration distance (${latestDistance.toFixed(3)}) exceeds the danger threshold (${dangerThreshold.toFixed(3)}).`
+        : `Accelerating wear trend (${wear?.toFixed(2) ?? 'n/a'}).`
+    );
   }
 
   if (isAnomalyFailing || isWearFailing) {
@@ -59,20 +77,41 @@ export const deriveMachineHealthStatus = (
           ? [{ key: 'health.reasonHighAbnormal', values: { value: anomaly!.toFixed(1) } }]
           : []),
         ...(isWearFailing
-          ? [{ key: 'health.reasonAcceleratingWear', values: { value: wear!.toFixed(2) } }]
+          ? latestDistance != null && dangerThreshold != null
+            ? [
+                {
+                  key: 'health.reasonDistanceDanger',
+                  values: {
+                    value: latestDistance.toFixed(3),
+                    threshold: dangerThreshold.toFixed(3),
+                  },
+                },
+              ]
+            : [
+                {
+                  key: 'health.reasonAcceleratingWear',
+                  values: { value: wear?.toFixed(2) ?? 'n/a' },
+                },
+              ]
           : []),
       ],
     };
   }
 
   const isAnomalyDeteriorating = anomaly != null && anomaly >= thresholds.anomalyDeteriorating;
-  const isWearDeteriorating = wear != null && wear >= thresholds.wearDeteriorating;
+  const isWearDeteriorating = hasAdaptiveWearState
+    ? input.wearThresholdState === 'warning'
+    : wear != null && wear >= thresholds.wearDeteriorating;
 
   if (isAnomalyDeteriorating) {
     reasons.push(`Elevated abnormal behavior (${anomaly.toFixed(1)}%).`);
   }
   if (isWearDeteriorating) {
-    reasons.push(`Wear trend rising (${wear.toFixed(2)}).`);
+    reasons.push(
+      latestDistance != null && warningThreshold != null
+        ? `Latest deterioration distance (${latestDistance.toFixed(3)}) exceeds the warning threshold (${warningThreshold.toFixed(3)}).`
+        : `Wear trend rising (${wear?.toFixed(2) ?? 'n/a'}).`
+    );
   }
 
   if (isAnomalyDeteriorating || isWearDeteriorating) {
@@ -86,7 +125,22 @@ export const deriveMachineHealthStatus = (
           ? [{ key: 'health.reasonElevatedAbnormal', values: { value: anomaly!.toFixed(1) } }]
           : []),
         ...(isWearDeteriorating
-          ? [{ key: 'health.reasonWearRising', values: { value: wear!.toFixed(2) } }]
+          ? latestDistance != null && warningThreshold != null
+            ? [
+                {
+                  key: 'health.reasonDistanceWarning',
+                  values: {
+                    value: latestDistance.toFixed(3),
+                    threshold: warningThreshold.toFixed(3),
+                  },
+                },
+              ]
+            : [
+                {
+                  key: 'health.reasonWearRising',
+                  values: { value: wear?.toFixed(2) ?? 'n/a' },
+                },
+              ]
           : []),
       ],
     };

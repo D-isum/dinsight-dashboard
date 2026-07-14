@@ -2,6 +2,14 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import LoginPage from '@/app/login/page';
+import { I18nProvider } from '@/i18n/client';
+
+const renderLoginPage = () =>
+  render(
+    <I18nProvider initialLocale="en">
+      <LoginPage />
+    </I18nProvider>
+  );
 
 // LoginPage uses Suspense + searchParams; the explicit mocks below stub
 // the surfaces we care about so the test focuses on the SSO discovery
@@ -32,7 +40,7 @@ describe('Login page SSO button', () => {
     ssoConfigMock.mockResolvedValueOnce({
       data: { success: true, data: { enabled: false, label: 'Single sign-on' } },
     });
-    render(<LoginPage />);
+    renderLoginPage();
 
     // Wait long enough for the useEffect to settle.
     await waitFor(() => {
@@ -45,7 +53,7 @@ describe('Login page SSO button', () => {
     ssoConfigMock.mockResolvedValueOnce({
       data: { success: true, data: { enabled: true, label: 'UPDF SSO' } },
     });
-    render(<LoginPage />);
+    renderLoginPage();
 
     await waitFor(() => {
       expect(screen.getByText(/Continue with UPDF SSO/i)).toBeInTheDocument();
@@ -57,7 +65,7 @@ describe('Login page SSO button', () => {
 
   it('hides the SSO button when the discovery call fails', async () => {
     ssoConfigMock.mockRejectedValueOnce(new Error('network'));
-    render(<LoginPage />);
+    renderLoginPage();
 
     await waitFor(() => {
       expect(ssoConfigMock).toHaveBeenCalledTimes(1);

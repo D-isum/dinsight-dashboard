@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuditLogSection } from '@/components/audit/audit-log-section';
+import { I18nProvider } from '@/i18n/client';
 
 // AuditLogSection is the extracted body of the former /dashboard/audit
 // page. It's embedded as an admin-only tab under Settings.
@@ -31,9 +32,11 @@ beforeEach(() => {
 const renderSection = () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={qc}>
-      <AuditLogSection />
-    </QueryClientProvider>
+    <I18nProvider initialLocale="en">
+      <QueryClientProvider client={qc}>
+        <AuditLogSection />
+      </QueryClientProvider>
+    </I18nProvider>
   );
 };
 

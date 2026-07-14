@@ -259,15 +259,15 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         id: 'run-wear-trend',
         title: t('command.runWearTrend'),
         description:
-          pathname === '/dashboard/insights'
+          pathname === '/dashboard/monitor' || pathname === '/dashboard/insights'
             ? t('command.runWearTrendHereDescription')
             : t('command.runWearTrendElsewhereDescription'),
         icon: <Activity className="h-4 w-4" aria-hidden="true" />,
         action: () => {
-          if (pathname !== '/dashboard/insights') {
-            router.push('/dashboard/insights');
+          if (pathname !== '/dashboard/monitor' && pathname !== '/dashboard/insights') {
+            router.push('/dashboard/monitor?view=deterioration');
           }
-          window.setTimeout(() => publishDashboardCommand('run-wear-trend'), 100);
+          window.setTimeout(() => publishDashboardCommand('run-wear-trend'), 300);
         },
       },
     ],

@@ -122,11 +122,12 @@ const readJsonArray = <T,>(raw: string | null): T[] => {
 const formatCurrentPageName = () => {
   if (typeof window === 'undefined') return 'Dashboard view';
   const path = window.location.pathname;
-  if (path.includes('/dashboard/data')) return 'Data ingestion';
+  if (path.includes('/dashboard/data')) return 'Data';
+  if (path.includes('/dashboard/monitor')) return 'Asset monitor';
   if (path.includes('/dashboard/live')) return 'Live monitor';
   if (path.includes('/dashboard/insights')) return 'Health insights';
   if (path.includes('/dashboard/account')) return 'Account and security';
-  return 'Machine status';
+  return 'Overview';
 };
 
 export function publishDashboardActivity(

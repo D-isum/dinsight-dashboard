@@ -3,19 +3,19 @@ import { expect, test } from '@playwright/test';
 const API_BASE = 'http://localhost:8080/api/v1';
 
 test.describe('core workflows', () => {
-  test('auth pages basic flow: login -> register -> login', async ({ page }) => {
+  test('auth pages basic flow: login -> invite-only registration -> login', async ({ page }) => {
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: /Welcome Back/i })).toBeVisible();
 
     await page.getByRole('link', { name: /Sign up/i }).click();
     await expect(page).toHaveURL(/\/register/);
-    await expect(page.getByRole('heading', { name: /Create Account/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Registration is invite-only/i })).toBeVisible();
 
-    await page.getByRole('link', { name: /Sign in/i }).click();
+    await page.getByRole('link', { name: /Back to sign in/i }).click();
     await expect(page).toHaveURL(/\/login/);
   });
 
-  test('dashboard shell: 5-page IA only + perf budget', async ({ context, page }) => {
+  test('dashboard shell: 4-page IA only + perf budget', async ({ context, page }) => {
     await context.addCookies([
       {
         name: 'access_token',
@@ -127,17 +127,17 @@ test.describe('core workflows', () => {
     });
 
     await page.goto('/dashboard');
-    await expect(page.getByRole('heading', { name: /Operations Dashboard/i })).toBeVisible();
+    await expect(page.getByText('Machine status', { exact: true })).toBeVisible();
 
-    await expect(page.getByRole('link', { name: 'Machine Status', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Data Ingestion', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Live Monitor', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Health Insights', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Account & Security', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Overview', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Data', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Asset Monitor', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Settings', exact: true })).toBeVisible();
 
     await expect(page.getByRole('link', { name: /Visualization/i })).toHaveCount(0);
     await expect(page.getByRole('link', { name: /Streaming/i })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: /Settings/i })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Live Monitor', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Health Insights', exact: true })).toHaveCount(0);
 
     const dclMs = await page.evaluate(() => {
       const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;

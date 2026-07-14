@@ -790,7 +790,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   </Button>
                   <Button variant="outline" size="sm" asChild>
                     <Link
-                      href="/dashboard/live"
+                      href="/dashboard/monitor?view=map"
                       onClick={() => selectWorkspaceDataset(previewDatasetId)}
                     >
                       <Monitor className="mr-2 h-4 w-4" />
@@ -799,7 +799,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   </Button>
                   <Button variant="outline" size="sm" asChild>
                     <Link
-                      href="/dashboard/insights"
+                      href="/dashboard/monitor?view=deterioration"
                       onClick={() => selectWorkspaceDataset(previewDatasetId)}
                     >
                       <BarChart3 className="mr-2 h-4 w-4" />
@@ -1047,13 +1047,13 @@ function DetailDrawer({
           </div>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/live" onClick={onOpenLive}>
+              <Link href="/dashboard/monitor?view=map" onClick={onOpenLive}>
                 <Monitor className="mr-2 h-4 w-4" />
                 {t('data.live')}
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
-              <Link href="/dashboard/insights" onClick={onOpenInsights}>
+              <Link href="/dashboard/monitor?view=deterioration" onClick={onOpenInsights}>
                 <BarChart3 className="mr-2 h-4 w-4" />
                 {t('common.insights')}
               </Link>

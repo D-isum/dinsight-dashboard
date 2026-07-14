@@ -18,7 +18,8 @@ const EMPTY_STATUSES: Record<number, StreamingStatusSummary> = {};
 
 export function useActiveStreamingDataset(
   datasetIds: number[],
-  refreshMs = 3_000
+  refreshMs = 3_000,
+  enabled = true
 ): ActiveStreamingDatasetResult {
   const stableDatasetIds = useMemo(
     () => Array.from(new Set(datasetIds)).filter((id) => Number.isInteger(id) && id > 0),
@@ -27,7 +28,7 @@ export function useActiveStreamingDataset(
 
   const statusQuery = useQuery<StreamingStatusSummary[]>({
     queryKey: ['active-streaming-dataset', stableDatasetIds],
-    enabled: stableDatasetIds.length > 0,
+    enabled: enabled && stableDatasetIds.length > 0,
     staleTime: Math.max(1_000, Math.floor(refreshMs / 2)),
     refetchOnWindowFocus: true,
     refetchInterval: refreshMs,
@@ -60,7 +61,10 @@ export function useActiveStreamingDataset(
     },
   });
 
-  const statuses = useMemo(() => statusQuery.data ?? [], [statusQuery.data]);
+  const statuses = useMemo(
+    () => (enabled ? (statusQuery.data ?? []) : []),
+    [enabled, statusQuery.data]
+  );
   const activeStreamingDatasetId = useMemo(() => {
     const active = statuses
       .filter((entry) => entry.isActive || entry.status === 'streaming')

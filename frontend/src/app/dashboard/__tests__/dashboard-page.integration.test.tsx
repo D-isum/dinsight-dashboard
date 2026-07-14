@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import DashboardPage from '@/app/dashboard/page';
+import { I18nProvider } from '@/i18n/client';
 
 vi.mock('@/context/dashboard-workspace-context', () => ({
   useDashboardWorkspace: () => ({
@@ -100,6 +101,8 @@ vi.mock('@/hooks/useDashboardOverview', () => ({
       state: 'Deteriorating',
       recommendation: 'Inspect machine soon.',
       reasons: ['Anomaly is rising.'],
+      recommendationKey: 'health.recommendationDeteriorating',
+      reasonsI18n: [],
     },
     history: [
       {
@@ -132,7 +135,11 @@ vi.mock('@/hooks/useDashboardOverview', () => ({
 
 describe('Dashboard page integration', () => {
   it('renders operator-critical cards and actions', () => {
-    render(<DashboardPage />);
+    render(
+      <I18nProvider initialLocale="en">
+        <DashboardPage />
+      </I18nProvider>
+    );
 
     expect(screen.getByText('Machine status')).toBeInTheDocument();
     expect(screen.getAllByText('Deteriorating').length).toBeGreaterThan(0);

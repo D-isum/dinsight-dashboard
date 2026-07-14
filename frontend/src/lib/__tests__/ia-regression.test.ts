@@ -6,18 +6,24 @@ import { mainNavItems, quickActions } from '@/lib/nav-config';
 const dashboardRoot = path.resolve(process.cwd(), 'src/app/dashboard');
 
 describe('IA regression checks', () => {
-  // Five top-level pages. Settings-y surfaces (alerts, audit log,
-  // license, notifications, validation rules) all live as tabs under
+  // Four top-level pages. Live coordinates and deterioration analysis share
+  // Asset Monitor; settings-y surfaces remain under account settings.
+  // License, notifications, and validation rules all live as tabs under
   // /dashboard/account so the sidebar stays scannable.
-  it('keeps the sidebar trimmed to the five top-level pages', () => {
+  it('keeps the sidebar trimmed to the four top-level pages', () => {
     const hrefs = mainNavItems.map((item) => item.href);
     expect(hrefs).toEqual([
       '/dashboard',
       '/dashboard/data',
-      '/dashboard/live',
-      '/dashboard/insights',
+      '/dashboard/monitor',
       '/dashboard/account',
     ]);
+  });
+
+  it('keeps the former live and insights URLs as compatibility routes', () => {
+    expect(fs.existsSync(path.join(dashboardRoot, 'live', 'page.tsx'))).toBe(true);
+    expect(fs.existsSync(path.join(dashboardRoot, 'insights', 'page.tsx'))).toBe(true);
+    expect(fs.existsSync(path.join(dashboardRoot, 'monitor', 'page.tsx'))).toBe(true);
   });
 
   it('keeps the legacy alerts + audit routes as redirect stubs (no sidebar entry)', () => {
@@ -45,6 +51,6 @@ describe('IA regression checks', () => {
 
   it('keeps quick actions within operator IA', () => {
     const hrefs = quickActions.map((action) => action.href);
-    expect(hrefs).toEqual(['/dashboard/data', '/dashboard/live', '/dashboard/insights']);
+    expect(hrefs).toEqual(['/dashboard/data', '/dashboard/monitor']);
   });
 });

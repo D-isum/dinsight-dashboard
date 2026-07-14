@@ -1,4 +1,4 @@
-import { Home, Database, Monitor, ShieldAlert, UserCog, type LucideIcon } from 'lucide-react';
+import { Home, Database, Monitor, UserCog, type LucideIcon } from 'lucide-react';
 import { type Action } from '@/lib/permissions';
 
 export interface NavItem {
@@ -21,7 +21,7 @@ export interface NavItem {
   descriptionKey?: string;
 }
 
-// Top-level sidebar IA. Five entries only. Account, security,
+// Top-level sidebar IA. Four entries only. Account, security,
 // alerts, audit log, license, and related controls live under Settings
 // as tabs. Per-tab routing inside that page uses ?section=...
 //
@@ -30,7 +30,7 @@ export interface NavItem {
 // page.tsx for the redirect stubs.
 export const mainNavItems: NavItem[] = [
   {
-    label: 'Machine Status',
+    label: 'Overview',
     labelKey: 'nav.machineStatus',
     href: '/dashboard',
     icon: Home,
@@ -39,7 +39,7 @@ export const mainNavItems: NavItem[] = [
     descriptionKey: 'nav.machineStatusDescription',
   },
   {
-    label: 'Data Ingestion',
+    label: 'Data',
     labelKey: 'nav.dataIngestion',
     href: '/dashboard/data',
     icon: Database,
@@ -48,22 +48,13 @@ export const mainNavItems: NavItem[] = [
     descriptionKey: 'nav.dataIngestionDescription',
   },
   {
-    label: 'Live Monitor',
-    labelKey: 'nav.liveMonitor',
-    href: '/dashboard/live',
+    label: 'Asset Monitor',
+    labelKey: 'nav.assetMonitor',
+    href: '/dashboard/monitor',
     icon: Monitor,
     requiresAuth: true,
-    description: 'Observe live and near-real-time machine behavior',
-    descriptionKey: 'nav.liveMonitorDescription',
-  },
-  {
-    label: 'Health Insights',
-    labelKey: 'nav.healthInsights',
-    href: '/dashboard/insights',
-    icon: ShieldAlert,
-    requiresAuth: true,
-    description: 'Anomaly and wear trend interpretation',
-    descriptionKey: 'nav.healthInsightsDescription',
+    description: 'Compare live behavior and deterioration in one workspace',
+    descriptionKey: 'nav.assetMonitorDescription',
   },
   {
     label: 'Settings',
@@ -85,15 +76,9 @@ export const userMenuItems = [
 export const quickActions = [
   { label: 'Upload Data', labelKey: 'nav.uploadData', href: '/dashboard/data', icon: Database },
   {
-    label: 'Open Live Monitor',
-    labelKey: 'nav.openLiveMonitor',
-    href: '/dashboard/live',
+    label: 'Open Asset Monitor',
+    labelKey: 'nav.assetMonitor',
+    href: '/dashboard/monitor',
     icon: Monitor,
-  },
-  {
-    label: 'View Insights',
-    labelKey: 'nav.viewInsights',
-    href: '/dashboard/insights',
-    icon: ShieldAlert,
   },
 ];

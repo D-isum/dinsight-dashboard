@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { X, ChevronRight, Sparkles } from 'lucide-react';
+import { ChevronRight, PanelLeftClose, PanelLeftOpen, Sparkles, X } from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { OrgSwitcher } from '@/components/layout/org-switcher';
@@ -15,9 +15,16 @@ import { cn } from '@/utils/cn';
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ isOpen, onClose }: SidebarProps) {
+export function Sidebar({
+  isOpen,
+  onClose,
+  isCollapsed = false,
+  onToggleCollapse = () => undefined,
+}: SidebarProps) {
   const pathname = usePathname();
   const { user, currentOrgRole } = useAuth();
   const { t } = useI18n();
@@ -25,6 +32,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const isActiveLink = (href: string) => {
     if (href === '/dashboard') {
       return pathname === '/dashboard';
+    }
+    if (href === '/dashboard/monitor') {
+      return (
+        pathname.startsWith('/dashboard/monitor') ||
+        pathname.startsWith('/dashboard/live') ||
+        pathname.startsWith('/dashboard/insights')
+      );
     }
     return pathname.startsWith(href);
   };
@@ -65,21 +79,31 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-in-out xl:relative xl:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 w-72 transform transition-[width,transform] duration-300 ease-in-out xl:relative xl:translate-x-0',
           'bg-canvas border-r border-border',
+          isCollapsed && 'xl:w-20',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         <div className="flex h-full flex-col">
           {/* Sidebar header */}
-          <div className="flex h-16 items-center justify-between border-b border-border px-4">
-            <Link href="/dashboard" className="flex items-center space-x-3 group" onClick={onClose}>
+          <div
+            className={cn(
+              'flex h-16 items-center justify-between border-b border-border px-4',
+              isCollapsed && 'xl:px-1'
+            )}
+          >
+            <Link
+              href="/dashboard"
+              className={cn('group flex items-center space-x-3', isCollapsed && 'xl:space-x-0')}
+              onClick={onClose}
+            >
               <div className="relative">
                 <div className="relative h-10 w-10 bg-accent rounded-lg flex items-center justify-center shadow-sm">
                   <Sparkles className="h-5 w-5 text-accent-contrast" />
                 </div>
               </div>
-              <div className="flex flex-col">
+              <div className={cn('flex flex-col', isCollapsed && 'xl:sr-only')}>
                 <span className="font-semibold text-xl text-accent">D'Insight</span>
                 <span className="text-xs text-fg-muted">{t('app.productSubtitle')}</span>
               </div>
@@ -93,19 +117,46 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               <X className="h-5 w-5" />
               <span className="sr-only">{t('header.closeSidebar')}</span>
             </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                'hidden rounded-lg hover:bg-surface-hover xl:inline-flex',
+                isCollapsed && 'xl:h-8 xl:w-8'
+              )}
+              onClick={onToggleCollapse}
+              aria-label={isCollapsed ? t('header.expandSidebar') : t('header.collapseSidebar')}
+              title={isCollapsed ? t('header.expandSidebar') : t('header.collapseSidebar')}
+            >
+              {isCollapsed ? (
+                <PanelLeftOpen className="h-5 w-5" />
+              ) : (
+                <PanelLeftClose className="h-5 w-5" />
+              )}
+            </Button>
           </div>
 
           {/* Org switcher — shows active organization + role, opens a
               picker when the user belongs to more than one. */}
-          <div className="border-b border-border px-4 py-3">
+          <div className={cn('border-b border-border px-4 py-3', isCollapsed && 'xl:hidden')}>
             <OrgSwitcher />
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 space-y-1 p-4 overflow-y-auto scrollbar-thin">
+          <nav
+            className={cn(
+              'flex-1 space-y-1 overflow-y-auto p-4 scrollbar-thin',
+              isCollapsed && 'xl:px-2'
+            )}
+          >
             {/* Main navigation */}
             <div className="space-y-1">
-              <h3 className="px-3 mb-2 text-xs font-semibold text-fg-subtle uppercase tracking-wider">
+              <h3
+                className={cn(
+                  'mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-fg-subtle',
+                  isCollapsed && 'xl:sr-only'
+                )}
+              >
                 {t('nav.mainMenu')}
               </h3>
               {mainNavItems.filter(hasPermission).map((item) => {
@@ -121,6 +172,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     onClick={onClose}
                     className={cn(
                       'group flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      isCollapsed && 'xl:justify-center xl:px-2',
                       isActive
                         ? 'bg-surface-selected dark:bg-surface-selected text-accent dark:text-accent border-l-4 border-strong'
                         : 'text-fg hover:bg-surface-hover/50 hover:text-fg border-l-4 border-transparent'
@@ -130,6 +182,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     <div
                       className={cn(
                         'mr-3 rounded-lg p-1.5 transition-colors',
+                        isCollapsed && 'xl:mr-0',
                         isActive
                           ? 'bg-surface-selected dark:bg-surface-selected text-accent'
                           : 'bg-surface-muted text-fg-muted group-hover:bg-surface-hover'
@@ -137,13 +190,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     >
                       <Icon className="h-4 w-4" />
                     </div>
-                    <span className="flex-1">{label}</span>
+                    <span className={cn('flex-1', isCollapsed && 'xl:sr-only')}>{label}</span>
                     {item.badge && (
                       <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full bg-danger text-accent-contrast">
                         {item.badge}
                       </span>
                     )}
-                    {isActive && <ChevronRight className="h-4 w-4 text-accent" />}
+                    {isActive && (
+                      <ChevronRight
+                        className={cn('h-4 w-4 text-accent', isCollapsed && 'xl:hidden')}
+                      />
+                    )}
                   </Link>
                 );
               })}
@@ -151,7 +208,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
             {/* System status widget (Quick Actions block removed — its links
                 duplicated entries already in MAIN MENU) */}
-            <div className="mt-6">
+            <div className={cn('mt-6', isCollapsed && 'xl:hidden')}>
               <div className="rounded-lg bg-surface-muted/50 border border-border p-4">
                 <h4 className="text-xs font-semibold text-fg-muted uppercase tracking-wider mb-2">
                   {t('nav.systemStatus')}
@@ -174,7 +231,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </nav>
 
           {/* Bottom navigation */}
-          <div className="border-t border-border p-4">
+          <div className={cn('border-t border-border p-4', isCollapsed && 'xl:px-2')}>
             <div className="space-y-1 mb-4">
               {bottomNavItems.filter(hasPermission).map((item) => {
                 const isActive = isActiveLink(item.href);
@@ -203,8 +260,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
 
             {/* User info */}
-            <div className="rounded-lg bg-surface-muted/50 p-3">
-              <div className="flex items-center space-x-3">
+            <div className={cn('rounded-lg bg-surface-muted/50 p-3', isCollapsed && 'xl:p-2')}>
+              <div
+                className={cn(
+                  'flex items-center space-x-3',
+                  isCollapsed && 'xl:justify-center xl:space-x-0'
+                )}
+              >
                 <div className="relative">
                   <div className="h-10 w-10 rounded-lg bg-surface-muted flex items-center justify-center shadow-sm">
                     <span className="text-sm font-semibold text-fg">
@@ -216,7 +278,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   </div>
                   <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-success border-2 border-white dark:border-canvas rounded-full" />
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className={cn('min-w-0 flex-1', isCollapsed && 'xl:sr-only')}>
                   <p className="text-sm font-medium text-fg truncate">
                     {user?.full_name || t('common.user')}
                   </p>

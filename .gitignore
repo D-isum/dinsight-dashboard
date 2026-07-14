@@ -14,11 +14,25 @@ UPDF_PILOT_INFRASTRUCTURE_RESEARCH.docx
 UPDF_PILOT_INFRASTRUCTURE_RESEARCH.md
 SCREENSHOT_BASED_WIREFRAME.md
 
+# Business outreach and branding working files
+# These contain prospect-specific documents, generated renders, and local logo explorations.
+docs/outreach/
+docs/branding/
+
 # Dependencies
 node_modules/
+.venv/
+venv/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Python caches and local tooling
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # Production builds
 dist/
@@ -42,8 +56,8 @@ out/
 *.swp
 *.swo
 .claude/
-.github/
 .github/instructions/
+.github/copilot-instructions.md
 dinsight-dashboard.code-workspace
 
 # OS

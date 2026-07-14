@@ -16,4 +16,21 @@ describe('deriveMachineHealthStatus', () => {
     const result = deriveMachineHealthStatus({ anomalyPercentage: 2, wearTrendScore: 1.4 });
     expect(result.state).toBe('Failing');
   });
+
+  it('uses the adaptive distance band when one is available', () => {
+    const result = deriveMachineHealthStatus({
+      anomalyPercentage: 8,
+      wearTrendScore: 0.7,
+      wearThresholdState: 'danger',
+      wearLatestDistance: 1.55,
+      wearWarningThreshold: 0.603,
+      wearDangerThreshold: 0.778,
+    });
+
+    expect(result.state).toBe('Failing');
+    expect(result.reasonsI18n).toContainEqual({
+      key: 'health.reasonDistanceDanger',
+      values: { value: '1.550', threshold: '0.778' },
+    });
+  });
 });

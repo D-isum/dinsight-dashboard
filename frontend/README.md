@@ -77,7 +77,7 @@ src/
 
 - **Unit + component** — Vitest + Testing Library. Run with `pnpm test`. Setup at `src/test/setup.ts`. MSW handlers at `src/test/server.ts`.
 - **E2E** — Playwright. Run with `pnpm test:e2e`. Auth fixtures regenerate via `e2e/auth.setup.ts`. Specs in `e2e/`.
-- **IA regression** — `src/lib/__tests__/ia-regression.test.ts` asserts the 5-section nav stays trimmed (no `/dashboard/alerts` or `/dashboard/audit` in the sidebar; both routes exist as redirect stubs to `/dashboard/account?section=…`).
+- **IA regression** — `src/lib/__tests__/ia-regression.test.ts` asserts the four-section nav stays trimmed. Live coordinates and deterioration analysis share Asset Monitor; alerts and audit remain under Settings.
 
 ## Environment variables
 
@@ -87,7 +87,12 @@ Copy `.env.local.example` → `.env.local` and adjust:
 NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 ```
 
-That's the only one the FE reads at runtime.
+For local UI testing against a remote API without relaxing production CORS, use:
+
+```
+NEXT_PUBLIC_API_URL=/api
+DINSIGHT_API_PROXY_TARGET=http://135.149.57.99/api/v1
+```
 
 ## Changelog
 

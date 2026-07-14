@@ -176,10 +176,10 @@ export function ProcessingDialog({
                 asChild
                 className="flex-1 bg-accent hover:bg-accent-hover text-accent-contrast shadow-sm"
               >
-                <a href="/dashboard/live">Open Live Monitor</a>
+                <a href="/dashboard/monitor?view=map">Open Live Monitor</a>
               </Button>
               <Button asChild variant="outline" className="flex-1">
-                <a href="/dashboard/insights">Open Health Insights</a>
+                <a href="/dashboard/monitor?view=deterioration">Open Health Insights</a>
               </Button>
             </div>
           )}

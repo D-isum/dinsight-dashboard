@@ -1260,13 +1260,15 @@ export default function DataIngestionPage() {
               actions={
                 <>
                   <Button asChild size="sm">
-                    <Link href="/dashboard/live">
+                    <Link href="/dashboard/monitor?view=map">
                       {t('data.openInLive')}
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </Link>
                   </Button>
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/dashboard/insights">{t('data.openInInsights')}</Link>
+                    <Link href="/dashboard/monitor?view=deterioration">
+                      {t('data.openInInsights')}
+                    </Link>
                   </Button>
                 </>
               }
@@ -1987,7 +1989,7 @@ export default function DataIngestionPage() {
                   </p>
                   <div className="flex flex-wrap gap-3">
                     <Button asChild>
-                      <Link href="/dashboard/live">
+                      <Link href="/dashboard/monitor?view=map">
                         {t('data.openLiveMonitor')}
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Link>
@@ -2323,7 +2325,7 @@ function DataNextActions({
         )}
         {action.command === 'live' && (
           <Button asChild variant="outline" className="w-full justify-start">
-            <Link href="/dashboard/live">
+            <Link href="/dashboard/monitor?view=map">
               <ArrowRight className="mr-2 h-4 w-4" />
               {t('data.openLiveMonitor')}
             </Link>

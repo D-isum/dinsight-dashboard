@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Sidebar } from '@/components/layout/sidebar';
+import { I18nProvider } from '@/i18n/client';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/dashboard',
@@ -22,18 +23,24 @@ vi.mock('@/context/auth-context', () => ({
 // scope even when the switcher itself short-circuits to null.
 const renderWithQueryClient = (ui: React.ReactElement) => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>);
+  return render(
+    <I18nProvider initialLocale="en">
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
+    </I18nProvider>
+  );
 };
 
 describe('Sidebar integration', () => {
-  it('shows exactly the five top-level pages (alerts + audit moved to settings)', () => {
+  it('shows the four top-level pages with monitoring and deterioration consolidated', () => {
     renderWithQueryClient(<Sidebar isOpen onClose={() => undefined} />);
 
-    expect(screen.getByRole('link', { name: /Machine Status/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Data Ingestion/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Live Monitor/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Health Insights/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Overview/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Data$/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Asset Monitor/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Settings/i })).toBeInTheDocument();
+
+    expect(screen.queryByRole('link', { name: /Live Monitor/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Health Insights/i })).not.toBeInTheDocument();
 
     // Settings-y surfaces no longer have sidebar entries — they live
     // as tabs under Settings.

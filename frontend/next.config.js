@@ -1,3 +1,6 @@
+const publicApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+const apiProxyTarget = process.env.DINSIGHT_API_PROXY_TARGET || publicApiUrl;
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -7,13 +10,13 @@ const nextConfig = {
   // Required for the production container; harmless for `pnpm dev`.
   output: 'standalone',
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1',
+    NEXT_PUBLIC_API_URL: publicApiUrl,
   },
   async rewrites() {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api/v1'}/:path*`,
+        destination: `${apiProxyTarget}/:path*`,
       },
     ];
   },

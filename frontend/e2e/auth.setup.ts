@@ -21,9 +21,7 @@
  *     per-role storage state files (admin.json, operator.json, viewer.json).
  */
 import { test as setup, expect } from '@playwright/test';
-import path from 'node:path';
-
-export const STORAGE_STATE = path.join(__dirname, '..', 'playwright', '.auth', 'user.json');
+import { STORAGE_STATE } from './auth-state';
 
 setup('authenticate', async ({ page, context }) => {
   // Cookies the frontend uses (see src/lib/api-client.ts tokenManager).

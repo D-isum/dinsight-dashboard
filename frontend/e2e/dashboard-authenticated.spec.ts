@@ -11,7 +11,7 @@
  * setup files (admin.setup.ts, operator.setup.ts, viewer.setup.ts).
  */
 import { expect, test } from '@playwright/test';
-import { STORAGE_STATE } from './auth.setup';
+import { STORAGE_STATE } from './auth-state';
 
 test.use({ storageState: STORAGE_STATE });
 
@@ -44,9 +44,8 @@ test('lands on the dashboard with the shell mounted', async ({ page }) => {
   await expect(page.getByText("D'Insight").first()).toBeVisible();
 
   // The header/sidebar nav surfaces the IA the design audit locked in.
-  await expect(page.getByRole('link', { name: /Machine Status/i })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Data Ingestion/i })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Live Monitor/i })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Health Insights/i })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Account & Security/i })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Overview', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Data', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Asset Monitor', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Settings', exact: true })).toBeVisible();
 });

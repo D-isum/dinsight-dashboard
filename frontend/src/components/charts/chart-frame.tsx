@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Maximize2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
 interface ChartFrameProps {
@@ -26,6 +27,7 @@ export function ChartFrame({
   bodyClassName,
   enableFullscreen = true,
 }: ChartFrameProps) {
+  const { t } = useI18n();
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -57,8 +59,8 @@ export function ChartFrame({
               variant="outline"
               size="icon-sm"
               onClick={() => setIsFullscreen(true)}
-              aria-label={`Open ${title} fullscreen`}
-              title="Open fullscreen"
+              aria-label={t('common.openFullscreen', { title })}
+              title={t('common.openFullscreen', { title })}
               className="shrink-0"
             >
               <Maximize2 className="h-4 w-4" aria-hidden="true" />
@@ -66,13 +68,13 @@ export function ChartFrame({
           )}
         </div>
         {actions && (
-          <div className="-mx-1 flex min-w-0 overflow-x-auto px-1 pb-1">
-            <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          <div className="-mx-1 min-w-0 px-1 pb-1">
+            <div className="flex flex-wrap items-center gap-2">{actions}</div>
           </div>
         )}
         {stats && (
-          <div className="-mx-1 flex min-w-0 overflow-x-auto px-1 pb-1">
-            <div className="flex shrink-0 items-stretch gap-2">{stats}</div>
+          <div className="-mx-1 min-w-0 px-1 pb-1">
+            <div className="flex flex-wrap items-stretch gap-2">{stats}</div>
           </div>
         )}
       </div>
@@ -93,7 +95,7 @@ export function ChartFrame({
           className="fixed inset-0 z-[90] flex min-w-0 flex-col bg-canvas p-3 sm:p-5"
           role="dialog"
           aria-modal="true"
-          aria-label={`${title} fullscreen chart`}
+          aria-label={t('common.fullscreenChart', { title })}
         >
           <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-xl">
             <div className="flex min-w-0 items-start justify-between gap-4 border-b border-border px-4 py-3">
@@ -107,8 +109,8 @@ export function ChartFrame({
                 variant="outline"
                 size="icon-sm"
                 onClick={() => setIsFullscreen(false)}
-                aria-label={`Close ${title} fullscreen`}
-                title="Close fullscreen"
+                aria-label={t('common.closeFullscreen', { title })}
+                title={t('common.closeFullscreen', { title })}
                 className="shrink-0"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
@@ -153,7 +155,7 @@ export function ChartStat({
       tabIndex={description ? 0 : undefined}
       aria-label={description ? `${label}: ${description}` : undefined}
       className={cn(
-        'min-h-[3.25rem] min-w-[6.75rem] rounded-md border px-2.5 py-1.5 text-xs sm:min-w-[7.25rem]',
+        'min-h-[3.25rem] min-w-[6rem] max-w-[14rem] flex-1 rounded-md border px-2.5 py-1.5 text-xs sm:min-w-[6.5rem]',
         description && 'cursor-help',
         tone === 'neutral' && 'border-border bg-surface-muted/60 text-fg',
         tone === 'info' && 'border-info-border bg-info-bg text-info-text',

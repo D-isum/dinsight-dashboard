@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OrgSwitcher } from '@/components/layout/org-switcher';
+import { I18nProvider } from '@/i18n/client';
 
 // useAuth is mocked per-test with the shape OrgSwitcher cares about.
 const setCurrentOrg = vi.fn();
@@ -28,7 +29,11 @@ beforeEach(() => {
 
 const renderWithQueryClient = (ui: React.ReactElement) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}>{ui}</QueryClientProvider>);
+  return render(
+    <I18nProvider initialLocale="en">
+      <QueryClientProvider client={qc}>{ui}</QueryClientProvider>
+    </I18nProvider>
+  );
 };
 
 describe('OrgSwitcher', () => {
@@ -71,7 +76,7 @@ describe('OrgSwitcher', () => {
     };
     renderWithQueryClient(<OrgSwitcher />);
     expect(screen.getByText('Default Organization')).toBeInTheDocument();
-    expect(screen.getByText('operator')).toBeInTheDocument();
+    expect(screen.getByText('Operator')).toBeInTheDocument();
     // No switcher affordance.
     expect(screen.queryByRole('button', { name: /Switch organization/i })).not.toBeInTheDocument();
   });

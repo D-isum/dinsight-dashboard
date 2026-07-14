@@ -5,8 +5,11 @@ export type AlertStatus = 'active' | 'acknowledged' | 'resolved';
 
 export interface DashboardAlert {
   id: number;
+  datasetId?: number | null;
   title: string;
   message: string;
+  kind?: 'wear-failing' | 'wear-deteriorating' | 'wear-early-warning';
+  messageValues?: Record<string, string | number>;
   severity: AlertSeverity;
   status: AlertStatus;
   anomalyPercentage: number;
@@ -28,11 +31,30 @@ export interface DashboardHistoryPoint {
 export interface WearTrendAlertInput {
   datasetId: number | null;
   metadataColumn: string;
+  baselineMean: number | null;
   monitoringMean: number | null;
   monitoringLatest: number | null;
   monitoringMax: number | null;
   sampleCount: number;
+  warningThreshold: number;
+  dangerThreshold: number;
 }
+
+const ALERT_SEVERITY_RANK: Record<AlertSeverity, number> = {
+  low: 0,
+  medium: 1,
+  high: 2,
+  critical: 3,
+};
+
+export const sortDashboardAlerts = (alerts: DashboardAlert[]): DashboardAlert[] =>
+  [...alerts].sort((a, b) => {
+    const severityDelta = ALERT_SEVERITY_RANK[b.severity] - ALERT_SEVERITY_RANK[a.severity];
+    if (severityDelta !== 0) {
+      return severityDelta;
+    }
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
 
 export const summarizeAlerts = (alerts: DashboardAlert[]): AlertSummary => {
   const bySeverity: Record<AlertSeverity, number> = {
@@ -64,15 +86,28 @@ export const buildWearTrendAlerts = (input: WearTrendAlertInput): DashboardAlert
     return [];
   }
 
-  const maxDistance = input.monitoringMax ?? input.monitoringLatest;
   const nowIso = new Date().toISOString();
+  const warningThreshold = Number.isFinite(input.warningThreshold) ? input.warningThreshold : 0.8;
+  const dangerThreshold = Number.isFinite(input.dangerThreshold) ? input.dangerThreshold : 1.2;
+  const earlyWarningThreshold =
+    input.baselineMean != null && Number.isFinite(input.baselineMean)
+      ? input.baselineMean + Math.max(0, warningThreshold - input.baselineMean) * 0.5
+      : warningThreshold * 0.56;
+  const syntheticIdBase = input.datasetId * 10;
 
-  if (input.monitoringLatest >= 1.2 || input.monitoringMean >= 1.0 || maxDistance >= 1.5) {
+  if (input.monitoringLatest >= dangerThreshold) {
     return [
       {
-        id: 1,
+        id: -(syntheticIdBase + 3),
+        datasetId: input.datasetId,
         title: 'Failing trend risk',
-        message: `Monitoring distance from baseline is critical (latest ${input.monitoringLatest.toFixed(3)}, mean ${input.monitoringMean.toFixed(3)}).`,
+        message: `Latest monitoring distance ${input.monitoringLatest.toFixed(3)} exceeds the danger threshold ${dangerThreshold.toFixed(3)} (mean ${input.monitoringMean.toFixed(3)}).`,
+        kind: 'wear-failing',
+        messageValues: {
+          latest: input.monitoringLatest.toFixed(3),
+          mean: input.monitoringMean.toFixed(3),
+          danger: dangerThreshold.toFixed(3),
+        },
         severity: 'critical',
         status: 'active',
         anomalyPercentage: 0,
@@ -81,12 +116,19 @@ export const buildWearTrendAlerts = (input: WearTrendAlertInput): DashboardAlert
     ];
   }
 
-  if (input.monitoringLatest >= 0.8 || input.monitoringMean >= 0.65 || maxDistance >= 1.0) {
+  if (input.monitoringLatest >= warningThreshold) {
     return [
       {
-        id: 2,
+        id: -(syntheticIdBase + 2),
+        datasetId: input.datasetId,
         title: 'Deterioration alert',
-        message: `Monitoring distance from baseline is rising (latest ${input.monitoringLatest.toFixed(3)}, mean ${input.monitoringMean.toFixed(3)}).`,
+        message: `Latest monitoring distance ${input.monitoringLatest.toFixed(3)} exceeds the warning threshold ${warningThreshold.toFixed(3)} (mean ${input.monitoringMean.toFixed(3)}).`,
+        kind: 'wear-deteriorating',
+        messageValues: {
+          latest: input.monitoringLatest.toFixed(3),
+          mean: input.monitoringMean.toFixed(3),
+          warning: warningThreshold.toFixed(3),
+        },
         severity: 'high',
         status: 'active',
         anomalyPercentage: 0,
@@ -95,12 +137,19 @@ export const buildWearTrendAlerts = (input: WearTrendAlertInput): DashboardAlert
     ];
   }
 
-  if (input.monitoringLatest >= 0.45 || input.monitoringMean >= 0.35 || maxDistance >= 0.6) {
+  if (input.monitoringLatest >= earlyWarningThreshold) {
     return [
       {
-        id: 3,
+        id: -(syntheticIdBase + 1),
+        datasetId: input.datasetId,
         title: 'Early warning',
-        message: `Monitoring distance from baseline shows early drift (latest ${input.monitoringLatest.toFixed(3)}, mean ${input.monitoringMean.toFixed(3)}).`,
+        message: `Latest monitoring distance ${input.monitoringLatest.toFixed(3)} is approaching the warning threshold ${warningThreshold.toFixed(3)} (mean ${input.monitoringMean.toFixed(3)}).`,
+        kind: 'wear-early-warning',
+        messageValues: {
+          latest: input.monitoringLatest.toFixed(3),
+          mean: input.monitoringMean.toFixed(3),
+          warning: warningThreshold.toFixed(3),
+        },
         severity: 'medium',
         status: 'active',
         anomalyPercentage: 0,
@@ -149,10 +198,18 @@ export const deriveWearDirection = (
 export const deriveDashboardMachineState = (input: {
   anomalyPercentage: number | null;
   wearScore: number | null;
+  wearThresholdState?: 'normal' | 'warning' | 'danger' | null;
+  wearLatestDistance?: number | null;
+  wearWarningThreshold?: number | null;
+  wearDangerThreshold?: number | null;
 }): MachineHealthResult =>
   deriveMachineHealthStatus({
     anomalyPercentage: input.anomalyPercentage,
     wearTrendScore: input.wearScore,
+    wearThresholdState: input.wearThresholdState,
+    wearLatestDistance: input.wearLatestDistance,
+    wearWarningThreshold: input.wearWarningThreshold,
+    wearDangerThreshold: input.wearDangerThreshold,
   });
 
 export const appendHistoryPoint = (
