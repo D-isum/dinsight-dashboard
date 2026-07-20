@@ -208,7 +208,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align={isRtl ? 'left' : 'right'} className="w-56 rounded-lg">
+            <DropdownMenuContent align="right" className="w-56 rounded-lg">
               <div className="px-3 py-2 border-b dark:border-border">
                 <p className="text-sm font-medium text-fg">{user?.full_name}</p>
                 <p className="text-xs text-fg-muted truncate">{user?.email}</p>
