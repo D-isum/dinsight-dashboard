@@ -55,7 +55,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             href="/dashboard"
             className="inline-flex items-center gap-1 text-xs font-medium text-fg-muted hover:text-fg transition-colors"
           >
-            <ChevronLeft className="h-3 w-3" />
+            <ChevronLeft className="rtl-mirror h-3 w-3" />
             {t('admin.backToDashboard')}
           </Link>
         </div>

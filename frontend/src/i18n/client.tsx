@@ -13,7 +13,10 @@ import {
   DEFAULT_LOCALE,
   LOCALE_COOKIE,
   LOCALE_STORAGE_KEY,
+  localeDirections,
+  localeIntlTags,
   type Locale,
+  type TextDirection,
   resolveLocale,
 } from '@/i18n/config';
 import { messages, type Messages } from '@/i18n/messages';
@@ -22,6 +25,7 @@ type Primitive = string | number | boolean | null | undefined;
 
 interface I18nContextValue {
   locale: Locale;
+  direction: TextDirection;
   setLocale: (locale: Locale) => void;
   t: (key: string, values?: Record<string, Primitive>) => string;
   formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
@@ -73,6 +77,7 @@ const getInitialBrowserLocale = (initialLocale: Locale): Locale => {
 const persistLocale = (locale: Locale) => {
   if (typeof document !== 'undefined') {
     document.documentElement.lang = locale;
+    document.documentElement.dir = localeDirections[locale];
     document.cookie = `${LOCALE_COOKIE}=${locale}; Path=/; Max-Age=31536000; SameSite=Lax`;
   }
 
@@ -91,6 +96,7 @@ export function I18nProvider({
   children: ReactNode;
 }) {
   const [locale, setLocaleState] = useState<Locale>(() => getInitialBrowserLocale(initialLocale));
+  const direction = localeDirections[locale];
 
   useEffect(() => {
     persistLocale(locale);
@@ -111,13 +117,13 @@ export function I18nProvider({
 
   const formatNumber = useCallback(
     (value: number, options?: Intl.NumberFormatOptions) =>
-      new Intl.NumberFormat(locale === 'ja' ? 'ja-JP' : 'en-US', options).format(value),
+      new Intl.NumberFormat(localeIntlTags[locale], options).format(value),
     [locale]
   );
 
   const formatDate = useCallback(
     (value: string | number | Date, options?: Intl.DateTimeFormatOptions) =>
-      new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+      new Intl.DateTimeFormat(localeIntlTags[locale], {
         dateStyle: 'medium',
         ...options,
       }).format(new Date(value)),
@@ -126,7 +132,7 @@ export function I18nProvider({
 
   const formatTime = useCallback(
     (value: string | number | Date, options?: Intl.DateTimeFormatOptions) =>
-      new Intl.DateTimeFormat(locale === 'ja' ? 'ja-JP' : 'en-US', {
+      new Intl.DateTimeFormat(localeIntlTags[locale], {
         timeStyle: 'short',
         ...options,
       }).format(new Date(value)),
@@ -134,8 +140,8 @@ export function I18nProvider({
   );
 
   const value = useMemo(
-    () => ({ locale, setLocale, t, formatNumber, formatDate, formatTime }),
-    [formatDate, formatNumber, formatTime, locale, setLocale, t]
+    () => ({ locale, direction, setLocale, t, formatNumber, formatDate, formatTime }),
+    [direction, formatDate, formatNumber, formatTime, locale, setLocale, t]
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;

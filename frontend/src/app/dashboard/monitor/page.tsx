@@ -40,9 +40,9 @@ const isAssetMonitorView = (value: string | null): value is AssetMonitorView =>
   value === 'compare' || value === 'map' || value === 'deterioration';
 
 const stateAccent = {
-  OK: 'border-l-success-text',
-  Deteriorating: 'border-l-warning-text',
-  Failing: 'border-l-danger-text',
+  OK: 'border-s-success-text',
+  Deteriorating: 'border-s-warning-text',
+  Failing: 'border-s-danger-text',
 } as const;
 
 const stateBadge = {
@@ -240,7 +240,7 @@ export default function AssetMonitorPage() {
       <div className="bg-canvas pb-1">
         <Card
           className={cn(
-            'overflow-visible border border-l-4 border-border bg-surface shadow-sm',
+            'overflow-visible border border-s-4 border-border bg-surface shadow-sm',
             stateAccent[machineStatus.state]
           )}
         >
@@ -297,7 +297,7 @@ export default function AssetMonitorPage() {
                   <summary className="flex h-10 cursor-pointer list-none items-center rounded-md border border-border bg-surface px-3 text-sm font-medium text-fg transition-colors hover:bg-surface-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
                     {t('assetMonitor.whyThisState')}
                   </summary>
-                  <div className="absolute right-0 top-[calc(100%+0.4rem)] z-50 w-[min(32rem,calc(100vw-2rem))] rounded-md border border-border bg-surface p-3 text-sm text-fg shadow-xl">
+                  <div className="absolute end-0 top-[calc(100%+0.4rem)] z-50 w-[min(32rem,calc(100vw-2rem))] rounded-md border border-border bg-surface p-3 text-sm text-fg shadow-xl">
                     <p className="font-medium">{recommendation}</p>
                     <ul className="mt-2 grid gap-1 text-fg-muted">
                       {reasons.map((reason) => (
@@ -379,7 +379,7 @@ export default function AssetMonitorPage() {
               aria-expanded={controlPanel === 'map'}
               aria-controls="asset-monitor-map-controls"
             >
-              <Settings2 className="mr-2 h-4 w-4" />
+              <Settings2 className="me-2 h-4 w-4" />
               <span className="truncate">{t('assetMonitor.configureMap')}</span>
             </Button>
           )}
@@ -394,7 +394,7 @@ export default function AssetMonitorPage() {
               aria-expanded={controlPanel === 'analysis'}
               aria-controls="asset-monitor-analysis-controls"
             >
-              <Settings2 className="mr-2 h-4 w-4" />
+              <Settings2 className="me-2 h-4 w-4" />
               <span className="truncate">{t('assetMonitor.configureAnalysis')}</span>
             </Button>
           )}
@@ -553,7 +553,7 @@ export default function AssetMonitorPage() {
 
 function StatusMetric({ label, value, detail }: { label: string; value: string; detail?: string }) {
   return (
-    <div className="min-w-0 border-l border-border pl-3 odd:border-l-0 odd:pl-0 sm:odd:border-l sm:odd:pl-3 sm:first:border-l-0 sm:first:pl-0">
+    <div className="min-w-0 border-s border-border ps-3 odd:border-s-0 odd:ps-0 sm:odd:border-s sm:odd:ps-3 sm:first:border-s-0 sm:first:ps-0">
       <p className="text-[10px] font-semibold uppercase text-fg-muted">{label}</p>
       <p className="mt-0.5 truncate text-sm font-semibold text-fg" title={value}>
         {value}

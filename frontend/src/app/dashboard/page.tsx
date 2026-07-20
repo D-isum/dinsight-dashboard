@@ -27,6 +27,7 @@ import {
   useDashboardWorkspace,
 } from '@/context/dashboard-workspace-context';
 import { useDashboardOverview } from '@/hooks/useDashboardOverview';
+import { localizeDashboardActivity } from '@/i18n/activity';
 import { useI18n } from '@/i18n/client';
 import { buildSparklinePath } from '@/lib/dashboard-overview';
 import type { DinsightDatasetSummary } from '@/lib/dataset-normalizers';
@@ -215,7 +216,7 @@ function ActionQueue({
             >
               <Link href={action.href}>
                 {action.label}
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="rtl-mirror ms-2 h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -324,7 +325,7 @@ function PriorityQueue({
                     })}
                   </div>
                 </div>
-                <div className="min-w-[112px] text-right">
+                <div className="min-w-[112px] text-end">
                   <div className="text-xs font-medium uppercase text-fg-muted">
                     {t('dashboard.priority')}
                   </div>
@@ -352,7 +353,7 @@ function PriorityQueue({
         {items.length > 0 && (
           <Button asChild variant="outline" className="mt-2 w-full">
             <Link href="/dashboard/data?catalog=open">
-              <Database className="mr-2 h-4 w-4" />
+              <Database className="me-2 h-4 w-4" />
               {t('dashboard.openCatalog')}
             </Link>
           </Button>
@@ -364,6 +365,7 @@ function PriorityQueue({
 
 function ActivityRow({ activity }: { activity: DashboardActivity }) {
   const { t } = useI18n();
+  const localizedActivity = localizeDashboardActivity(activity, t);
   const tone: Tone =
     activity.status === 'danger'
       ? 'danger'
@@ -376,9 +378,11 @@ function ActivityRow({ activity }: { activity: DashboardActivity }) {
     <div className="flex min-w-0 items-start gap-3 rounded-md border border-border bg-surface px-3 py-2">
       <span className={cn('mt-1 h-2.5 w-2.5 shrink-0 rounded-full border', toneClasses[tone])} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium text-fg">{activity.title}</div>
-        {activity.description && (
-          <div className="mt-0.5 truncate text-xs text-fg-muted">{activity.description}</div>
+        <div className="truncate text-sm font-medium text-fg">{localizedActivity.title}</div>
+        {localizedActivity.description && (
+          <div className="mt-0.5 truncate text-xs text-fg-muted">
+            {localizedActivity.description}
+          </div>
         )}
         <div className="mt-1 text-xs text-fg-muted">
           {formatRelativeTime(activity.timestamp, t)}
@@ -870,7 +874,7 @@ export default function DashboardPage() {
                   onClick={() => void handleRefresh()}
                   disabled={isRefreshing}
                 >
-                  <RefreshCw className={cn('mr-2 h-4 w-4', isRefreshing && 'animate-spin')} />
+                  <RefreshCw className={cn('me-2 h-4 w-4', isRefreshing && 'animate-spin')} />
                   {t('common.refresh')}
                 </Button>
               </div>

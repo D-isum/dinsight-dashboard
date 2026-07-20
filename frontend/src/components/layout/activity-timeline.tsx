@@ -25,6 +25,7 @@ import {
   type DashboardActivity,
   useDashboardWorkspace,
 } from '@/context/dashboard-workspace-context';
+import { localizeDashboardActivity } from '@/i18n/activity';
 import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
@@ -65,6 +66,7 @@ const statusClass = (activity: DashboardActivity) =>
 function ActivityRow({ activity }: { activity: DashboardActivity }) {
   const { t } = useI18n();
   const Icon = activityIcon(activity);
+  const localizedActivity = localizeDashboardActivity(activity, t);
   const content = (
     <div className="flex w-full min-w-0 gap-3">
       <span className={statusClass(activity)}>
@@ -72,16 +74,16 @@ function ActivityRow({ activity }: { activity: DashboardActivity }) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-start justify-between gap-2">
-          <p className="min-w-0 truncate text-sm font-medium text-fg">{activity.title}</p>
+          <p className="min-w-0 truncate text-sm font-medium text-fg">{localizedActivity.title}</p>
           {activity.datasetId != null && (
             <Badge variant="outline" className="shrink-0">
               #{activity.datasetId}
             </Badge>
           )}
         </div>
-        {activity.description && (
+        {localizedActivity.description && (
           <p className="mt-0.5 max-h-8 overflow-hidden text-xs text-fg-muted">
-            {activity.description}
+            {localizedActivity.description}
           </p>
         )}
         <p className="mt-1 flex items-center gap-1 text-[11px] text-fg-subtle">
@@ -120,7 +122,7 @@ export function ActivityTimeline() {
         >
           <Bell className="h-5 w-5" aria-hidden="true" />
           {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-danger px-1 text-xs font-medium text-accent-contrast shadow-sm">
+            <span className="absolute -end-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-danger px-1 text-xs font-medium text-accent-contrast shadow-sm">
               {Math.min(unreadCount, 9)}
             </span>
           )}

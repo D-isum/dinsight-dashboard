@@ -45,6 +45,7 @@ import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useMachineHealthStatus } from '@/hooks/useMachineHealthStatus';
 import type { MachineHealthResult } from '@/lib/health-status';
 import { useI18n } from '@/i18n/client';
+import { localizeDataError } from '@/i18n/data-errors';
 import { api } from '@/lib/api-client';
 import type { CoordinateSeries } from '@/lib/dataset-normalizers';
 import {
@@ -2115,7 +2116,7 @@ export function LiveMonitorWorkspace({
               controlsPresentation === 'inline' &&
                 'lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden',
               controlsPresentation === 'drawer' &&
-                'fixed bottom-0 right-0 top-16 z-50 w-[min(28rem,100vw)] overflow-hidden rounded-none border-y-0 border-r-0 shadow-2xl'
+                'fixed bottom-0 end-0 top-16 z-50 w-[min(28rem,100vw)] overflow-hidden rounded-none border-y-0 border-e-0 shadow-2xl'
             )}
             role={controlsPresentation === 'drawer' ? 'dialog' : undefined}
             aria-modal={controlsPresentation === 'drawer' ? true : undefined}
@@ -2153,7 +2154,7 @@ export function LiveMonitorWorkspace({
                     <X className="h-4 w-4" />
                   ) : (
                     <>
-                      <PanelLeftClose className="h-4 w-4" />
+                      <PanelLeftClose className="rtl-mirror h-4 w-4" />
                       {t('live.hideControls')}
                     </>
                   )}
@@ -2239,7 +2240,7 @@ export function LiveMonitorWorkspace({
 
                   <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
                     <Button variant="outline" onClick={refreshNow} disabled={!selectedId}>
-                      <RefreshCw className="mr-2 h-4 w-4" />
+                      <RefreshCw className="me-2 h-4 w-4" />
                       {t('live.refreshNow')}
                     </Button>
                     <Button
@@ -2247,7 +2248,7 @@ export function LiveMonitorWorkspace({
                       onClick={() => setIsResetConfirmOpen(true)}
                       disabled={!selectedId}
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
+                      <Trash2 className="me-2 h-4 w-4" />
                       {t('live.resetStreamState')}
                     </Button>
                   </div>
@@ -2490,7 +2491,7 @@ export function LiveMonitorWorkspace({
                       setAnomalyResult(null);
                     }}
                   >
-                    <MousePointerClick className="mr-2 h-4 w-4" aria-hidden="true" />
+                    <MousePointerClick className="me-2 h-4 w-4" aria-hidden="true" />
                     {manualSelectionEnabled
                       ? t('live.finishDrawingHealthyRegions')
                       : t('live.drawHealthyRegions')}
@@ -2556,7 +2557,7 @@ export function LiveMonitorWorkspace({
                           onClick={undoLastBoundary}
                           disabled={boundaries.length === 0}
                         >
-                          <Undo2 className="mr-2 h-4 w-4" />
+                          <Undo2 className="me-2 h-4 w-4" />
                           {t('live.undoLastRegion')}
                         </Button>
                         <Button
@@ -2565,7 +2566,7 @@ export function LiveMonitorWorkspace({
                           onClick={clearBoundaries}
                           disabled={boundaries.length === 0}
                         >
-                          <Trash2 className="mr-2 h-4 w-4" />
+                          <Trash2 className="me-2 h-4 w-4" />
                           {t('live.clearRegions')}
                         </Button>
                         <span className="self-center text-xs text-muted-foreground">
@@ -2618,7 +2619,7 @@ export function LiveMonitorWorkspace({
                     className="w-full"
                     onClick={() => setShowAdvanced((prev) => !prev)}
                   >
-                    <SlidersHorizontal className="mr-2 h-4 w-4" />
+                    <SlidersHorizontal className="me-2 h-4 w-4" />
                     {showAdvanced ? t('live.hideAdvanced') : t('live.showAdvanced')}
                   </Button>
 
@@ -2688,7 +2689,7 @@ export function LiveMonitorWorkspace({
                   <p className="text-xs text-fg-muted">{t('live.liveControlsHiddenDescription')}</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={showControls} className="gap-2">
-                  <PanelLeftOpen className="h-4 w-4" />
+                  <PanelLeftOpen className="rtl-mirror h-4 w-4" />
                   {t('live.showControls')}
                 </Button>
               </div>
@@ -2712,8 +2713,8 @@ export function LiveMonitorWorkspace({
             <CardContent className={cn(embedded && 'p-0')}>
               {(baselineError || monitoringError) && (
                 <div className="mb-4 space-y-1 rounded-lg border border-warning-border bg-warning-bg p-3 text-sm text-warning-text ">
-                  {baselineError && <p>{baselineError}</p>}
-                  {monitoringError && <p>{monitoringError}</p>}
+                  {baselineError && <p>{localizeDataError(baselineError, t)}</p>}
+                  {monitoringError && <p>{localizeDataError(monitoringError, t)}</p>}
                 </div>
               )}
 
@@ -2834,7 +2835,7 @@ export function LiveMonitorWorkspace({
                         setAnomalyResult(null);
                       }}
                     >
-                      <MousePointerClick className="mr-2 h-4 w-4" aria-hidden="true" />
+                      <MousePointerClick className="me-2 h-4 w-4" aria-hidden="true" />
                       {manualSelectionEnabled
                         ? t('live.finishDrawingHealthyRegions')
                         : t('live.drawHealthyRegions')}
@@ -2932,13 +2933,13 @@ export function LiveMonitorWorkspace({
             <Button asChild>
               <Link href="/dashboard/monitor?view=deterioration">
                 {t('live.openHealthInsights')}
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="rtl-mirror ms-2 h-4 w-4" />
               </Link>
             </Button>
             <Button variant="outline" asChild>
               <Link href="/dashboard/data">{t('live.uploadMoreData')}</Link>
             </Button>
-            <div className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="ms-auto flex items-center gap-2 text-sm text-muted-foreground">
               <Clock className="h-4 w-4" />
               {autoRefresh
                 ? t('live.autoRefreshSeconds', {

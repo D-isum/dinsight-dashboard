@@ -194,7 +194,7 @@ function RegisterPageInner() {
   return (
     <div className="min-h-screen flex">
       {/* Left side — what happens next */}
-      <div className="hidden lg:flex lg:flex-1 bg-surface-muted border-r border-border">
+      <div className="hidden lg:flex lg:flex-1 bg-surface-muted border-e border-border">
         <div className="flex-1 flex items-center justify-center p-12">
           <div className="max-w-md text-fg">
             <h2 className="text-2xl font-semibold mb-2">{t('auth.setupAccountTitle')}</h2>
@@ -317,7 +317,7 @@ function RegisterPageInner() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     className={cn(
-                      'block w-full px-3 py-2 pr-10 border rounded-lg shadow-sm',
+                      'block w-full px-3 py-2 pe-10 border rounded-lg shadow-sm',
                       'focus:outline-none focus:ring-2 focus:ring-focus focus:border-control-border-focus',
                       'transition-colors duration-200',
                       errors.password ? 'border-danger-border text-danger-text ' : 'border-strong'
@@ -326,7 +326,7 @@ function RegisterPageInner() {
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 end-0 pe-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
@@ -386,7 +386,7 @@ function RegisterPageInner() {
                 type="checkbox"
                 className="h-4 w-4 text-accent focus:ring-focus border-strong rounded mt-0.5"
               />
-              <label htmlFor="agree-terms" className="ml-2 block text-sm text-fg">
+              <label htmlFor="agree-terms" className="ms-2 block text-sm text-fg">
                 {t('auth.agreeTo')}{' '}
                 <Link href="/terms" className="text-accent hover:text-accent">
                   {t('auth.termsOfService')}
@@ -415,7 +415,7 @@ function RegisterPageInner() {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    <Loader2 className="animate-spin h-5 w-5 me-2" />
                     {t('auth.creatingAccount')}
                   </>
                 ) : (

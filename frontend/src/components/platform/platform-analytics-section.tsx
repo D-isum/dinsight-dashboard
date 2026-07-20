@@ -113,7 +113,7 @@ export function PlatformAnalyticsSection() {
                   <TableCell className="font-medium">
                     {row.org_name}
                     {isDefault && (
-                      <Badge variant="outline" className="ml-2">
+                      <Badge variant="outline" className="ms-2">
                         {t('admin.platform')}
                       </Badge>
                     )}

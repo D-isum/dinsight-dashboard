@@ -344,7 +344,7 @@ function AccountSecurityView() {
       <Tabs value={section} onValueChange={handleSectionChange} className="space-y-4">
         <TabsList
           aria-label={t('settings.title')}
-          className="grid h-auto w-full items-stretch justify-stretch gap-3 bg-transparent p-0 text-left md:grid-cols-2 xl:grid-cols-4"
+          className="grid h-auto w-full items-stretch justify-stretch gap-3 bg-transparent p-0 text-start md:grid-cols-2 xl:grid-cols-4"
         >
           {sectionGroups.map((group) => (
             <div
@@ -406,14 +406,14 @@ function AccountSecurityView() {
                   {authProvider === 'oidc' ? (
                     <>
                       {t('settings.singleSignOn')}{' '}
-                      <Badge variant="secondary" className="ml-1">
+                      <Badge variant="secondary" className="ms-1">
                         OIDC
                       </Badge>
                     </>
                   ) : (
                     <>
                       {t('settings.password')}{' '}
-                      <Badge variant="outline" className="ml-1">
+                      <Badge variant="outline" className="ms-1">
                         {t('settings.local')}
                       </Badge>
                     </>
@@ -423,7 +423,7 @@ function AccountSecurityView() {
               <Button onClick={() => void saveProfile()} disabled={isSavingProfile}>
                 {isSavingProfile ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
                     {t('settings.saving')}
                   </>
                 ) : (
@@ -487,7 +487,7 @@ function AccountSecurityView() {
                   <Button onClick={() => void changePassword()} disabled={isChangingPassword}>
                     {isChangingPassword ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        <Loader2 className="me-2 h-4 w-4 animate-spin" />
                         {t('settings.updatingPassword')}
                       </>
                     ) : (

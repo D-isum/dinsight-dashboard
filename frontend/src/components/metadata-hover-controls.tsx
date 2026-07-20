@@ -126,7 +126,7 @@ export function MetadataHoverControls({
                         : 'text-fg'
                     )}
                   >
-                    <span className="truncate pr-3">{key}</span>
+                    <span className="truncate pe-3">{key}</span>
                     <input
                       type="checkbox"
                       className="rounded border-strong"

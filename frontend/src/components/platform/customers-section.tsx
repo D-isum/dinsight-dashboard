@@ -294,7 +294,7 @@ function CustomersTable() {
                   <TableCell className="font-medium">
                     {c.name}
                     {isDefault && (
-                      <Badge variant="outline" className="ml-2 gap-1">
+                      <Badge variant="outline" className="ms-2 gap-1">
                         <ShieldAlert className="h-3 w-3" /> {t('admin.platform')}
                       </Badge>
                     )}
@@ -304,7 +304,7 @@ function CustomersTable() {
                   </TableCell>
                   <TableCell>
                     <span className="font-medium">{formatNumber(c.total_members)}</span>
-                    <span className="text-xs text-muted-foreground ml-1">
+                    <span className="text-xs text-muted-foreground ms-1">
                       ({formatNumber(c.admin_count)}a/{formatNumber(c.operator_count)}o/
                       {formatNumber(c.viewer_count)}v)
                     </span>
@@ -316,7 +316,7 @@ function CustomersTable() {
                   <TableCell className="text-xs text-muted-foreground">
                     {formatLocaleDate(c.created_at, { dateStyle: 'medium', timeStyle: 'short' })}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     <Button
                       variant="ghost"
                       size="sm"

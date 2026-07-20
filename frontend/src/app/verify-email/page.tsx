@@ -242,7 +242,7 @@ function VerifyEmailContent() {
             href="/login"
             className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="rtl-mirror h-4 w-4" />
             {t('auth.backToSignIn')}
           </Link>
         </div>

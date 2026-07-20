@@ -1941,7 +1941,7 @@ export function HealthInsightsWorkspace({
               controlsPresentation === 'inline' &&
                 'lg:sticky lg:top-6 lg:max-h-[calc(100vh-6rem)] lg:overflow-hidden',
               controlsPresentation === 'drawer' &&
-                'fixed bottom-0 right-0 top-16 z-50 w-[min(30rem,100vw)] overflow-hidden rounded-none border-y-0 border-r-0 shadow-2xl'
+                'fixed bottom-0 end-0 top-16 z-50 w-[min(30rem,100vw)] overflow-hidden rounded-none border-y-0 border-e-0 shadow-2xl'
             )}
             role={controlsPresentation === 'drawer' ? 'dialog' : undefined}
             aria-modal={controlsPresentation === 'drawer' ? true : undefined}
@@ -1976,7 +1976,7 @@ export function HealthInsightsWorkspace({
                     <X className="h-4 w-4" />
                   ) : (
                     <>
-                      <PanelLeftClose className="h-4 w-4" />
+                      <PanelLeftClose className="rtl-mirror h-4 w-4" />
                       {t('live.hideControls')}
                     </>
                   )}
@@ -2108,11 +2108,11 @@ export function HealthInsightsWorkspace({
                     </p>
 
                     <div className="relative">
-                      <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Search className="pointer-events-none absolute start-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                       <Input
                         value={clusterFilterText}
                         onChange={(event) => setClusterFilterText(event.target.value)}
-                        className="pl-8"
+                        className="ps-8"
                         placeholder={t('insights.filterBaselineIntervals')}
                       />
                     </div>
@@ -2403,7 +2403,7 @@ export function HealthInsightsWorkspace({
                     <Button onClick={applyWearTrendSelection} disabled={!canRunWearTrend}>
                       {isFetchingWearTrend ? (
                         <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          <Loader2 className="me-2 h-4 w-4 animate-spin" />
                           {t('insights.runningWearTrend')}
                         </>
                       ) : (
@@ -2415,7 +2415,7 @@ export function HealthInsightsWorkspace({
                       onClick={resetToLastAppliedSelection}
                       disabled={!hasAppliedWearTrendRun || !hasPendingChanges}
                     >
-                      <RotateCcw className="mr-2 h-4 w-4" />
+                      <RotateCcw className="me-2 h-4 w-4" />
                       {t('insights.revertLastRun')}
                     </Button>
                     <Button variant="outline" onClick={resetCurrentConfiguration}>
@@ -2438,7 +2438,7 @@ export function HealthInsightsWorkspace({
                   <p className="text-xs text-fg-muted">{t('insights.controlsHiddenDescription')}</p>
                 </div>
                 <Button variant="outline" size="sm" onClick={showControls} className="gap-2">
-                  <PanelLeftOpen className="h-4 w-4" />
+                  <PanelLeftOpen className="rtl-mirror h-4 w-4" />
                   {t('insights.showControls')}
                 </Button>
               </div>
@@ -2580,7 +2580,7 @@ export function HealthInsightsWorkspace({
                         <div className="rounded-lg border border-input bg-muted/30 p-3 text-sm text-muted-foreground">
                           <button
                             type="button"
-                            className="flex w-full items-center justify-between text-left"
+                            className="flex w-full items-center justify-between text-start"
                             onClick={() => setShowDistanceGuide((prev) => !prev)}
                           >
                             <span className="font-medium text-foreground">
@@ -2762,7 +2762,7 @@ export function HealthInsightsWorkspace({
                                 )
                               }
                             >
-                              <Download className="mr-2 h-4 w-4" />
+                              <Download className="me-2 h-4 w-4" />
                               {t('insights.exportIntervalCsv')}
                             </Button>
                           </div>
@@ -2789,14 +2789,14 @@ export function HealthInsightsWorkspace({
                               <div className="overflow-x-auto">
                                 <table className="min-w-full table-auto text-sm">
                                   <thead>
-                                    <tr className="text-left">
-                                      <th className="pb-2 pr-4">{t('insights.interval')}</th>
-                                      <th className="pb-2 pr-4">{t('data.type')}</th>
-                                      <th className="pb-2 pr-4">{t('common.points')}</th>
-                                      <th className="pb-2 pr-4">
+                                    <tr className="text-start">
+                                      <th className="pb-2 pe-4">{t('insights.interval')}</th>
+                                      <th className="pb-2 pe-4">{t('data.type')}</th>
+                                      <th className="pb-2 pe-4">{t('common.points')}</th>
+                                      <th className="pb-2 pe-4">
                                         {t('insights.distanceFromBaseline')}
                                       </th>
-                                      <th className="pb-2 pr-4">
+                                      <th className="pb-2 pe-4">
                                         {t('insights.inBaselineCluster')}
                                       </th>
                                     </tr>
@@ -2807,15 +2807,15 @@ export function HealthInsightsWorkspace({
                                         key={`${row.metadata_value}-${row.sort_index}-${index}`}
                                         className="border-t border-border/50"
                                       >
-                                        <td className="py-2 pr-4">{row.metadata_value}</td>
-                                        <td className="py-2 pr-4">{row.dataset_type}</td>
-                                        <td className="py-2 pr-4">
+                                        <td className="py-2 pe-4">{row.metadata_value}</td>
+                                        <td className="py-2 pe-4">{row.dataset_type}</td>
+                                        <td className="py-2 pe-4">
                                           {formatNumber(row.point_count)}
                                         </td>
-                                        <td className="py-2 pr-4">
+                                        <td className="py-2 pe-4">
                                           {row.distance_from_g0.toFixed(4)}
                                         </td>
-                                        <td className="py-2 pr-4">
+                                        <td className="py-2 pe-4">
                                           {row.is_baseline_cluster
                                             ? t('common.yes')
                                             : t('common.no')}
@@ -2866,7 +2866,7 @@ export function HealthInsightsWorkspace({
                         <div className="rounded-lg border border-input bg-muted/30 p-3 text-sm text-muted-foreground">
                           <button
                             type="button"
-                            className="flex w-full items-center justify-between text-left"
+                            className="flex w-full items-center justify-between text-start"
                             onClick={() => setShowTransitionGuide((prev) => !prev)}
                           >
                             <span className="font-medium text-foreground">
@@ -2970,7 +2970,7 @@ export function HealthInsightsWorkspace({
                                 )
                               }
                             >
-                              <Download className="mr-2 h-4 w-4" />
+                              <Download className="me-2 h-4 w-4" />
                               {t('insights.exportTransitionCsv')}
                             </Button>
                           </div>
@@ -2997,12 +2997,12 @@ export function HealthInsightsWorkspace({
                               <div className="overflow-x-auto">
                                 <table className="min-w-full table-auto text-sm">
                                   <thead>
-                                    <tr className="text-left">
-                                      <th className="pb-2 pr-4">{t('insights.from')}</th>
-                                      <th className="pb-2 pr-4">{t('insights.to')}</th>
-                                      <th className="pb-2 pr-4">{t('insights.fromType')}</th>
-                                      <th className="pb-2 pr-4">{t('insights.toType')}</th>
-                                      <th className="pb-2 pr-4">{t('insights.distance')}</th>
+                                    <tr className="text-start">
+                                      <th className="pb-2 pe-4">{t('insights.from')}</th>
+                                      <th className="pb-2 pe-4">{t('insights.to')}</th>
+                                      <th className="pb-2 pe-4">{t('insights.fromType')}</th>
+                                      <th className="pb-2 pe-4">{t('insights.toType')}</th>
+                                      <th className="pb-2 pe-4">{t('insights.distance')}</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -3011,11 +3011,11 @@ export function HealthInsightsWorkspace({
                                         key={`${row.from_label}-${row.to_label}-${index}`}
                                         className="border-t border-border/50"
                                       >
-                                        <td className="py-2 pr-4">{row.from_label}</td>
-                                        <td className="py-2 pr-4">{row.to_label}</td>
-                                        <td className="py-2 pr-4">{row.from_dataset_type}</td>
-                                        <td className="py-2 pr-4">{row.to_dataset_type}</td>
-                                        <td className="py-2 pr-4">{row.distance.toFixed(4)}</td>
+                                        <td className="py-2 pe-4">{row.from_label}</td>
+                                        <td className="py-2 pe-4">{row.to_label}</td>
+                                        <td className="py-2 pe-4">{row.from_dataset_type}</td>
+                                        <td className="py-2 pe-4">{row.to_dataset_type}</td>
+                                        <td className="py-2 pe-4">{row.distance.toFixed(4)}</td>
                                       </tr>
                                     ))}
                                   </tbody>
@@ -3076,7 +3076,7 @@ export function HealthInsightsWorkspace({
             <Button asChild>
               <Link href="/dashboard/monitor?view=map">
                 {t('nav.openLiveMonitor')}
-                <ArrowRight className="ml-2 h-4 w-4" />
+                <ArrowRight className="rtl-mirror ms-2 h-4 w-4" />
               </Link>
             </Button>
             <Button variant="outline" asChild>

@@ -91,7 +91,7 @@ describe('Table', () => {
     expect(screen.getByText('Asset').getAttribute('aria-sort')).toBeNull();
   });
 
-  it('applies tabular-nums on right-aligned cells', () => {
+  it('applies tabular-nums on end-aligned cells', () => {
     const { container } = render(
       <Table>
         <TableBody>
@@ -104,7 +104,7 @@ describe('Table', () => {
     );
     const cells = container.querySelectorAll('td');
     expect(cells[0].className).toContain('tabular-nums');
-    expect(cells[0].className).toContain('text-right');
+    expect(cells[0].className).toContain('text-end');
     expect(cells[1].className).toContain('font-mono');
   });
 

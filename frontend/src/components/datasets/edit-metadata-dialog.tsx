@@ -174,12 +174,12 @@ export function EditMetadataDialog({ open, onOpenChange, meta, onSaved }: EditMe
           <AlertDialogAction disabled={mutation.isPending} onClick={submit}>
             {mutation.isPending ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                 {t('settings.saving')}
               </>
             ) : (
               <>
-                <Save className="mr-2 h-4 w-4" />
+                <Save className="me-2 h-4 w-4" />
                 {t('data.saveChanges')}
               </>
             )}

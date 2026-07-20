@@ -150,12 +150,12 @@ export function ValidationRulesPanel({ datasetId }: ValidationRulesPanelProps) {
             >
               {runMutation.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   {t('settings.running')}
                 </>
               ) : (
                 <>
-                  <Play className="mr-2 h-4 w-4" />
+                  <Play className="me-2 h-4 w-4" />
                   {selectedRuleIds.size > 0
                     ? t('settings.runSelectedRules', { count: selectedRuleIds.size })
                     : t('settings.runAllActive')}
@@ -165,7 +165,7 @@ export function ValidationRulesPanel({ datasetId }: ValidationRulesPanelProps) {
           )}
           {canCreate && (
             <Button size="sm" variant="ghost" onClick={() => setCreating(true)}>
-              <Plus className="mr-1 h-4 w-4" />
+              <Plus className="me-1 h-4 w-4" />
               {t('settings.newRule')}
             </Button>
           )}
@@ -604,12 +604,12 @@ function CreateRuleDialog({ onClose, onCreated }: CreateRuleDialogProps) {
           <AlertDialogAction disabled={mutation.isPending} onClick={submit}>
             {mutation.isPending ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                 {t('settings.creating')}
               </>
             ) : (
               <>
-                <ShieldCheck className="mr-2 h-4 w-4" />
+                <ShieldCheck className="me-2 h-4 w-4" />
                 {t('settings.createRule')}
               </>
             )}

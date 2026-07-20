@@ -75,12 +75,12 @@ function LicenseLockout({ issue }: { issue: LicenseIssue }) {
         <div className="mt-5 flex flex-wrap gap-2">
           <Button asChild>
             <Link href="/dashboard/account?section=license">
-              <ScrollText className="mr-2 h-4 w-4" aria-hidden="true" />
+              <ScrollText className="me-2 h-4 w-4" aria-hidden="true" />
               {t('license.viewDetails')}
             </Link>
           </Button>
           <Button variant="outline" onClick={() => window.location.reload()}>
-            <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
+            <RefreshCw className="me-2 h-4 w-4" aria-hidden="true" />
             {t('common.retry')}
           </Button>
         </div>

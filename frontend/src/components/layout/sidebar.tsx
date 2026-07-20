@@ -2,7 +2,15 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { ChevronRight, PanelLeftClose, PanelLeftOpen, Sparkles, X } from 'lucide-react';
+import {
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useAuth } from '@/context/auth-context';
 import { Button } from '@/components/ui/button';
 import { OrgSwitcher } from '@/components/layout/org-switcher';
@@ -27,7 +35,8 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const { user, currentOrgRole } = useAuth();
-  const { t } = useI18n();
+  const { t, direction } = useI18n();
+  const isRtl = direction === 'rtl';
 
   const isActiveLink = (href: string) => {
     if (href === '/dashboard') {
@@ -79,10 +88,10 @@ export function Sidebar({
       {/* Sidebar */}
       <div
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-72 transform transition-[width,transform] duration-300 ease-in-out xl:relative xl:translate-x-0',
-          'bg-canvas border-r border-border',
+          'fixed inset-y-0 z-50 w-72 transform bg-canvas transition-[width,transform] duration-300 ease-in-out xl:relative xl:translate-x-0',
+          isRtl ? 'right-0 border-l border-border' : 'left-0 border-r border-border',
           isCollapsed && 'xl:w-20',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          isOpen ? 'translate-x-0' : isRtl ? 'translate-x-full' : '-translate-x-full'
         )}
       >
         <div className="flex h-full flex-col">
@@ -95,7 +104,7 @@ export function Sidebar({
           >
             <Link
               href="/dashboard"
-              className={cn('group flex items-center space-x-3', isCollapsed && 'xl:space-x-0')}
+              className={cn('group flex items-center gap-3', isCollapsed && 'xl:gap-0')}
               onClick={onClose}
             >
               <div className="relative">
@@ -129,7 +138,13 @@ export function Sidebar({
               title={isCollapsed ? t('header.expandSidebar') : t('header.collapseSidebar')}
             >
               {isCollapsed ? (
-                <PanelLeftOpen className="h-5 w-5" />
+                isRtl ? (
+                  <PanelRightOpen className="h-5 w-5" />
+                ) : (
+                  <PanelLeftOpen className="h-5 w-5" />
+                )
+              ) : isRtl ? (
+                <PanelRightClose className="h-5 w-5" />
               ) : (
                 <PanelLeftClose className="h-5 w-5" />
               )}
@@ -174,15 +189,24 @@ export function Sidebar({
                       'group flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                       isCollapsed && 'xl:justify-center xl:px-2',
                       isActive
-                        ? 'bg-surface-selected dark:bg-surface-selected text-accent dark:text-accent border-l-4 border-strong'
-                        : 'text-fg hover:bg-surface-hover/50 hover:text-fg border-l-4 border-transparent'
+                        ? cn(
+                            'bg-surface-selected text-accent dark:bg-surface-selected dark:text-accent',
+                            isRtl ? 'border-r-4 border-strong' : 'border-l-4 border-strong'
+                          )
+                        : cn(
+                            'text-fg hover:bg-surface-hover/50 hover:text-fg',
+                            isRtl
+                              ? 'border-r-4 border-transparent'
+                              : 'border-l-4 border-transparent'
+                          )
                     )}
                     title={description}
                   >
                     <div
                       className={cn(
-                        'mr-3 rounded-lg p-1.5 transition-colors',
-                        isCollapsed && 'xl:mr-0',
+                        'rounded-lg p-1.5 transition-colors',
+                        isRtl ? 'ml-3' : 'mr-3',
+                        isCollapsed && (isRtl ? 'xl:ml-0' : 'xl:mr-0'),
                         isActive
                           ? 'bg-surface-selected dark:bg-surface-selected text-accent'
                           : 'bg-surface-muted text-fg-muted group-hover:bg-surface-hover'
@@ -192,13 +216,22 @@ export function Sidebar({
                     </div>
                     <span className={cn('flex-1', isCollapsed && 'xl:sr-only')}>{label}</span>
                     {item.badge && (
-                      <span className="ml-2 inline-flex items-center justify-center px-2 py-0.5 text-xs font-bold rounded-full bg-danger text-accent-contrast">
+                      <span
+                        className={cn(
+                          'inline-flex items-center justify-center rounded-full bg-danger px-2 py-0.5 text-xs font-bold text-accent-contrast',
+                          isRtl ? 'mr-2' : 'ml-2'
+                        )}
+                      >
                         {item.badge}
                       </span>
                     )}
                     {isActive && (
                       <ChevronRight
-                        className={cn('h-4 w-4 text-accent', isCollapsed && 'xl:hidden')}
+                        className={cn(
+                          'h-4 w-4 text-accent',
+                          isRtl && 'rotate-180',
+                          isCollapsed && 'xl:hidden'
+                        )}
                       />
                     )}
                   </Link>
@@ -217,7 +250,9 @@ export function Sidebar({
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-fg-muted">{t('common.apiStatus')}</span>
                     <span className="flex items-center text-xs">
-                      <span className="h-2 w-2 bg-success rounded-full mr-1"></span>
+                      <span
+                        className={cn('h-2 w-2 rounded-full bg-success', isRtl ? 'ml-1' : 'mr-1')}
+                      ></span>
                       <span className="text-success-text font-medium">{t('common.online')}</span>
                     </span>
                   </div>
@@ -247,12 +282,20 @@ export function Sidebar({
                     className={cn(
                       'group flex w-full items-center rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
                       isActive
-                        ? 'bg-surface-selected dark:bg-surface-selected text-accent dark:text-accent border-l-4 border-strong'
-                        : 'text-fg hover:bg-surface-hover/50 border-l-4 border-transparent'
+                        ? cn(
+                            'bg-surface-selected text-accent dark:bg-surface-selected dark:text-accent',
+                            isRtl ? 'border-r-4 border-strong' : 'border-l-4 border-strong'
+                          )
+                        : cn(
+                            'text-fg hover:bg-surface-hover/50',
+                            isRtl
+                              ? 'border-r-4 border-transparent'
+                              : 'border-l-4 border-transparent'
+                          )
                     )}
                     title={description}
                   >
-                    <Icon className="mr-3 h-4 w-4" />
+                    <Icon className={cn('h-4 w-4', isRtl ? 'ml-3' : 'mr-3')} />
                     {label}
                   </Link>
                 );
@@ -263,8 +306,8 @@ export function Sidebar({
             <div className={cn('rounded-lg bg-surface-muted/50 p-3', isCollapsed && 'xl:p-2')}>
               <div
                 className={cn(
-                  'flex items-center space-x-3',
-                  isCollapsed && 'xl:justify-center xl:space-x-0'
+                  'flex items-center gap-3',
+                  isCollapsed && 'xl:justify-center xl:gap-0'
                 )}
               >
                 <div className="relative">
@@ -276,7 +319,12 @@ export function Sidebar({
                         .join('') || 'U'}
                     </span>
                   </div>
-                  <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-success border-2 border-white dark:border-canvas rounded-full" />
+                  <div
+                    className={cn(
+                      'absolute -bottom-1 h-3 w-3 rounded-full border-2 border-white bg-success dark:border-canvas',
+                      isRtl ? '-left-1' : '-right-1'
+                    )}
+                  />
                 </div>
                 <div className={cn('min-w-0 flex-1', isCollapsed && 'xl:sr-only')}>
                   <p className="text-sm font-medium text-fg truncate">

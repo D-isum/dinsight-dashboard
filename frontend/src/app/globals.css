@@ -200,6 +200,36 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  .ltr-isolate {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  [dir='rtl'] .rtl-mirror {
+    transform: scaleX(-1);
+  }
+}
+
+/* Keep machine identifiers, timestamps, coordinates, and code-like values stable in RTL pages. */
+html[dir='rtl'] :where(.font-mono, code, pre, kbd, [data-ltr]) {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[dir='rtl']
+  :where(
+    input[type='email'],
+    input[type='password'],
+    input[type='url'],
+    input[type='tel'],
+    input[type='number'],
+    input[type='date'],
+    input[type='time'],
+    input[type='datetime-local']
+  ) {
+  direction: ltr;
+  text-align: left;
 }
 
 /* Scrollbar chrome — uses semantic tokens so it tracks both themes */

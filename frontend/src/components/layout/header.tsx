@@ -40,7 +40,8 @@ interface HeaderProps {
 
 export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderProps) {
   const { user, logout } = useAuth();
-  const { t } = useI18n();
+  const { t, direction } = useI18n();
+  const isRtl = direction === 'rtl';
   const isPlatformAdmin = usePlatformAdmin();
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const {
@@ -61,7 +62,10 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
         <Button
           variant="ghost"
           size="icon"
-          className="mr-2 xl:hidden hover:bg-surface-hover rounded-lg transition-colors"
+          className={cn(
+            'rounded-lg transition-colors hover:bg-surface-hover xl:hidden',
+            isRtl ? 'ml-2' : 'mr-2'
+          )}
           onClick={onMenuClick}
         >
           <Menu className="h-5 w-5" />
@@ -83,7 +87,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             type="button"
             onClick={() => setIsCommandOpen(true)}
             className={cn(
-              'flex w-full items-center gap-3 rounded-lg border border-border bg-surface-muted px-3 py-2.5 text-left text-sm transition-colors duration-150',
+              'flex w-full items-center gap-3 rounded-lg border border-border bg-surface-muted px-3 py-2.5 text-start text-sm transition-colors duration-150',
               'text-fg-muted hover:border-control-border-focus hover:bg-surface-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-1 focus-visible:ring-offset-canvas'
             )}
           >
@@ -149,7 +153,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
         <div className="flex-1" />
 
         {/* Right side actions */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           {/* Mobile search button */}
           <Button
             variant="ghost"
@@ -175,7 +179,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                 variant="ghost"
                 className="h-10 px-2 sm:px-3 hover:bg-surface-hover rounded-lg transition-colors"
               >
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-2">
                   <div className="relative">
                     <div className="h-8 w-8 rounded-lg bg-surface-muted flex items-center justify-center shadow-sm">
                       <span className="text-sm font-semibold text-fg">
@@ -185,9 +189,14 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                           .join('') || 'U'}
                       </span>
                     </div>
-                    <div className="absolute -bottom-1 -right-1 h-3 w-3 bg-success border-2 border-white dark:border-canvas rounded-full" />
+                    <div
+                      className={cn(
+                        'absolute -bottom-1 h-3 w-3 rounded-full border-2 border-white bg-success dark:border-canvas',
+                        isRtl ? '-left-1' : '-right-1'
+                      )}
+                    />
                   </div>
-                  <div className="hidden flex-col text-left 2xl:flex">
+                  <div className="hidden flex-col text-start 2xl:flex">
                     <span className="text-sm font-medium text-fg">
                       {user?.full_name || t('common.user')}
                     </span>
@@ -199,7 +208,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="right" className="w-56 rounded-lg">
+            <DropdownMenuContent align={isRtl ? 'left' : 'right'} className="w-56 rounded-lg">
               <div className="px-3 py-2 border-b dark:border-border">
                 <p className="text-sm font-medium text-fg">{user?.full_name}</p>
                 <p className="text-xs text-fg-muted truncate">{user?.email}</p>
@@ -207,13 +216,13 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
               <div className="py-2">
                 <Link href="/dashboard/account">
                   <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
-                    <User className="mr-2 h-4 w-4" />
+                    <User className={cn('h-4 w-4', isRtl ? 'ml-2' : 'mr-2')} />
                     <span>{t('common.account')}</span>
                   </DropdownMenuItem>
                 </Link>
                 <Link href="/dashboard/account?section=security">
                   <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
-                    <Settings className="mr-2 h-4 w-4" />
+                    <Settings className={cn('h-4 w-4', isRtl ? 'ml-2' : 'mr-2')} />
                     <span>{t('common.security')}</span>
                   </DropdownMenuItem>
                 </Link>
@@ -222,9 +231,19 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                 <div className="border-t dark:border-border py-2">
                   <Link href="/dashboard/admin">
                     <DropdownMenuItem className="px-3 py-2 hover:bg-surface-hover/50 transition-colors cursor-pointer">
-                      <ShieldAlert className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-400" />
+                      <ShieldAlert
+                        className={cn(
+                          'h-4 w-4 text-amber-600 dark:text-amber-400',
+                          isRtl ? 'ml-2' : 'mr-2'
+                        )}
+                      />
                       <span>{t('header.admin')}</span>
-                      <span className="ml-auto text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                      <span
+                        className={cn(
+                          'text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400',
+                          isRtl ? 'mr-auto' : 'ml-auto'
+                        )}
+                      >
                         {t('header.staff')}
                       </span>
                     </DropdownMenuItem>
@@ -236,7 +255,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                   onClick={logout}
                   className="px-3 py-2 text-danger-text hover:bg-danger-bg transition-colors"
                 >
-                  <LogOut className="mr-2 h-4 w-4" />
+                  <LogOut className={cn('h-4 w-4', isRtl ? 'ml-2' : 'mr-2')} />
                   <span>{t('header.signOut')}</span>
                 </DropdownMenuItem>
               </div>

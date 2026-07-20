@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
                     type="email"
                     autoComplete="email"
                     className={cn(
-                      'block w-full px-3 py-2 pl-10 border rounded-lg shadow-sm bg-surface text-fg',
+                      'block w-full px-3 py-2 ps-10 border rounded-lg shadow-sm bg-surface text-fg',
                       'focus:outline-none focus:ring-2 focus:ring-focus focus:border-control-border-focus',
                       'transition-colors duration-200',
                       errors.email ? 'border-danger-border text-danger-text' : 'border-strong'
@@ -106,7 +106,7 @@ export default function ForgotPasswordPage() {
                     placeholder="you@example.com"
                   />
                   <Mail
-                    className="absolute left-3 top-2.5 h-5 w-5 text-fg-subtle"
+                    className="absolute start-3 top-2.5 h-5 w-5 text-fg-subtle"
                     aria-hidden="true"
                   />
                 </div>
@@ -143,7 +143,7 @@ export default function ForgotPasswordPage() {
             href="/login"
             className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="rtl-mirror h-4 w-4" />
             {t('auth.backToSignIn')}
           </Link>
         </div>

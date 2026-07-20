@@ -47,7 +47,7 @@ interface DatasetMetadataItem {
 export interface CompatibilityCheckDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Optional initial dataset to lock the left-hand side. Lets the catalog drawer pre-fill. */
+  /** Optional initial dataset to lock the start-hand side. Lets the catalog drawer pre-fill. */
   initialDatasetId?: number;
 }
 
@@ -194,7 +194,7 @@ export function CompatibilityCheckDialog({
           >
             {checkMutation.isPending ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                 {t('data.checkingCompatibility')}
               </>
             ) : checkMutation.data ? (
@@ -296,7 +296,7 @@ function ResultPanel({ result }: { result: CompatibilityResult }) {
                 <div className="flex-1">
                   <span className="font-medium text-fg">{check.check_name}</span>
                   {check.score !== undefined && (
-                    <span className="ml-2 text-xs text-fg-muted">({check.score.toFixed(0)}%)</span>
+                    <span className="ms-2 text-xs text-fg-muted">({check.score.toFixed(0)}%)</span>
                   )}
                   {check.details && (
                     <span className="block text-xs text-fg-muted">{check.details}</span>

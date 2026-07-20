@@ -6,7 +6,7 @@ import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
 export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
-  const { locale, setLocale, t } = useI18n();
+  const { locale, direction, setLocale, t } = useI18n();
 
   return (
     <label
@@ -20,6 +20,7 @@ export function LanguageSwitcher({ compact = false }: { compact?: boolean }) {
       <span className="sr-only">{t('common.language')}</span>
       <select
         value={locale}
+        dir={direction}
         onChange={(event) => setLocale(event.target.value as Locale)}
         className="h-full bg-transparent text-xs outline-none"
         aria-label={t('common.language')}

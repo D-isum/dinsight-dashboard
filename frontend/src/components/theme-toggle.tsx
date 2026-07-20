@@ -50,17 +50,17 @@ export function ThemeToggle() {
         <DropdownMenuItem onClick={() => setTheme('light')} className="flex items-center gap-2">
           <Sun className="h-4 w-4" />
           <span>{t('theme.light')}</span>
-          {theme === 'light' && <span className="ml-auto text-accent">✓</span>}
+          {theme === 'light' && <span className="ms-auto text-accent">✓</span>}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme('dark')} className="flex items-center gap-2">
           <Moon className="h-4 w-4" />
           <span>{t('theme.dark')}</span>
-          {theme === 'dark' && <span className="ml-auto text-accent">✓</span>}
+          {theme === 'dark' && <span className="ms-auto text-accent">✓</span>}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme('system')} className="flex items-center gap-2">
           <Monitor className="h-4 w-4" />
           <span>{t('theme.system')}</span>
-          {theme === 'system' && <span className="ml-auto text-accent">✓</span>}
+          {theme === 'system' && <span className="ms-auto text-accent">✓</span>}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

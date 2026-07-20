@@ -106,7 +106,7 @@ function LoginForm() {
 
   return (
     <div className="relative min-h-screen flex">
-      <div className="absolute right-4 top-4 z-10">
+      <div className="absolute end-4 top-4 z-10">
         <LanguageSwitcher />
       </div>
 
@@ -175,7 +175,7 @@ function LoginForm() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="current-password"
                     className={cn(
-                      'block w-full px-3 py-2 pr-10 border rounded-lg shadow-sm bg-surface text-fg',
+                      'block w-full px-3 py-2 pe-10 border rounded-lg shadow-sm bg-surface text-fg',
                       'focus:outline-none focus:ring-2 focus:ring-focus focus:border-control-border-focus',
                       'transition-colors duration-200',
                       errors.password ? 'border-danger-border text-danger-text ' : 'border-strong'
@@ -184,7 +184,7 @@ function LoginForm() {
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 end-0 pe-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     {showPassword ? (
@@ -209,7 +209,7 @@ function LoginForm() {
                   type="checkbox"
                   className="h-4 w-4 text-accent focus:ring-focus border-strong rounded"
                 />
-                <label htmlFor="remember-me" className="ml-2 block text-sm text-fg">
+                <label htmlFor="remember-me" className="ms-2 block text-sm text-fg">
                   {t('auth.rememberMe')}
                 </label>
               </div>
@@ -236,7 +236,7 @@ function LoginForm() {
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="animate-spin h-5 w-5 mr-2" />
+                    <Loader2 className="animate-spin h-5 w-5 me-2" />
                     {t('auth.signingIn')}
                   </>
                 ) : (
@@ -269,7 +269,7 @@ function LoginForm() {
                     'transition-colors duration-150'
                   )}
                 >
-                  <KeyRound className="h-4 w-4 mr-2 text-fg-muted" aria-hidden="true" />
+                  <KeyRound className="h-4 w-4 me-2 text-fg-muted" aria-hidden="true" />
                   {t('auth.continueWith', { label: ssoLabel })}
                 </a>
               </div>
@@ -289,7 +289,7 @@ function LoginForm() {
       </div>
 
       {/* Right side — operator-tone capability summary, not marketing copy */}
-      <div className="hidden lg:flex lg:flex-1 bg-surface-muted border-l border-border">
+      <div className="hidden lg:flex lg:flex-1 bg-surface-muted border-s border-border">
         <div className="flex-1 flex items-center justify-center p-12">
           <div className="max-w-md text-fg">
             <h2 className="text-2xl font-semibold mb-2">{t('auth.continueMonitoringTitle')}</h2>

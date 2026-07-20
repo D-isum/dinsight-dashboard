@@ -66,6 +66,7 @@ import {
 } from '@/context/dashboard-workspace-context';
 import { cn } from '@/utils/cn';
 import { useI18n } from '@/i18n/client';
+import { localizeDataError } from '@/i18n/data-errors';
 
 // Catalog browses the dataset metadata + lineage + validation that
 // upload + processing pipelines record server-side.
@@ -417,13 +418,13 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       setRegisterOpen(true);
                     }}
                   >
-                    <Plus className="mr-2 h-4 w-4" />
+                    <Plus className="me-2 h-4 w-4" />
                     {t('data.registerMetadata')}
                   </Button>
                 )}
                 <Button variant="outline" asChild>
                   <Link href="/dashboard/data">
-                    <ArrowLeft className="mr-2 h-4 w-4" />
+                    <ArrowLeft className="rtl-mirror me-2 h-4 w-4" />
                     {t('data.backToDataIngestion')}
                   </Link>
                 </Button>
@@ -471,7 +472,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   setRegisterOpen(true);
                 }}
               >
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="me-2 h-4 w-4" />
                 {t('data.registerMetadata')}
               </Button>
             )}
@@ -495,9 +496,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   disabled={exportingDatasetId != null}
                 >
                   {exportingDatasetId != null ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   ) : (
-                    <Download className="mr-2 h-4 w-4" />
+                    <Download className="me-2 h-4 w-4" />
                   )}
                   {t('data.exportById')}
                 </Button>
@@ -525,9 +526,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     disabled={deleteMutation.isPending}
                   >
                     {deleteMutation.isPending ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <Loader2 className="me-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Trash2 className="mr-2 h-4 w-4" />
+                      <Trash2 className="me-2 h-4 w-4" />
                     )}
                     {t('data.deleteById')}
                   </Button>
@@ -565,9 +566,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   <TableHead>{t('data.catalogValidation')}</TableHead>
                   <TableHead>{t('data.catalogRecords')}</TableHead>
                   <TableHead>{t('data.catalogRegistered')}</TableHead>
-                  <TableHead className="w-20 text-right">{t('common.export')}</TableHead>
+                  <TableHead className="w-20 text-end">{t('common.export')}</TableHead>
                   {canDelete && (
-                    <TableHead className="w-20 text-right">{t('common.delete')}</TableHead>
+                    <TableHead className="w-20 text-end">{t('common.delete')}</TableHead>
                   )}
                 </TableRow>
               </TableHeader>
@@ -639,7 +640,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                             })
                           : '—'}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-end">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -660,7 +661,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                         </Button>
                       </TableCell>
                       {canDelete && (
-                        <TableCell className="text-right">
+                        <TableCell className="text-end">
                           <Button
                             variant="ghost"
                             size="sm"
@@ -759,7 +760,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
               ) : previewBaselineError ? (
                 <ChartEmptyState
                   title={t('data.previewUnavailable')}
-                  description={previewBaselineError}
+                  description={localizeDataError(previewBaselineError, t) ?? previewBaselineError}
                 />
               ) : previewPlot ? (
                 <div className="h-[280px]">
@@ -776,7 +777,9 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                 />
               )}
               {previewMonitoringError && (
-                <p className="px-1 text-xs text-fg-muted">{previewMonitoringError}</p>
+                <p className="px-1 text-xs text-fg-muted">
+                  {localizeDataError(previewMonitoringError, t)}
+                </p>
               )}
               {previewDatasetId && (
                 <div className="flex flex-wrap gap-2 px-1">
@@ -785,7 +788,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                     size="sm"
                     onClick={() => void requestExport(previewDatasetId)}
                   >
-                    <Download className="mr-2 h-4 w-4" />
+                    <Download className="me-2 h-4 w-4" />
                     {t('common.export')}
                   </Button>
                   <Button variant="outline" size="sm" asChild>
@@ -793,7 +796,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       href="/dashboard/monitor?view=map"
                       onClick={() => selectWorkspaceDataset(previewDatasetId)}
                     >
-                      <Monitor className="mr-2 h-4 w-4" />
+                      <Monitor className="me-2 h-4 w-4" />
                       {t('data.openInLive')}
                     </Link>
                   </Button>
@@ -802,7 +805,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       href="/dashboard/monitor?view=deterioration"
                       onClick={() => selectWorkspaceDataset(previewDatasetId)}
                     >
-                      <BarChart3 className="mr-2 h-4 w-4" />
+                      <BarChart3 className="me-2 h-4 w-4" />
                       {t('data.openInInsights')}
                     </Link>
                   </Button>
@@ -814,7 +817,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       selectWorkspaceDataset(previewDatasetId);
                     }}
                   >
-                    <BarChart3 className="mr-2 h-4 w-4" />
+                    <BarChart3 className="me-2 h-4 w-4" />
                     {t('data.details')}
                   </Button>
                 </div>
@@ -904,7 +907,7 @@ function DeleteImpactDialog({
 
         <div className="rounded-md border border-danger-border bg-danger-bg p-3 text-sm text-danger-text">
           <div className="font-semibold">{t('data.deletionImpact')}</div>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
+          <ul className="mt-2 list-disc space-y-1 ps-5">
             <li>{t('data.deletionImpactBaseline')}</li>
             <li>{t('data.deletionImpactMonitoring')}</li>
             <li>{t('data.deletionImpactVisualization')}</li>
@@ -925,7 +928,7 @@ function DeleteImpactDialog({
           >
             {isDeleting ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                 {t('data.deleting')}
               </>
             ) : (
@@ -1035,7 +1038,7 @@ function DetailDrawer({
   return (
     <div className="fixed inset-0 z-50 flex items-stretch justify-end bg-scrim" onClick={onClose}>
       <div
-        className="h-full w-full max-w-2xl overflow-y-auto bg-canvas border-l border-border shadow-xl"
+        className="h-full w-full max-w-2xl overflow-y-auto bg-canvas border-s border-border shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-canvas px-6 py-4">
@@ -1048,34 +1051,34 @@ function DetailDrawer({
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard/monitor?view=map" onClick={onOpenLive}>
-                <Monitor className="mr-2 h-4 w-4" />
+                <Monitor className="me-2 h-4 w-4" />
                 {t('data.live')}
               </Link>
             </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/dashboard/monitor?view=deterioration" onClick={onOpenInsights}>
-                <BarChart3 className="mr-2 h-4 w-4" />
+                <BarChart3 className="me-2 h-4 w-4" />
                 {t('common.insights')}
               </Link>
             </Button>
             <Button variant="outline" size="sm" onClick={onExport} disabled={isExporting}>
               {isExporting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="me-2 h-4 w-4 animate-spin" />
               ) : (
-                <Download className="mr-2 h-4 w-4" />
+                <Download className="me-2 h-4 w-4" />
               )}
               {t('common.export')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCompatibilityOpen(true)}>
-              <ShieldQuestion className="mr-2 h-4 w-4" />
+              <ShieldQuestion className="me-2 h-4 w-4" />
               {t('data.checkCompatibility')}
             </Button>
             {onDelete && (
               <Button variant="destructive" size="sm" onClick={onDelete} disabled={isDeleting}>
                 {isDeleting ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <Trash2 className="mr-2 h-4 w-4" />
+                  <Trash2 className="me-2 h-4 w-4" />
                 )}
                 {t('common.delete')}
               </Button>
@@ -1096,7 +1099,7 @@ function DetailDrawer({
               </CardTitle>
               {metadataQuery.data && canUpdateMetadata && (
                 <Button variant="ghost" size="sm" onClick={() => setEditingMetadata(true)}>
-                  <Pencil className="mr-2 h-4 w-4" />
+                  <Pencil className="me-2 h-4 w-4" />
                   {t('common.edit')}
                 </Button>
               )}
@@ -1112,7 +1115,7 @@ function DetailDrawer({
                   <p className="text-sm text-fg-muted">{t('data.noMetadataRegistered')}</p>
                   {onRegisterMetadata && (
                     <Button variant="outline" size="sm" onClick={onRegisterMetadata}>
-                      <Plus className="mr-2 h-4 w-4" />
+                      <Plus className="me-2 h-4 w-4" />
                       {t('data.registerMetadata')}
                     </Button>
                   )}

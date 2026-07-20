@@ -2,7 +2,7 @@
 
 exports[`Alert > renders the danger variant with the right semantic classes 1`] = `
 <div
-  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:pl-7 border-danger-border bg-danger-bg text-danger-text [&>svg]:text-danger-text"
+  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:ps-7 border-danger-border bg-danger-bg text-danger-text [&>svg]:text-danger-text"
   role="alert"
 >
   <h5
@@ -20,7 +20,7 @@ exports[`Alert > renders the danger variant with the right semantic classes 1`] 
 
 exports[`Alert > renders the default variant with the right semantic classes 1`] = `
 <div
-  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:pl-7 border-border bg-surface text-fg [&>svg]:text-fg-muted"
+  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:ps-7 border-border bg-surface text-fg [&>svg]:text-fg-muted"
   role="alert"
 >
   <h5
@@ -38,7 +38,7 @@ exports[`Alert > renders the default variant with the right semantic classes 1`]
 
 exports[`Alert > renders the destructive variant with the right semantic classes 1`] = `
 <div
-  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:pl-7 border-danger-border bg-danger-bg text-danger-text [&>svg]:text-danger-text"
+  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:ps-7 border-danger-border bg-danger-bg text-danger-text [&>svg]:text-danger-text"
   role="alert"
 >
   <h5
@@ -56,7 +56,7 @@ exports[`Alert > renders the destructive variant with the right semantic classes
 
 exports[`Alert > renders the info variant with the right semantic classes 1`] = `
 <div
-  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:pl-7 border-info-border bg-info-bg text-info-text [&>svg]:text-info-text"
+  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:ps-7 border-info-border bg-info-bg text-info-text [&>svg]:text-info-text"
   role="alert"
 >
   <h5
@@ -74,7 +74,7 @@ exports[`Alert > renders the info variant with the right semantic classes 1`] = 
 
 exports[`Alert > renders the success variant with the right semantic classes 1`] = `
 <div
-  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:pl-7 border-success-border bg-success-bg text-success-text [&>svg]:text-success-text"
+  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:ps-7 border-success-border bg-success-bg text-success-text [&>svg]:text-success-text"
   role="alert"
 >
   <h5
@@ -92,7 +92,7 @@ exports[`Alert > renders the success variant with the right semantic classes 1`]
 
 exports[`Alert > renders the warning variant with the right semantic classes 1`] = `
 <div
-  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:pl-7 border-warning-border bg-warning-bg text-warning-text [&>svg]:text-warning-text"
+  class="relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:ps-7 border-warning-border bg-warning-bg text-warning-text [&>svg]:text-warning-text"
   role="alert"
 >
   <h5

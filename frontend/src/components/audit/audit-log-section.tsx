@@ -262,7 +262,7 @@ export function AuditLogSection() {
               disabled={!hasPrev || auditQuery.isFetching}
               onClick={() => setPage((p) => Math.max(0, p - 1))}
             >
-              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              <ChevronLeft className="rtl-mirror h-4 w-4" aria-hidden="true" />
               {t('common.previous')}
             </Button>
             <Button
@@ -272,7 +272,7 @@ export function AuditLogSection() {
               onClick={() => setPage((p) => p + 1)}
             >
               {t('common.next')}
-              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+              <ChevronRight className="rtl-mirror h-4 w-4" aria-hidden="true" />
             </Button>
           </div>
         </nav>

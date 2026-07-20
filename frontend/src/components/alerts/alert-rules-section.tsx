@@ -100,7 +100,7 @@ export function AlertRulesSection() {
         <p className="text-sm text-fg-muted">{t('settings.alertRulesIntro')}</p>
         {canCreate && (
           <Button onClick={() => setCreating(true)} size="sm">
-            <Plus className="mr-2 h-4 w-4" />
+            <Plus className="me-2 h-4 w-4" />
             {t('settings.newRule')}
           </Button>
         )}
@@ -130,7 +130,7 @@ export function AlertRulesSection() {
                 <TableHead>{t('settings.name')}</TableHead>
                 <TableHead>{t('settings.type')}</TableHead>
                 <TableHead>{t('settings.threshold')}</TableHead>
-                <TableHead className="text-right">{t('common.actions')}</TableHead>
+                <TableHead className="text-end">{t('common.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -149,7 +149,7 @@ export function AlertRulesSection() {
                     {formatAlertType(rule.alert_type, t)}
                   </TableCell>
                   <TableCell className="text-sm text-fg-muted">{rule.anomaly_threshold}%</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     <div className="flex justify-end gap-2">
                       {canUpdate && (
                         <Button
@@ -427,7 +427,7 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
             <div className="flex items-center justify-between">
               <Label>{t('settings.severityBands')}</Label>
               <Button size="sm" variant="ghost" onClick={addBand}>
-                <Plus className="mr-1 h-3.5 w-3.5" />
+                <Plus className="me-1 h-3.5 w-3.5" />
                 {t('settings.addBand')}
               </Button>
             </div>
@@ -495,17 +495,17 @@ function RuleEditor({ rule, onClose, onSaved }: RuleEditorProps) {
           <AlertDialogAction disabled={mutation.isPending} onClick={submit}>
             {mutation.isPending ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                 {t('settings.saving')}
               </>
             ) : isEdit ? (
               <>
-                <CheckCircle2 className="mr-2 h-4 w-4" />
+                <CheckCircle2 className="me-2 h-4 w-4" />
                 {t('data.saveChanges')}
               </>
             ) : (
               <>
-                <Plus className="mr-2 h-4 w-4" />
+                <Plus className="me-2 h-4 w-4" />
                 {t('settings.createRule')}
               </>
             )}

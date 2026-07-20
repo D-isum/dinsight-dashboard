@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/config';
+import { ar } from '@/i18n/messages.ar';
 
 export type Messages = typeof en;
 
@@ -130,6 +131,11 @@ const en = {
     noActivity: 'No activity yet',
     noActivityDescription:
       'Uploads, streaming status, saved views, and catalog actions will appear here.',
+    wearTrendReady: 'Wear trend result ready for dataset #{id}',
+    streamingCompleted: 'Streaming completed for dataset #{id}',
+    streamingActive: 'Streaming active for dataset #{id}',
+    streamingPaused: 'Streaming paused for dataset #{id}',
+    pointsStreamed: '{streamed} of {total} points streamed.',
   },
   command: {
     palette: 'Command palette',
@@ -640,6 +646,12 @@ const en = {
       'Start with a healthy reference dataset or use the combined CSV splitter.',
     uploadMonitoringData: 'Upload monitoring data',
     uploadMonitoringDataDescription: 'Attach monitoring data to the selected baseline target.',
+    baselineCoordinatesInvalid: 'The baseline dataset does not contain valid coordinates yet.',
+    monitoringDataUnavailable: 'Monitoring data is not available for this baseline yet.',
+    monitoringDataNotFound:
+      'Monitoring data was not found for this baseline. Upload monitoring data to continue.',
+    unableLoadBaseline: 'Unable to load the baseline dataset.',
+    unableLoadMonitoring: 'Unable to load monitoring data.',
     reviewMetadata: 'Open catalog and review metadata',
     reviewMetadataDescription: 'Catalog metadata unlocks validation, compatibility, and curation.',
     openResultVisualization: 'Open result visualization',
@@ -1733,6 +1745,11 @@ const ja: Messages = {
     noActivity: 'アクティビティはまだありません',
     noActivityDescription:
       'アップロード、ストリーミング状態、保存ビュー、カタログ操作がここに表示されます。',
+    wearTrendReady: 'データセット #{id} の摩耗トレンド結果が準備できました',
+    streamingCompleted: 'データセット #{id} のストリーミングが完了しました',
+    streamingActive: 'データセット #{id} をストリーミング中',
+    streamingPaused: 'データセット #{id} のストリーミングは一時停止中です',
+    pointsStreamed: '{total} 点中 {streamed} 点をストリーミングしました。',
   },
   command: {
     palette: 'コマンドパレット',
@@ -2245,6 +2262,12 @@ const ja: Messages = {
       '正常な参照データセットから開始するか、結合 CSV 分割を使用してください。',
     uploadMonitoringData: '監視データをアップロード',
     uploadMonitoringDataDescription: '監視データを選択したベースライン対象に関連付けます。',
+    baselineCoordinatesInvalid: 'ベースラインデータセットに有効な座標がまだありません。',
+    monitoringDataUnavailable: 'このベースラインの監視データはまだ利用できません。',
+    monitoringDataNotFound:
+      'このベースラインの監視データが見つかりません。続行するには監視データをアップロードしてください。',
+    unableLoadBaseline: 'ベースラインデータセットを読み込めませんでした。',
+    unableLoadMonitoring: '監視データを読み込めませんでした。',
     reviewMetadata: 'カタログを開いてメタデータを確認',
     reviewMetadataDescription: 'カタログメタデータにより、検証、互換性、管理機能が利用できます。',
     openResultVisualization: '結果可視化を開く',
@@ -3205,4 +3228,4 @@ const ja: Messages = {
   },
 };
 
-export const messages: Record<Locale, Messages> = { en, ja };
+export const messages: Record<Locale, Messages> = { en, ja, ar };

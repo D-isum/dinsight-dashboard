@@ -14,7 +14,7 @@ import { cn } from '@/utils/cn';
  * authors don't need to add manual padding.
  */
 const alertVariants = cva(
-  'relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:pl-7',
+  'relative w-full rounded-lg border p-4 text-sm [&>svg]:absolute [&>svg]:start-4 [&>svg]:top-4 [&>svg]:h-4 [&>svg]:w-4 [&>svg~*]:ps-7',
   {
     variants: {
       variant: {

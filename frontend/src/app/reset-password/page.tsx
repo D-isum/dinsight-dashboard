@@ -137,7 +137,7 @@ function ResetPasswordForm() {
                     type={showPassword ? 'text' : 'password'}
                     autoComplete="new-password"
                     className={cn(
-                      'block w-full px-3 py-2 pr-10 border rounded-lg shadow-sm bg-surface text-fg',
+                      'block w-full px-3 py-2 pe-10 border rounded-lg shadow-sm bg-surface text-fg',
                       'focus:outline-none focus:ring-2 focus:ring-focus focus:border-control-border-focus',
                       'transition-colors duration-200',
                       errors.password ? 'border-danger-border text-danger-text' : 'border-strong'
@@ -146,7 +146,7 @@ function ResetPasswordForm() {
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 end-0 pe-3 flex items-center"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
@@ -172,7 +172,7 @@ function ResetPasswordForm() {
                     type={showConfirm ? 'text' : 'password'}
                     autoComplete="new-password"
                     className={cn(
-                      'block w-full px-3 py-2 pr-10 border rounded-lg shadow-sm bg-surface text-fg',
+                      'block w-full px-3 py-2 pe-10 border rounded-lg shadow-sm bg-surface text-fg',
                       'focus:outline-none focus:ring-2 focus:ring-focus focus:border-control-border-focus',
                       'transition-colors duration-200',
                       errors.confirm ? 'border-danger-border text-danger-text' : 'border-strong'
@@ -181,7 +181,7 @@ function ResetPasswordForm() {
                   />
                   <button
                     type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    className="absolute inset-y-0 end-0 pe-3 flex items-center"
                     onClick={() => setShowConfirm(!showConfirm)}
                     aria-label={showConfirm ? t('auth.hidePassword') : t('auth.showPassword')}
                   >
@@ -228,7 +228,7 @@ function ResetPasswordForm() {
             href="/login"
             className="inline-flex items-center gap-1 text-sm font-medium text-accent hover:underline"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="rtl-mirror h-4 w-4" />
             {t('auth.backToSignIn')}
           </Link>
         </div>

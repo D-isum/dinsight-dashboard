@@ -171,7 +171,7 @@ function ActiveAlertsTable({
               <TableHead>{t('settings.alertTitle')}</TableHead>
               <TableHead>{t('settings.status')}</TableHead>
               <TableHead>{t('settings.fired')}</TableHead>
-              <TableHead className="text-right">{t('common.actions')}</TableHead>
+              <TableHead className="text-end">{t('common.actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -193,7 +193,7 @@ function ActiveAlertsTable({
                     timeStyle: 'short',
                   })}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <div className="flex justify-end gap-2">
                     {alert.status === 'active' && canAck && (
                       <Button
@@ -259,7 +259,7 @@ function ActiveAlertsTable({
             >
               {resolveMutation.isPending ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   {t('settings.resolving')}
                 </>
               ) : (

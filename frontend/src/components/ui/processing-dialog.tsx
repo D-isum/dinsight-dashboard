@@ -128,7 +128,7 @@ export function ProcessingDialog({
                   <div className="flex justify-between items-center text-sm text-fg-muted">
                     <span className="flex-1">{statusMessage || 'Processing data...'}</span>
                     {progress !== undefined && progress >= 0 && (
-                      <span className="font-mono text-accent ml-2">{progress}%</span>
+                      <span className="font-mono text-accent ms-2">{progress}%</span>
                     )}
                   </div>
                   {progress === 0 && (

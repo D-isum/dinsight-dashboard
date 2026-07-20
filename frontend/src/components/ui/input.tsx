@@ -61,7 +61,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               // Disabled: token-driven surface, reduced opacity contained
               'disabled:cursor-not-allowed disabled:bg-control-bg-disabled disabled:text-fg-disabled disabled:border-control-border-disabled disabled:placeholder:text-fg-disabled',
               // Loading: leave room for the trailing spinner
-              loading && 'pr-9',
+              loading && 'pe-9',
               // Native file input styling — keep cohesive
               'file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-fg',
               className
@@ -71,7 +71,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           {loading && (
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+              className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2"
             >
               <span className="spinner" />
             </span>

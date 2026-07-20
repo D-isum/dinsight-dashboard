@@ -36,6 +36,7 @@ import { useDatasetDiscovery } from '@/hooks/useDatasetDiscovery';
 import { useDatasetSourceFilter } from '@/hooks/useDatasetSourceFilter';
 import { useUploadWorkflow } from '@/hooks/useUploadWorkflow';
 import { useI18n } from '@/i18n/client';
+import { localizeDataError } from '@/i18n/data-errors';
 import { api } from '@/lib/api-client';
 import {
   CombinedCsvSplitPreview,
@@ -1139,7 +1140,7 @@ export default function DataIngestionPage() {
             <Button onClick={() => void onSaveConfig()} disabled={isSavingConfig}>
               {isSavingConfig ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="me-2 h-4 w-4 animate-spin" />
                   {t('data.saving')}
                 </>
               ) : (
@@ -1234,7 +1235,7 @@ export default function DataIngestionPage() {
           ) : isPreviewLoadingBaseline || isPreviewLoadingMonitoring ? (
             <p className="text-sm text-muted-foreground">{t('data.loadingVisualization')}</p>
           ) : previewBaselineError ? (
-            <p className="text-sm text-danger-text">{previewBaselineError}</p>
+            <p className="text-sm text-danger-text">{localizeDataError(previewBaselineError, t)}</p>
           ) : previewPlot ? (
             <ChartFrame
               title={t('live.coordinateMap')}
@@ -1262,7 +1263,7 @@ export default function DataIngestionPage() {
                   <Button asChild size="sm">
                     <Link href="/dashboard/monitor?view=map">
                       {t('data.openInLive')}
-                      <ArrowRight className="ml-2 h-4 w-4" />
+                      <ArrowRight className="rtl-mirror ms-2 h-4 w-4" />
                     </Link>
                   </Button>
                   <Button asChild variant="outline" size="sm">
@@ -1281,7 +1282,9 @@ export default function DataIngestionPage() {
                 />
               </div>
               {previewMonitoringError && (
-                <p className="text-xs text-muted-foreground">{previewMonitoringError}</p>
+                <p className="text-xs text-muted-foreground">
+                  {localizeDataError(previewMonitoringError, t)}
+                </p>
               )}
             </ChartFrame>
           ) : (
@@ -1328,11 +1331,11 @@ export default function DataIngestionPage() {
 
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => void refetch()}>
-              <RefreshCw className="mr-2 h-4 w-4" />
+              <RefreshCw className="me-2 h-4 w-4" />
               {t('common.refresh')}
             </Button>
             <Button variant="outline" onClick={() => setIsCatalogOpen(true)}>
-              <Database className="mr-2 h-4 w-4" />
+              <Database className="me-2 h-4 w-4" />
               {t('common.catalog')}
             </Button>
           </div>
@@ -1613,9 +1616,9 @@ export default function DataIngestionPage() {
                             }
                           >
                             {isPreviewingSplit ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              <Loader2 className="me-2 h-4 w-4 animate-spin" />
                             ) : (
-                              <Eye className="mr-2 h-4 w-4" />
+                              <Eye className="me-2 h-4 w-4" />
                             )}
                             {t('data.previewSplit')}
                           </Button>
@@ -1628,7 +1631,7 @@ export default function DataIngestionPage() {
                           >
                             {isActiveProcessing ? (
                               <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                                 {t('data.processingCombined')}
                               </>
                             ) : (
@@ -1692,7 +1695,7 @@ export default function DataIngestionPage() {
                           >
                             {state.status === 'uploading' || state.status === 'processing' ? (
                               <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                                 {t('data.processingBaseline')}
                               </>
                             ) : (
@@ -1844,7 +1847,7 @@ export default function DataIngestionPage() {
                             {state.step === 'monitoring' &&
                             (state.status === 'uploading' || state.status === 'processing') ? (
                               <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <Loader2 className="me-2 h-4 w-4 animate-spin" />
                                 {t('data.processingMonitoring')}
                               </>
                             ) : (
@@ -1894,7 +1897,7 @@ export default function DataIngestionPage() {
                       }}
                       variant="outline"
                     >
-                      <Eye className="mr-2 h-4 w-4" />
+                      <Eye className="me-2 h-4 w-4" />
                       {t('data.latest')}
                     </Button>
                     <Button
@@ -1905,7 +1908,7 @@ export default function DataIngestionPage() {
                       }}
                       variant="outline"
                     >
-                      <Database className="mr-2 h-4 w-4" />
+                      <Database className="me-2 h-4 w-4" />
                       {t('data.saved')}
                     </Button>
                   </div>
@@ -1947,7 +1950,7 @@ export default function DataIngestionPage() {
                   ) : inlineBaselineError ? (
                     <EmptyState
                       title={t('data.previewUnavailable')}
-                      description={inlineBaselineError}
+                      description={localizeDataError(inlineBaselineError, t) ?? inlineBaselineError}
                     />
                   ) : inlinePreviewPlot ? (
                     <div className="h-[250px]">
@@ -1965,7 +1968,7 @@ export default function DataIngestionPage() {
                   )}
                   {inlineMonitoringError && (
                     <p className="mt-2 px-2 text-xs text-muted-foreground">
-                      {inlineMonitoringError}
+                      {localizeDataError(inlineMonitoringError, t)}
                     </p>
                   )}
                 </ChartFrame>
@@ -1991,7 +1994,7 @@ export default function DataIngestionPage() {
                     <Button asChild>
                       <Link href="/dashboard/monitor?view=map">
                         {t('data.openLiveMonitor')}
-                        <ArrowRight className="ml-2 h-4 w-4" />
+                        <ArrowRight className="rtl-mirror ms-2 h-4 w-4" />
                       </Link>
                     </Button>
                     <Button variant="outline" onClick={() => void refetch()}>
@@ -2066,7 +2069,7 @@ export default function DataIngestionPage() {
                   />
                 </div>
                 <Button className="w-full justify-start" onClick={() => setIsCatalogOpen(true)}>
-                  <Database className="mr-2 h-4 w-4" />
+                  <Database className="me-2 h-4 w-4" />
                   {t('dashboard.openCatalog')}
                 </Button>
               </CardContent>
@@ -2313,20 +2316,20 @@ function DataNextActions({
         <p className="text-muted-foreground">{action.description}</p>
         {action.command === 'catalog' && (
           <Button variant="outline" className="w-full justify-start" onClick={onOpenCatalog}>
-            <Database className="mr-2 h-4 w-4" />
+            <Database className="me-2 h-4 w-4" />
             {t('dashboard.openCatalog')}
           </Button>
         )}
         {action.command === 'results' && (
           <Button variant="outline" className="w-full justify-start" onClick={onOpenResults}>
-            <BarChart3 className="mr-2 h-4 w-4" />
+            <BarChart3 className="me-2 h-4 w-4" />
             {t('data.openVisualization')}
           </Button>
         )}
         {action.command === 'live' && (
           <Button asChild variant="outline" className="w-full justify-start">
             <Link href="/dashboard/monitor?view=map">
-              <ArrowRight className="mr-2 h-4 w-4" />
+              <ArrowRight className="rtl-mirror me-2 h-4 w-4" />
               {t('data.openLiveMonitor')}
             </Link>
           </Button>
@@ -2376,7 +2379,7 @@ function SideFact({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 border-b border-border pb-2 last:border-0 last:pb-0">
       <span className="shrink-0 text-muted-foreground">{label}</span>
-      <span className="min-w-0 truncate text-right font-semibold text-fg">{value}</span>
+      <span className="min-w-0 truncate text-end font-semibold text-fg">{value}</span>
     </div>
   );
 }
@@ -2402,7 +2405,7 @@ function FileValidationSummary({
     <div className="space-y-3 rounded-md border border-input bg-background/60 p-3 text-xs">
       <div className="flex items-center justify-between gap-3">
         <span className="text-muted-foreground">{t('data.selectedFile')}</span>
-        <span className="min-w-0 max-w-[70%] truncate text-right font-medium text-foreground">
+        <span className="min-w-0 max-w-[70%] truncate text-end font-medium text-foreground">
           {file?.name ?? t('data.selectedFileNone')}
         </span>
       </div>
@@ -2411,7 +2414,7 @@ function FileValidationSummary({
         <div className="space-y-2 border-t border-border pt-3">
           {isValidating ? (
             <p className="flex items-center text-muted-foreground">
-              <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="me-2 h-3.5 w-3.5 animate-spin" />
               {validatingLabel}
             </p>
           ) : (

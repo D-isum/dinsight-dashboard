@@ -255,7 +255,7 @@ function MembersTable({
                     <Badge variant="outline">{formatOrgRole(m.role, t)}</Badge>
                   )}
                   {m.is_last_admin && (
-                    <Badge variant="outline" className="ml-2 gap-1">
+                    <Badge variant="outline" className="ms-2 gap-1">
                       <ShieldAlert className="h-3 w-3" /> {t('settings.lastAdmin')}
                     </Badge>
                   )}
@@ -264,7 +264,7 @@ function MembersTable({
                   {formatDate(m.joined_at, { dateStyle: 'medium', timeStyle: 'short' })}
                 </TableCell>
                 {(canChangeRole || canRemove) && (
-                  <TableCell className="text-right">
+                  <TableCell className="text-end">
                     {canRemove && (
                       <Button
                         variant="ghost"
@@ -353,7 +353,7 @@ function PendingInvitationsTable() {
                 <TableCell className="text-muted-foreground text-sm">
                   {formatDate(inv.expires_at, { dateStyle: 'medium', timeStyle: 'short' })}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-end">
                   <Button
                     variant="ghost"
                     size="sm"

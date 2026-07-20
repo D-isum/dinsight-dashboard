@@ -113,8 +113,8 @@ const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
       aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : undefined}
       className={cn(
         'h-10 px-3 text-xs font-medium uppercase tracking-wide text-fg-muted',
-        align === 'left' && 'text-left',
-        align === 'right' && 'text-right',
+        align === 'left' && 'text-start',
+        align === 'right' && 'text-end',
         align === 'center' && 'text-center',
         sorted && 'text-fg',
         className
@@ -137,8 +137,8 @@ const TableCell = React.forwardRef<HTMLTableCellElement, TableCellProps>(
       ref={ref}
       className={cn(
         'px-3 py-2 align-middle',
-        align === 'left' && 'text-left',
-        align === 'right' && 'text-right tabular-nums',
+        align === 'left' && 'text-start',
+        align === 'right' && 'text-end tabular-nums',
         align === 'center' && 'text-center',
         mono && 'font-mono text-xs tabular-nums',
         className

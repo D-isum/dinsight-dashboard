@@ -204,12 +204,12 @@ export function FileUpload({
                 >
                   {isUploading ? (
                     <>
-                      <Upload className="h-4 w-4 mr-2 animate-spin" />
+                      <Upload className="h-4 w-4 me-2 animate-spin" />
                       Uploading...
                     </>
                   ) : (
                     <>
-                      <Upload className="h-4 w-4 mr-2" />
+                      <Upload className="h-4 w-4 me-2" />
                       {uploadText}
                     </>
                   )}
@@ -227,7 +227,7 @@ export function FileUpload({
                   getStatusColor(uploadedFile.status)
                 )}
               >
-                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className="flex items-center gap-x-3 flex-1 min-w-0">
                   {getStatusIcon(uploadedFile.status)}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{uploadedFile.file.name}</p>
@@ -239,7 +239,7 @@ export function FileUpload({
                     )}
                   </div>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center gap-x-2">
                   <span
                     className={cn(
                       'inline-flex px-2 py-1 text-xs font-medium rounded-full',
