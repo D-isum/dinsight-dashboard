@@ -11,6 +11,7 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog';
+import { useI18n } from '@/i18n/client';
 import { cn } from '@/utils/cn';
 
 export interface ConfigDialogProps {
@@ -30,17 +31,19 @@ export function ConfigDialog({
   children,
   contentClassName,
 }: ConfigDialogProps) {
+  const { t } = useI18n();
+
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent
         className={cn(
-          'sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-canvas border border-strong shadow-md',
+          'min-w-0 sm:max-w-[600px] max-h-[90vh] overflow-y-auto bg-canvas border border-strong shadow-md',
           contentClassName
         )}
       >
         <button
           type="button"
-          aria-label="Close dialog"
+          aria-label={t('common.close')}
           onClick={() => onOpenChange(false)}
           className="absolute end-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-surface-hover hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
@@ -56,9 +59,11 @@ export function ConfigDialog({
             </AlertDialogDescription>
           )}
         </AlertDialogHeader>
-        <div className="mt-6">{children}</div>
+        <div className="mt-6 min-w-0">{children}</div>
         <AlertDialogFooter className="mt-8">
-          <AlertDialogCancel onClick={() => onOpenChange(false)}>Close</AlertDialogCancel>
+          <AlertDialogCancel onClick={() => onOpenChange(false)}>
+            {t('common.close')}
+          </AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

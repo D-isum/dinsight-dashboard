@@ -398,8 +398,8 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
   const catalogColumnCount = canDelete ? 9 : 8;
 
   return (
-    <div className={isModal ? 'space-y-4' : 'space-y-6'}>
-      <Card className="border-border/60">
+    <div className={cn('min-w-0', isModal ? 'space-y-4' : 'space-y-6')}>
+      <Card className="min-w-0 border-border/60">
         {!isModal && (
           <CardHeader>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -432,7 +432,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
             </div>
           </CardHeader>
         )}
-        <CardContent className={cn(isModal && 'p-4')}>
+        <CardContent className={cn('min-w-0', isModal && 'p-4')}>
           <div className="grid gap-3 xl:grid-cols-[minmax(220px,1fr)_auto_auto_auto_auto] xl:items-center">
             <Input
               placeholder={t('data.searchCatalogPlaceholder')}

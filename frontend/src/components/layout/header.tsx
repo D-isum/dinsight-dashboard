@@ -57,14 +57,14 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border bg-surface">
       <CommandPalette open={isCommandOpen} onOpenChange={setIsCommandOpen} />
-      <div className="flex h-16 items-center px-4 sm:px-6">
+      <div className="flex h-16 items-center px-2 sm:px-6">
         {/* Mobile menu button */}
         <Button
           variant="ghost"
           size="icon"
           className={cn(
             'rounded-lg transition-colors hover:bg-surface-hover xl:hidden',
-            isRtl ? 'ml-2' : 'mr-2'
+            isRtl ? 'ml-1 sm:ml-2' : 'mr-1 sm:mr-2'
           )}
           onClick={onMenuClick}
         >
@@ -153,7 +153,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
         <div className="flex-1" />
 
         {/* Right side actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           {/* Mobile search button */}
           <Button
             variant="ghost"
@@ -177,7 +177,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="h-10 px-2 sm:px-3 hover:bg-surface-hover rounded-lg transition-colors"
+                className="h-10 px-1 sm:px-3 hover:bg-surface-hover rounded-lg transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <div className="relative">
@@ -204,7 +204,7 @@ export function Header({ onMenuClick, isSidebarOpen: _isSidebarOpen }: HeaderPro
                       {formatRoleLabel(user?.role, t) || t('header.member')}
                     </span>
                   </div>
-                  <ChevronDown className="h-4 w-4 text-fg-subtle" />
+                  <ChevronDown className="hidden h-4 w-4 text-fg-subtle sm:block" />
                 </div>
               </Button>
             </DropdownMenuTrigger>
