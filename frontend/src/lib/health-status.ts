@@ -1,4 +1,4 @@
-export type MachineHealthState = 'OK' | 'Deteriorating' | 'Failing';
+export type MachineHealthState = 'Unknown' | 'OK' | 'Deteriorating' | 'Failing';
 
 export interface MachineHealthInput {
   anomalyPercentage?: number | null;
@@ -48,6 +48,17 @@ export const deriveMachineHealthStatus = (
     ? input.wearDangerThreshold
     : null;
   const hasAdaptiveWearState = input.wearThresholdState != null;
+
+  if (anomaly == null && wear == null && latestDistance == null && !hasAdaptiveWearState) {
+    return {
+      state: 'Unknown',
+      recommendation:
+        'Add monitoring data and configure a healthy baseline before assessing condition.',
+      reasons: ['No monitoring evidence is available for a condition assessment.'],
+      recommendationKey: 'health.recommendationUnknown',
+      reasonsI18n: [{ key: 'health.reasonUnknown' }],
+    };
+  }
 
   const reasons: string[] = [];
 

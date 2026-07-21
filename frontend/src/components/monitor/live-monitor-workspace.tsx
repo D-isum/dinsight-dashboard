@@ -43,7 +43,7 @@ import { MetadataHoverControls } from '@/components/metadata-hover-controls';
 import { useMetadataHover } from '@/hooks/useMetadataHover';
 import { useBaselineMonitoringData } from '@/hooks/useBaselineMonitoringData';
 import { useMachineHealthStatus } from '@/hooks/useMachineHealthStatus';
-import type { MachineHealthResult } from '@/lib/health-status';
+import type { MachineHealthResult, MachineHealthState } from '@/lib/health-status';
 import { useI18n } from '@/i18n/client';
 import { localizeDataError } from '@/i18n/data-errors';
 import { api } from '@/lib/api-client';
@@ -145,7 +145,8 @@ interface AnomalyDetectionResult {
   anomalous_points: AnomalyPoint[];
 }
 
-const stateTone: Record<'OK' | 'Deteriorating' | 'Failing', string> = {
+const stateTone: Record<MachineHealthState, string> = {
+  Unknown: 'border-border bg-surface-muted text-fg',
   OK: 'border-success-border bg-success-bg text-success-text   ',
   Deteriorating: 'border-warning-border bg-warning-bg text-warning-text   ',
   Failing: 'border-danger-border bg-danger-bg text-danger-text   ',
@@ -671,12 +672,14 @@ export function LiveMonitorWorkspace({
       : status === 'streaming'
         ? t('dashboard.streaming')
         : t('dashboard.notStarted');
-  const healthStateText = (state: 'OK' | 'Deteriorating' | 'Failing') =>
-    state === 'OK'
-      ? t('health.ok')
-      : state === 'Deteriorating'
-        ? t('health.deteriorating')
-        : t('health.failing');
+  const healthStateText = (state: MachineHealthState) =>
+    state === 'Unknown'
+      ? t('health.unknown')
+      : state === 'OK'
+        ? t('health.ok')
+        : state === 'Deteriorating'
+          ? t('health.deteriorating')
+          : t('health.failing');
   const selectionModeLabel = (mode: SelectionMode) =>
     mode === 'rectangle'
       ? t('live.rectangle')

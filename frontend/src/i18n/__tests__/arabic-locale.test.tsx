@@ -47,7 +47,7 @@ describe('Arabic locale catalog', () => {
   it('has exactly the same message keys as English and Japanese', () => {
     const englishKeys = Object.keys(flattenMessages(messages.en)).sort();
 
-    expect(englishKeys).toHaveLength(1431);
+    expect(englishKeys).toHaveLength(1497);
     expect(Object.keys(flattenMessages(messages.ja)).sort()).toEqual(englishKeys);
     expect(Object.keys(flattenMessages(messages.ar)).sort()).toEqual(englishKeys);
   });
@@ -64,7 +64,7 @@ describe('Arabic locale catalog', () => {
   it('uses the reviewed predictive-maintenance terminology', () => {
     expect(messages.ar.nav.liveMonitor).toBe('المراقبة المباشرة');
     expect(messages.ar.nav.healthInsights).toBe('رؤى صحة الأصول');
-    expect(messages.ar.data.title).toBe('إدخال البيانات');
+    expect(messages.ar.data.title).toBe('مساحة عمل البيانات');
     expect(messages.ar.insights.baselineRolling).toBe('المتوسط المتحرك لخط الأساس');
     expect(messages.ar.insights.monitoringRolling).toBe('المتوسط المتحرك للمراقبة');
   });

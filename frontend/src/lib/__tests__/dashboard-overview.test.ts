@@ -137,6 +137,12 @@ describe('dashboard overview helpers', () => {
     expect(state.state).toBe('Failing');
   });
 
+  it('does not report a healthy state without monitoring evidence', () => {
+    const state = deriveDashboardMachineState({ anomalyPercentage: null, wearScore: null });
+
+    expect(state.state).toBe('Unknown');
+  });
+
   it('builds wear trend alert stages', () => {
     const early = buildWearTrendAlerts({
       datasetId: 14,

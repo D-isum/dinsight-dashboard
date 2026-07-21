@@ -21,6 +21,7 @@ export interface ConfigDialogProps {
   description?: string | ReactNode;
   children: ReactNode;
   contentClassName?: string;
+  showFooter?: boolean;
 }
 
 export function ConfigDialog({
@@ -30,6 +31,7 @@ export function ConfigDialog({
   description,
   children,
   contentClassName,
+  showFooter = true,
 }: ConfigDialogProps) {
   const { t } = useI18n();
 
@@ -60,11 +62,13 @@ export function ConfigDialog({
           )}
         </AlertDialogHeader>
         <div className="mt-6 min-w-0">{children}</div>
-        <AlertDialogFooter className="mt-8">
-          <AlertDialogCancel onClick={() => onOpenChange(false)}>
-            {t('common.close')}
-          </AlertDialogCancel>
-        </AlertDialogFooter>
+        {showFooter && (
+          <AlertDialogFooter className="mt-8">
+            <AlertDialogCancel onClick={() => onOpenChange(false)}>
+              {t('common.close')}
+            </AlertDialogCancel>
+          </AlertDialogFooter>
+        )}
       </AlertDialogContent>
     </AlertDialog>
   );

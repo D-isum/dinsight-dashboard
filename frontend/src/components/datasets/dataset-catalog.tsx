@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   BarChart3,
   Calendar,
+  ChevronDown,
   Database,
   Download,
   GitBranch,
@@ -107,6 +108,7 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
     groups: datasetSourceGroups,
     selectedSourceKey,
     selectSource: selectWorkspaceSource,
+    selectedDatasetId: workspaceDatasetId,
     selectDataset: selectWorkspaceDataset,
     filteredDatasetIds,
     isLoadingDatasets,
@@ -357,9 +359,14 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
       previewDatasetId == null ||
       !filtered.some((item) => item.dataset_id === previewDatasetId)
     ) {
-      setPreviewDatasetId(filtered[0].dataset_id);
+      const preferredDatasetId =
+        workspaceDatasetId != null &&
+        filtered.some((item) => item.dataset_id === workspaceDatasetId)
+          ? workspaceDatasetId
+          : filtered[0].dataset_id;
+      setPreviewDatasetId(preferredDatasetId);
     }
-  }, [filtered, isModal, previewDatasetId]);
+  }, [filtered, isModal, previewDatasetId, workspaceDatasetId]);
 
   const {
     baselineData: previewBaselineData,
@@ -477,68 +484,78 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
               </Button>
             )}
           </div>
-          <div className="mt-4 grid gap-3 border-t border-border pt-4 lg:grid-cols-2">
-            <div className="rounded-md border border-border bg-surface-muted/35 p-3">
-              <div className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
+          <details className="group mt-4 border-t border-border pt-3">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-md px-2 py-2 text-sm font-medium text-fg transition-colors hover:bg-surface-muted">
+              <span>{t('data.datasetId')}</span>
+              <span className="flex items-center gap-2 text-xs font-normal text-fg-muted">
                 {t('data.exportDataset')}
-              </div>
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <Input
-                  inputMode="numeric"
-                  placeholder={t('data.datasetId')}
-                  value={exportDatasetId}
-                  onChange={(event) => setExportDatasetId(event.target.value)}
-                  className="w-36"
-                />
-                <Button
-                  variant="outline"
-                  onClick={requestManualExport}
-                  disabled={exportingDatasetId != null}
-                >
-                  {exportingDatasetId != null ? (
-                    <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <Download className="me-2 h-4 w-4" />
-                  )}
-                  {t('data.exportById')}
-                </Button>
-                {exportFeedback && (
-                  <span className="min-w-0 text-sm text-fg-muted">{exportFeedback}</span>
-                )}
-              </div>
-            </div>
-            {canDelete && (
-              <div className="rounded-md border border-danger-border bg-danger-bg/45 p-3">
-                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-danger-text">
-                  {t('data.deleteDataset')}
+                {canDelete ? ` · ${t('data.deleteDataset')}` : ''}
+                <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+              </span>
+            </summary>
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <div className="rounded-md border border-border bg-surface-muted/35 p-3">
+                <div className="mb-2 text-xs font-medium uppercase tracking-wide text-fg-muted">
+                  {t('data.exportDataset')}
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <Input
                     inputMode="numeric"
                     placeholder={t('data.datasetId')}
-                    value={deleteDatasetId}
-                    onChange={(event) => setDeleteDatasetId(event.target.value)}
+                    value={exportDatasetId}
+                    onChange={(event) => setExportDatasetId(event.target.value)}
                     className="w-36"
                   />
                   <Button
-                    variant="destructive"
-                    onClick={requestManualDelete}
-                    disabled={deleteMutation.isPending}
+                    variant="outline"
+                    onClick={requestManualExport}
+                    disabled={exportingDatasetId != null}
                   >
-                    {deleteMutation.isPending ? (
+                    {exportingDatasetId != null ? (
                       <Loader2 className="me-2 h-4 w-4 animate-spin" />
                     ) : (
-                      <Trash2 className="me-2 h-4 w-4" />
+                      <Download className="me-2 h-4 w-4" />
                     )}
-                    {t('data.deleteById')}
+                    {t('data.exportById')}
                   </Button>
-                  {deleteFeedback && (
-                    <span className="min-w-0 text-sm text-fg-muted">{deleteFeedback}</span>
+                  {exportFeedback && (
+                    <span className="min-w-0 text-sm text-fg-muted">{exportFeedback}</span>
                   )}
                 </div>
               </div>
-            )}
-          </div>
+              {canDelete && (
+                <div className="rounded-md border border-danger-border bg-danger-bg/45 p-3">
+                  <div className="mb-2 text-xs font-medium uppercase tracking-wide text-danger-text">
+                    {t('data.deleteDataset')}
+                  </div>
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <Input
+                      inputMode="numeric"
+                      placeholder={t('data.datasetId')}
+                      value={deleteDatasetId}
+                      onChange={(event) => setDeleteDatasetId(event.target.value)}
+                      className="w-36"
+                    />
+                    <Button
+                      variant="destructive"
+                      onClick={requestManualDelete}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? (
+                        <Loader2 className="me-2 h-4 w-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="me-2 h-4 w-4" />
+                      )}
+                      {t('data.deleteById')}
+                    </Button>
+                    {deleteFeedback && (
+                      <span className="min-w-0 text-sm text-fg-muted">{deleteFeedback}</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </details>
         </CardContent>
       </Card>
 
@@ -591,7 +608,12 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                   filtered.map((item) => (
                     <TableRow
                       key={item.id}
-                      className="cursor-pointer hover:bg-surface-muted"
+                      selected={previewDatasetId === item.dataset_id}
+                      aria-selected={previewDatasetId === item.dataset_id}
+                      className={cn(
+                        'cursor-pointer hover:bg-surface-muted',
+                        previewDatasetId === item.dataset_id && 'hover:bg-surface-selected'
+                      )}
                       onClick={() => {
                         setPreviewDatasetId(item.dataset_id);
                         setSelectedDatasetId(item.dataset_id);
@@ -599,8 +621,13 @@ export function DatasetCatalog({ variant = 'page' }: DatasetCatalogProps) {
                       }}
                     >
                       <TableCell className="min-w-0">
-                        <div className="truncate font-medium text-fg" title={item.name}>
-                          {item.name}
+                        <div className="flex min-w-0 items-center gap-2">
+                          <Badge variant="outline" className="shrink-0">
+                            #{item.dataset_id}
+                          </Badge>
+                          <div className="truncate font-medium text-fg" title={item.name}>
+                            {item.name}
+                          </div>
                         </div>
                         {item.description && (
                           <div className="truncate text-xs text-fg-muted" title={item.description}>

@@ -46,6 +46,7 @@ interface StreamingStatus {
   delay_seconds: number;
   is_active: boolean;
   status: 'not_started' | 'streaming' | 'completed';
+  last_data_at?: string;
 }
 
 type DatasetType = 'baseline' | 'monitoring';
@@ -111,8 +112,8 @@ const resolveRefreshMs = (streamSpeed: StreamSpeed | undefined): number => {
 // the `dinsight:u<userId>:` prefix so multiple users on the same browser
 // don't share live-monitor preferences or timeline history.
 const LIVE_MONITOR_PREFS_KEY = 'live-monitor:prefs:v1';
-const DASHBOARD_TIMELINE_HISTORY_KEY = 'dashboard:timeline-history:v1';
-const DASHBOARD_TIMELINE_HISTORY_PREFS_FIELD = 'dashboardTimelineHistory';
+const DASHBOARD_TIMELINE_HISTORY_KEY = 'dashboard:timeline-history:v2';
+const DASHBOARD_TIMELINE_HISTORY_PREFS_FIELD = 'dashboardTimelineHistoryV2';
 
 const sanitizeBoundaries = (values: unknown): Boundary[] => {
   if (!Array.isArray(values)) {
@@ -310,6 +311,7 @@ export function useDashboardOverview() {
   const [isLocalHistoryLoaded, setIsLocalHistoryLoaded] = useState(false);
   const hasHydratedTimelineHistoryRef = useRef(false);
   const historyPersistTimerRef = useRef<number | null>(null);
+  const historyDatasetIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const sync = () => setAppliedWearConfig(readAppliedConfigFromStorage(userId));
@@ -485,10 +487,12 @@ export function useDashboardOverview() {
     configuredWearDatasetId ??
     latestFilteredDatasetId ??
     null;
-  const wearColumn = resolvedWearConfig?.metadataColumn ?? '';
-  const wearClusterValues = resolvedWearConfig?.baselineClusterValues ?? [];
-  const wearRange = resolvedWearConfig?.baselineRange;
-  const includeMonitoring = resolvedWearConfig?.includeMonitoring ?? true;
+  const activeWearConfig =
+    resolvedWearConfig?.datasetId === wearDatasetId ? resolvedWearConfig : null;
+  const wearColumn = activeWearConfig?.metadataColumn ?? '';
+  const wearClusterValues = activeWearConfig?.baselineClusterValues ?? [];
+  const wearRange = activeWearConfig?.baselineRange;
+  const includeMonitoring = activeWearConfig?.includeMonitoring ?? true;
 
   const {
     data: streamingStatus,
@@ -552,7 +556,6 @@ export function useDashboardOverview() {
       }
     },
     staleTime: 5_000,
-    placeholderData: (previous) => previous,
     refetchOnWindowFocus: false,
     refetchInterval: streamingStatus?.is_active ? liveRefreshMs : false,
     retry: false,
@@ -582,6 +585,11 @@ export function useDashboardOverview() {
       }`,
     [activeBoundaries, activeDatasetId, manualModeEnabled]
   );
+
+  useEffect(() => {
+    setLastKnownAnomalyPercentage(null);
+    setFinalizedAnomaly(null);
+  }, [anomalyContextKey]);
 
   const { data: manualAnomaly, refetch: refetchManualAnomaly } = useQuery<{
     anomalyPercentage: number | null;
@@ -657,7 +665,6 @@ export function useDashboardOverview() {
       }
     },
     staleTime: 2_000,
-    placeholderData: (previous) => previous,
     refetchOnWindowFocus: false,
     refetchInterval: streamingStatus?.is_active ? liveRefreshMs : false,
     retry: false,
@@ -723,7 +730,7 @@ export function useDashboardOverview() {
       includeMonitoring,
       JSON.stringify(wearClusterValues),
       wearRange ? `${wearRange.start}:${wearRange.end}` : '',
-      resolvedWearConfig?.appliedAt ?? '',
+      activeWearConfig?.appliedAt ?? '',
     ],
     // The deterioration service rejects requests with an empty cluster
     // selection (no values AND no range) with HTTP 400, since it can't
@@ -733,11 +740,11 @@ export function useDashboardOverview() {
     enabled: Boolean(
       wearDatasetId &&
       wearColumn &&
-      resolvedWearConfig &&
+      activeWearConfig &&
       (wearClusterValues.length > 0 || (wearRange?.start && wearRange?.end))
     ),
     queryFn: async () => {
-      if (!wearDatasetId || !wearColumn || !resolvedWearConfig) {
+      if (!wearDatasetId || !wearColumn || !activeWearConfig) {
         return null;
       }
 
@@ -929,6 +936,9 @@ export function useDashboardOverview() {
   const liveAnomalyPercentage = manualModeEnabled
     ? (manualAnomaly?.anomalyPercentage ?? null)
     : (realtimeAnomaly?.anomalyPercentage ?? null);
+  const activeAnomalyTotal = manualModeEnabled
+    ? (manualAnomaly?.totalPoints ?? 0)
+    : (realtimeAnomaly?.totalPoints ?? 0);
 
   useEffect(() => {
     if (liveAnomalyPercentage != null) {
@@ -937,23 +947,27 @@ export function useDashboardOverview() {
   }, [liveAnomalyPercentage]);
 
   const latestAnomalyPercentage =
-    streamingStatus?.status === 'completed'
-      ? finalizedAnomaly?.contextKey === anomalyContextKey
-        ? finalizedAnomaly.percentage
-        : liveAnomalyPercentage
-      : (liveAnomalyPercentage ?? lastKnownAnomalyPercentage);
+    activeAnomalyTotal <= 0
+      ? null
+      : streamingStatus?.status === 'completed'
+        ? finalizedAnomaly?.contextKey === anomalyContextKey
+          ? finalizedAnomaly.percentage
+          : liveAnomalyPercentage
+        : (liveAnomalyPercentage ?? lastKnownAnomalyPercentage);
+  const wearScoreWithMonitoring =
+    (wearSnapshot?.monitoringDistance.sampleCount ?? 0) > 0 ? (wearSnapshot?.score ?? null) : null;
 
   const machineStatus = useMemo(
     () =>
       deriveDashboardMachineState({
         anomalyPercentage: latestAnomalyPercentage,
-        wearScore: wearSnapshot?.score ?? null,
+        wearScore: wearScoreWithMonitoring,
         wearThresholdState: wearThresholdSnapshot.state,
         wearLatestDistance: wearThresholdSnapshot.latest,
         wearWarningThreshold: wearThresholdSnapshot.warningThreshold,
         wearDangerThreshold: wearThresholdSnapshot.dangerThreshold,
       }),
-    [latestAnomalyPercentage, wearSnapshot?.score, wearThresholdSnapshot]
+    [latestAnomalyPercentage, wearScoreWithMonitoring, wearThresholdSnapshot]
   );
 
   useEffect(() => {
@@ -963,11 +977,11 @@ export function useDashboardOverview() {
       appendHistoryPoint(prev, {
         timestamp: now,
         anomalyPercentage: latestAnomalyPercentage,
-        wearScore: wearSnapshot?.score ?? null,
+        wearScore: wearScoreWithMonitoring,
         throughputPerMinute: null,
       })
     );
-  }, [latestAnomalyPercentage, streamingStatus?.streamed_points, wearSnapshot?.score]);
+  }, [latestAnomalyPercentage, streamingStatus?.streamed_points, wearScoreWithMonitoring]);
 
   const wearDirection = useMemo(() => {
     if (history.length < 2) {
@@ -1011,11 +1025,32 @@ export function useDashboardOverview() {
       localHistoryStore,
       serverHistoryStore ?? null
     );
-    if (resolvedHistoryStore?.points?.length) {
+    if (
+      resolvedHistoryStore?.points?.length &&
+      resolvedHistoryStore.selectedDatasetId === activeDatasetId
+    ) {
       setHistory(resolvedHistoryStore.points);
     }
+    historyDatasetIdRef.current = activeDatasetId;
     hasHydratedTimelineHistoryRef.current = true;
-  }, [hasFetchedServerHistoryStore, isLocalHistoryLoaded, localHistoryStore, serverHistoryStore]);
+  }, [
+    activeDatasetId,
+    hasFetchedServerHistoryStore,
+    isLocalHistoryLoaded,
+    localHistoryStore,
+    serverHistoryStore,
+  ]);
+
+  useEffect(() => {
+    if (!hasHydratedTimelineHistoryRef.current) {
+      return;
+    }
+    if (historyDatasetIdRef.current === activeDatasetId) {
+      return;
+    }
+    historyDatasetIdRef.current = activeDatasetId;
+    setHistory([]);
+  }, [activeDatasetId]);
 
   const persistTimelineHistoryToServer = useCallback(
     async (points: DashboardHistoryPoint[], selectedDatasetId: number | null) => {
@@ -1077,6 +1112,7 @@ export function useDashboardOverview() {
     alerts,
     alertSummary,
     wearSnapshot,
+    wearThresholds: wearThresholdSnapshot,
     wearDirection,
     machineStatus,
     history,
@@ -1085,7 +1121,7 @@ export function useDashboardOverview() {
     anomalySource: manualModeEnabled ? 'manual-boundary' : 'model-detection',
     wearColumn: wearSnapshot?.metadataColumn ?? wearColumn,
     liveRefreshMs,
-    appliedWearConfig: resolvedWearConfig,
+    appliedWearConfig: activeWearConfig,
     isLoading: isLoadingDatasets || isLoadingStreaming || isLoadingRealtimeAnomaly || isLoadingWear,
     isRefreshingWear: isFetchingWear,
     wearError: wearError ? (wearError as Error).message : null,

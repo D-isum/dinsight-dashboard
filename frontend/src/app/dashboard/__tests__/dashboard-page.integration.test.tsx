@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 import DashboardPage from '@/app/dashboard/page';
 import { I18nProvider } from '@/i18n/client';
 
+vi.mock('@/components/charts/echarts-canvas', () => ({
+  EChartsCanvas: () => <div data-testid="overview-condition-trend" />,
+}));
+
 vi.mock('@/context/dashboard-workspace-context', () => ({
   useDashboardWorkspace: () => ({
     selectedDatasetId: 14,
@@ -96,6 +100,13 @@ vi.mock('@/hooks/useDashboardOverview', () => ({
       monitoringDistance: { mean: 0.5, latest: 0.5, max: 0.5, sampleCount: 1 },
       datasetId: 14,
     },
+    wearThresholds: {
+      baselineMean: 0.2,
+      warningThreshold: 0.4,
+      dangerThreshold: 0.6,
+      latest: 0.5,
+      state: 'warning',
+    },
     wearDirection: 'up',
     machineStatus: {
       state: 'Deteriorating',
@@ -141,16 +152,16 @@ describe('Dashboard page integration', () => {
       </I18nProvider>
     );
 
-    expect(screen.getByText('Machine status')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Operations overview' })).toBeInTheDocument();
+    expect(screen.getByText('Condition assessment')).toBeInTheDocument();
     expect(screen.getAllByText('Deteriorating').length).toBeGreaterThan(0);
-    expect(screen.getByText('Next steps')).toBeInTheDocument();
-    expect(screen.getByText('Dataset queue')).toBeInTheDocument();
-    expect(screen.getByText('Checks')).toBeInTheDocument();
-    expect(screen.getByText('Live signal')).toBeInTheDocument();
-    expect(screen.getByText('Recent activity')).toBeInTheDocument();
-    expect(screen.getByText('Stream settings')).toBeInTheDocument();
-    expect(screen.getAllByRole('link', { name: /Live stream/i }).length).toBeGreaterThan(0);
-    expect(screen.getAllByRole('link', { name: /Open insights/i }).length).toBeGreaterThan(0);
+    expect(screen.getByText('Recommended action')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Current alerts' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Condition trend' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Recent assets and analyses' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Monitoring readiness' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Workspace activity' })).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: /View asset monitor/i }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole('link', { name: /Open catalog/i }).length).toBeGreaterThan(0);
   });
 });

@@ -2,6 +2,13 @@ import { describe, expect, it } from 'vitest';
 import { deriveMachineHealthStatus } from '@/lib/health-status';
 
 describe('deriveMachineHealthStatus', () => {
+  it('returns Unknown when no monitoring evidence is available', () => {
+    const result = deriveMachineHealthStatus({});
+
+    expect(result.state).toBe('Unknown');
+    expect(result.recommendationKey).toBe('health.recommendationUnknown');
+  });
+
   it('returns OK when inputs are below thresholds', () => {
     const result = deriveMachineHealthStatus({ anomalyPercentage: 2, wearTrendScore: 0.2 });
     expect(result.state).toBe('OK');

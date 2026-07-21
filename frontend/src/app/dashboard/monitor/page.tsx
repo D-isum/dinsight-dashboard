@@ -40,12 +40,14 @@ const isAssetMonitorView = (value: string | null): value is AssetMonitorView =>
   value === 'compare' || value === 'map' || value === 'deterioration';
 
 const stateAccent = {
+  Unknown: 'border-s-border-strong',
   OK: 'border-s-success-text',
   Deteriorating: 'border-s-warning-text',
   Failing: 'border-s-danger-text',
 } as const;
 
 const stateBadge = {
+  Unknown: 'neutral',
   OK: 'success',
   Deteriorating: 'warning',
   Failing: 'danger',
@@ -157,11 +159,13 @@ export default function AssetMonitorPage() {
   }, [changeView]);
 
   const healthStateLabel =
-    machineStatus.state === 'OK'
-      ? t('health.ok')
-      : machineStatus.state === 'Deteriorating'
-        ? t('health.deteriorating')
-        : t('health.failing');
+    machineStatus.state === 'Unknown'
+      ? t('health.unknown')
+      : machineStatus.state === 'OK'
+        ? t('health.ok')
+        : machineStatus.state === 'Deteriorating'
+          ? t('health.deteriorating')
+          : t('health.failing');
   const recommendation = t(machineStatus.recommendationKey);
   const reasons = useMemo(
     () =>
